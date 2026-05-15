@@ -1,8 +1,8 @@
-import { api } from '../core/api/client';
+import { api } from '../../core/api/client';
 import { authService } from '../auth.service';
 import { Platform } from 'react-native';
 
-jest.mock('../core/api/client', () => ({
+jest.mock('../../core/api/client', () => ({
   api: {
     post: jest.fn(),
   },
