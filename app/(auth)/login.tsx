@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   title: {
-    fontFamily: 'Manrope_700Bold',
+    fontFamily: 'Manrope_800ExtraBold',
     fontSize: 32,
     color: Tokens.colors.text,
     marginBottom: 8,
