@@ -55,7 +55,8 @@ const styles = StyleSheet.create({
   button: {
     backgroundColor: Tokens.colors.primary,
     borderRadius: Tokens.radius.lg,
-    padding: 18,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
     ...Platform.select({
