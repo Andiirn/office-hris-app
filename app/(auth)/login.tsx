@@ -1,21 +1,22 @@
-import React from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  Alert, 
-  KeyboardAvoidingView, 
-  Platform, 
-  ScrollView 
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
 import { useMutation } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
+import React from 'react';
+import { Controller, useForm } from 'react-hook-form';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View
+} from 'react-native';
+import * as z from 'zod';
 
-import { Input } from '../../src/components/ui/Input';
 import { Button } from '../../src/components/ui/Button';
+import { Input } from '../../src/components/ui/Input';
+import { tokenStore } from '../../src/core/auth/token-store';
 import { Tokens } from '../../src/core/theme/tokens';
 import { authService } from '../../src/services/auth.service';
 import { useAuthStore } from '../../src/stores/auth.store';
@@ -44,10 +45,36 @@ export default function LoginScreen() {
   });
 
   const mutation = useMutation({
-    mutationFn: (values: LoginFormValues) => 
+    mutationFn: (values: LoginFormValues) =>
       authService.login(values.nik, values.password),
     onSuccess: async (data) => {
-      await setAuth(data.user, data.access_token, data.refresh_token);
+      console.log('[Login] Success, checking for user data...');
+
+      const { access_token, refresh_token } = data;
+
+      // Save tokens first so they can be used by the API interceptor for getProfile
+      await tokenStore.setTokens(access_token, refresh_token);
+
+      let userData = data.user;
+
+      // If backend doesn't return user data on login, fetch it from /profile
+      if (!userData) {
+        try {
+          console.log('[Login] No user data in login response, fetching profile...');
+          const profile = await authService.getProfile();
+          userData = {
+            id: profile.id,
+            nik: profile.nik,
+            full_name: profile.full_name
+          };
+        } catch (err) {
+          console.error('[Login] Failed to fetch profile after login:', err);
+          Alert.alert('Error', 'Failed to retrieve user profile');
+          return;
+        }
+      }
+
+      await setAuth(userData, access_token, refresh_token);
       router.replace('/(tabs)');
     },
     onError: (error: any) => {
@@ -65,13 +92,13 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.header}>
-          <Text style={styles.title}>Welcome Back</Text>
-          <Text style={styles.subtitle}>Sign in to your account to continue</Text>
+          <Text className='font-manrope-bold text-3xl text-black mb-2'>Welcome Back</Text>
+          <Text className='font-inter-regular text-sm text-text-muted'>Sign in to your account to continue</Text>
         </View>
 
         <View style={styles.form}>

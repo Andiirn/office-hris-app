@@ -1,7 +1,7 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, Platform } from 'react-native';
 import { Tokens } from '../../src/core/theme/tokens';
 
 export default function TabLayout() {
@@ -31,16 +31,28 @@ const styles = StyleSheet.create({
     height: 84,
     borderTopWidth: 0,
     elevation: 0,
-    borderRadius: 20,
+    borderRadius: 24,
     marginHorizontal: 14,
-    marginBottom: 10,
+    marginBottom: Platform.OS === 'ios' ? 24 : 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.9)',
     overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
+      },
+      android: {
+        elevation: 10,
+      }
+    })
   },
   tabBarBackground: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.82)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.9)',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
   },
   label: {
     fontFamily: 'Inter_500Medium',

@@ -1,8 +1,11 @@
 // app/_layout.tsx
+import './../src/core/theme/global.css';
 import { Stack } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React, { useEffect } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { cssInterop } from 'nativewind';
 import { 
   useFonts, 
   Manrope_800ExtraBold, 
@@ -12,6 +15,11 @@ import {
   Inter_400Regular, 
   Inter_700Bold 
 } from '@expo-google-fonts/inter';
+
+// Interop for components that don't support className by default
+cssInterop(SafeAreaView, {
+  className: 'style',
+});
 
 SplashScreen.preventAutoHideAsync();
 

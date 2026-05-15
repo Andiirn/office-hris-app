@@ -5,7 +5,7 @@ import { Tokens } from '../../core/theme/tokens';
 
 export const GlassCard = ({ children, style }) => (
   <View style={[styles.container, style]}>
-    <BlurView intensity={20} style={styles.blur} tint="light">
+    <BlurView intensity={30} style={styles.blur} tint="light">
       <View style={styles.content}>{children}</View>
     </BlurView>
   </View>
@@ -16,10 +16,11 @@ const styles = StyleSheet.create({
     borderRadius: Tokens.radius.lg,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: Tokens.colors.white20,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   blur: {
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    width: '100%',
   },
   content: {
     padding: 16,

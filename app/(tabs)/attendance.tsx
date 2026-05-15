@@ -95,8 +95,8 @@ export default function AttendanceScreen() {
     setCheckinMessage(null);
     setErrorMessage(null);
     try {
-      const hasCheckin = !!todayRecord?.checkin_at;
-      const hasCheckout = !!todayRecord?.checkout_at;
+      const hasCheckin = !!todayRecord?.checkin_time;
+      const hasCheckout = !!todayRecord?.checkout_time;
 
       if (hasCheckin && hasCheckout) {
         setErrorMessage('Anda sudah check-in dan check-out hari ini.');
@@ -142,23 +142,22 @@ export default function AttendanceScreen() {
   }, [coords, height, parseQrPayload, todayRecord, width]);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.title}>Attendance Scanner</Text>
+    <SafeAreaView className="flex-1 bg-background">
+      <View className="flex-1 px-5 items-center justify-center gap-3">
+        <Text className="font-manrope-bold text-2xl text-on-surface">Attendance Scanner</Text>
         {status === 'loading' && <ActivityIndicator size="large" color={Tokens.colors.primary} />}
         {status === 'denied' && (
-          <>
-            <Text style={styles.errorText}>{errorMessage}</Text>
-            <Button title="Buka Pengaturan" onPress={() => Linking.openSettings()} />
-            <View style={styles.spacer} />
-            <Button title="Coba Lagi" onPress={requestLocationPermission} />
-          </>
+          <View className="items-center gap-4">
+            <Text className="font-inter text-sm text-error text-center">{errorMessage}</Text>
+            <Button title="Buka Pengaturan" onPress={() => Linking.openSettings()} className="w-full" />
+            <Button title="Coba Lagi" onPress={requestLocationPermission} className="w-full bg-white border border-primary" textStyle={{ color: Tokens.colors.primary }} />
+          </View>
         )}
         {status === 'granted' && cameraStatus === 'granted' && (
-          <>
-            <View style={styles.scannerWrap}>
+          <View className="items-center w-full gap-5">
+            <View className="w-full max-w-[340px] aspect-square rounded-2xl overflow-hidden border-2 border-primary/20">
               <CameraView
-                style={styles.scanner}
+                style={{ flex: 1 }}
                 barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
                 onBarcodeScanned={scanned ? undefined : ({ data }) => {
                   setScanned(true);
@@ -166,23 +165,24 @@ export default function AttendanceScreen() {
                 }}
               />
             </View>
-            {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
-            {checkinMessage ? <Text style={styles.successText}>{checkinMessage}</Text> : null}
-            {scanned ? <Button title="Scan Ulang" loading={submitting} onPress={() => { setScanned(false); setErrorMessage(null); setCheckinMessage(null); }} /> : null}
-          </>
+            {errorMessage ? <Text className="font-inter text-sm text-error text-center">{errorMessage}</Text> : null}
+            {checkinMessage ? <Text className="font-inter text-sm text-on-secondary-container text-center bg-secondary-container px-4 py-2 rounded-lg">{checkinMessage}</Text> : null}
+            {scanned ? (
+              <Button 
+                title="Scan Ulang" 
+                loading={submitting} 
+                onPress={() => { setScanned(false); setErrorMessage(null); setCheckinMessage(null); }} 
+                className="w-full"
+              />
+            ) : (
+              <Text className="font-inter text-xs text-text-muted italic">Scan QR code untuk Check In/Out</Text>
+            )}
+          </View>
         )}
       </View>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Tokens.colors.background },
-  content: { flex: 1, padding: 20, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  title: { fontFamily: 'Manrope_700Bold', fontSize: 24, color: Tokens.colors.text },
-  scannerWrap: { width: '100%', maxWidth: 340, aspectRatio: 1, borderRadius: 16, overflow: 'hidden' },
-  scanner: { flex: 1 },
-  errorText: { fontFamily: 'Inter_400Regular', fontSize: 14, color: Tokens.colors.error, textAlign: 'center' },
-  successText: { fontFamily: 'Inter_400Regular', fontSize: 14, color: '#1f6b42', textAlign: 'center' },
-  spacer: { height: 4 },
-});
+// StyleSheet removed!
+

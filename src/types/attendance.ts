@@ -21,3 +21,24 @@ export interface AttendanceActionResponse {
   message?: string;
   status?: string;
 }
+
+export interface AttendanceItem {
+  id: string;
+  employee_id?: string;
+  checkin_time?: string | null;
+  checkout_time?: string | null;
+  status?: string;
+  date?: string;
+  // API response alias fields
+  attendance_date?: string;
+  checkin_at?: string | null;
+  checkout_at?: string | null;
+}
+
+export interface AttendanceListQuery {
+  employee_id?: string;
+  date_from?: string;
+  date_to?: string;
+  page?: number;
+  limit?: number;
+}

@@ -8,6 +8,10 @@
 - **Rule:** Do NOT modify the backend. Only implement the frontend consuming the provided API contract.
 - **Rule:** When the user asks to implement a feature, always check this document for the "Why" and "How" (API Contracts) to understand the context.
 
+## 0.1 Current Status & Immediate Focus
+- **Status Saat Ini:** Fitur **Authentication (Login/Token Store)** dan **Attendance (Check-in via QR & Check-out via GPS)** sudah benar-benar berfungsi (**Works**). Modifikasi pada logika inti fitur ini harus dihindari kecuali diperlukan untuk perbaikan bug.
+- **Fokus Utama (Immediate Focus):** Mengaktifkan semua tombol navigasi/fitur yang ada di **Home Tab** agar berfungsi sepenuhnya (**Leave, Overtime, Payroll, History**). Pastikan setiap tombol mengarah ke screen yang benar dan memiliki fungsionalitas dasar sesuai kontrak API.
+
 ## 1. Architectural Patterns
 - **API Services:** Domain-Based Services (e.g., `src/lib/api/attendance.service.ts`). Use Axios instance with interceptors for auth.
 - **Component Structure:** Feature-Driven Design.
@@ -29,7 +33,7 @@ Berikut adalah hasil analisa menyeluruh dari fitur-fitur Employee View beserta k
   - `PATCH /api/v1/profile/password`: Memperbarui kata sandi pengguna.
   - `POST /api/v1/profile/avatar`: Mengunggah foto profil baru.
 
-### 2.2 Dashboard
+### 2.2 Home Tab
 - **Why:** Memberikan ringkasan cepat tentang jadwal hari ini, status kehadiran, sisa cuti, dan aksi cepat.
 - **How (API Contracts):**
   - Menggabungkan data dari `GET /api/v1/profile`.
@@ -94,5 +98,5 @@ Berikut adalah hasil analisa menyeluruh dari fitur-fitur Employee View beserta k
 
 ## Rules
 - fitur attendance checkin dan check out saat ini sudah benar2 berfungsi, tidak perlu di modifikasi. dan juga tidak perlu menambahkan test.
-- Hanya kerjakan apa yang di suruh, daan belum exist di current project. dan juga kalau ada file yang tidak bersangkutan dengan fitur yang di suruh, jangan di modifikasi.
-
+- Hanya kerjakan apa yang di suruh, dan belum exist di current project. dan juga kalau ada file yang tidak bersangkutan dengan fitur yang di suruh, jangan di modifikasi.
+- Kalo misal butuh refernsi fetch api, kamu bisa akses folder diluar ini `HRIF-fe` disitu sebenrnya semua fitur utk employee sudah di implemntasikan, hanya sja saya mau ubah total konsepnya khusus role employee akan menggunakan aplikasi ini

@@ -2,8 +2,11 @@
 import axios from 'axios';
 import { tokenStore } from '../auth/token-store';
 
+const rawBaseURL = process.env.EXPO_PUBLIC_API_URL || '';
+const baseURL = `${rawBaseURL.replace(/\/$/, '')}/api/v1`;
+
 export const api = axios.create({
-  baseURL: process.env.EXPO_PUBLIC_API_URL,
+  baseURL,
   headers: { 'Content-Type': 'application/json' },
 });
 

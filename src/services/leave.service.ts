@@ -1,26 +1,54 @@
 import { api } from '../core/api/client';
 import { unwrapData } from '../core/api/envelope';
-
-type LeaveBalanceItem = {
-  remaining_days?: number;
-};
+import { CreateLeaveRequest, LeaveBalance, LeaveHistoryQuery, LeaveRequest, LeaveType } from '../types/leave';
 
 export const leaveService = {
-  async getBalances(employeeId: string, year: number): Promise<LeaveBalanceItem[]> {
+  async getBalances(employeeId: string, year: number): Promise<LeaveBalance[]> {
     const response = await api.get(`/leave/balances/${employeeId}`, {
       params: { year },
     });
     const raw = unwrapData<any>(response.data);
 
-    if (Array.isArray(raw)) return raw as LeaveBalanceItem[];
-    if (Array.isArray(raw?.items)) return raw.items as LeaveBalanceItem[];
-    if (Array.isArray(raw?.balances)) return raw.balances as LeaveBalanceItem[];
+    if (Array.isArray(raw)) return raw as LeaveBalance[];
+    if (Array.isArray(raw?.items)) return raw.items as LeaveBalance[];
+    if (Array.isArray(raw?.balances)) return raw.balances as LeaveBalance[];
     if (raw && typeof raw === 'object') {
-      // Some backends return map keyed by leave_type_id.
       const values = Object.values(raw).filter((v) => v && typeof v === 'object');
-      if (values.length > 0) return values as LeaveBalanceItem[];
+      if (values.length > 0) return values as LeaveBalance[];
     }
 
+    return [];
+  },
+
+  async getRequests(query: LeaveHistoryQuery): Promise<LeaveRequest[]> {
+    const response = await api.get('/leave/requests', {
+      params: query,
+    });
+    const data = unwrapData<any>(response.data);
+    
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.items)) return data.items;
+    if (data && Array.isArray(data.data)) return data.data;
+    
+    return [];
+  },
+
+  async createRequest(payload: CreateLeaveRequest): Promise<LeaveRequest> {
+    const response = await api.post('/leave/requests', payload);
+    return unwrapData<LeaveRequest>(response.data);
+  },
+
+  async cancelRequest(requestId: string): Promise<void> {
+    await api.post(`/leave/requests/${requestId}/cancel`);
+  },
+
+  async getTypes(): Promise<LeaveType[]> {
+    const response = await api.get('/leave/types');
+    const data = unwrapData<any>(response.data);
+
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.items)) return data.items;
+    
     return [];
   },
 };

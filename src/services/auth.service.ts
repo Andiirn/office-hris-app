@@ -13,14 +13,21 @@ export const authService = {
       device_os: Platform.OS,
     };
 
-    console.log('[AuthService] Login Request:', payload);
-
     try {
       const response = await api.post('/auth/login', payload);
-      console.log('[AuthService] Login Response:', response.data);
       return unwrapData<LoginResponse>(response.data);
     } catch (error: any) {
-      console.error('[AuthService] Login Error:', error.response?.data || error.message);
+      console.warn('[AuthService] Login failed:', error.response?.data?.message || error.message);
+      throw error;
+    }
+  },
+
+  async getProfile(): Promise<any> {
+    try {
+      const response = await api.get('/profile');
+      return unwrapData<any>(response.data);
+    } catch (error: any) {
+      console.warn('[AuthService] Get Profile failed:', error.response?.data?.message || error.message);
       throw error;
     }
   },
