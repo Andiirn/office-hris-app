@@ -1,61 +1,50 @@
-import React from 'react';
 import { Tabs } from 'expo-router';
 import { BlurView } from 'expo-blur';
-import { Home, Scan, Bell, User } from 'lucide-react-native';
-import { StyleSheet, Platform } from 'react-native';
+import { Home, Calendar, User, Settings } from 'lucide-react-native';
 import { Tokens } from '../../src/core/theme/tokens';
+import React from 'react';
+import { StyleSheet } from 'react-native';
 
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerShown: false,
+        tabBarStyle: styles.tabBar,
+        tabBarBackground: () => (
+          <BlurView intensity={80} style={styles.blur} tint="light" />
+        ),
         tabBarActiveTintColor: Tokens.colors.primary,
         tabBarInactiveTintColor: Tokens.colors.outline,
-        tabBarStyle: styles.tabBar,
-        tabBarLabelStyle: {
-          fontFamily: 'Inter_700Bold',
-          fontSize: 10,
-        },
-        tabBarBackground: () => (
-          <BlurView
-            intensity={80}
-            tint="light"
-            style={[
-              StyleSheet.absoluteFill,
-              {
-                backgroundColor: 'rgba(255, 255, 255, 0.7)',
-              },
-            ]}
-          />
-        ),
-      }}>
+        tabBarLabelStyle: styles.label,
+        headerShown: false,
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color, size }) => <Home size={size} color={color} />,
+          tabBarIcon: ({ color }) => <Home color={color} size={24} />,
         }}
       />
       <Tabs.Screen
-        name="attendance"
+        name="calendar"
         options={{
-          title: 'Attendance',
-          tabBarIcon: ({ color, size }) => <Scan size={size} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="notifications"
-        options={{
-          title: 'Inbox',
-          tabBarIcon: ({ color, size }) => <Bell size={size} color={color} />,
+          title: 'Calendar',
+          tabBarIcon: ({ color }) => <Calendar color={color} size={24} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
           title: 'Profile',
-          tabBarIcon: ({ color, size }) => <User size={size} color={color} />,
+          tabBarIcon: ({ color }) => <User color={color} size={24} />,
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: 'Settings',
+          tabBarIcon: ({ color }) => <Settings color={color} size={24} />,
         }}
       />
     </Tabs>
@@ -68,13 +57,17 @@ const styles = StyleSheet.create({
     borderTopWidth: 0,
     elevation: 0,
     height: 80,
-    ...Platform.select({
-      ios: {
-        backgroundColor: 'transparent',
-      },
-      android: {
-        backgroundColor: 'rgba(255, 255, 255, 0.7)',
-      },
-    }),
+    borderTopLeftRadius: Tokens.radius.xl,
+    borderTopRightRadius: Tokens.radius.xl,
+    overflow: 'hidden',
+  },
+  blur: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: Tokens.colors.white80,
+  },
+  label: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 10,
+    marginBottom: 8,
   },
 });
