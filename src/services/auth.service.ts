@@ -12,7 +12,7 @@ export const authService = {
       device_name: 'Expo App Local',
       device_os: Platform.OS,
     };
-    
+
     console.log('[AuthService] Login Request:', payload);
 
     try {
