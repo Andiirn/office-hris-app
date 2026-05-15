@@ -5,16 +5,37 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { router } from 'expo-router';
 import { Tokens } from '../../src/core/theme/tokens';
 import { useAuthStore } from '../../src/stores/auth.store';
+import { leaveService } from '../../src/services/leave.service';
 
 export default function HomeScreen() {
   const { user } = useAuthStore();
   const name = user?.full_name || 'Employee';
   const [now, setNow] = React.useState(new Date());
+  const [leaveText, setLeaveText] = React.useState('Sisa: - Hari');
 
   React.useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  React.useEffect(() => {
+    const loadLeave = async () => {
+      if (!user?.id) return;
+      try {
+        const year = new Date().getFullYear();
+        const balances = await leaveService.getBalances(user.id, year);
+        console.log('[HomeLeave] balances', balances);
+        const totalRemaining = balances.reduce((acc, item) => acc + (item.remaining_days ?? 0), 0);
+        setLeaveText(`Sisa: ${totalRemaining} Hari`);
+      } catch {
+        setLeaveText('Sisa: - Hari');
+      }
+    };
+
+    loadLeave();
+    const timer = setInterval(loadLeave, 30_000);
+    return () => clearInterval(timer);
+  }, [user?.id]);
 
   const timeText = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const dateText = now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
@@ -43,18 +64,18 @@ export default function HomeScreen() {
 
         <View style={styles.grid}>
           {[
-            ['event-available', 'Leave (Cuti)', 'Sisa: 12 Hari'],
-            ['work-history', 'Overtime', 'Request/history'],
-            ['payments', 'Payroll', 'Preview Payslip'],
-            ['list-alt', 'History', 'Attendance log'],
-          ].map(([icon, title, subtitle]) => (
-            <View key={title} style={styles.card}>
+            { icon: 'event-available', title: 'Leave (Cuti)', subtitle: leaveText, onPress: () => router.push('/leave') },
+            { icon: 'work-history', title: 'Overtime', subtitle: 'Request/history', onPress: () => router.push('/overtime') },
+            { icon: 'payments', title: 'Payroll', subtitle: 'Preview Payslip', onPress: () => router.push('/payroll') },
+            { icon: 'list-alt', title: 'History', subtitle: 'Attendance log', onPress: () => router.push('/attendance-history') },
+          ].map((item) => (
+            <Pressable key={item.title} style={styles.card} onPress={item.onPress}>
               <View style={styles.cardIcon}>
-                <MaterialIcons name={icon as any} size={20} color={Tokens.colors.primary} />
+                <MaterialIcons name={item.icon as any} size={20} color={Tokens.colors.primary} />
               </View>
-              <Text style={styles.cardTitle}>{title}</Text>
-              <Text style={styles.cardSub}>{subtitle}</Text>
-            </View>
+              <Text style={styles.cardTitle}>{item.title}</Text>
+              <Text style={styles.cardSub}>{item.subtitle}</Text>
+            </Pressable>
           ))}
         </View>
       </ScrollView>
