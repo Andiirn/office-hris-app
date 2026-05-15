@@ -13,6 +13,10 @@ export default function TabLayout() {
         tabBarActiveTintColor: Tokens.colors.primary,
         tabBarInactiveTintColor: Tokens.colors.outline,
         tabBarStyle: styles.tabBar,
+        tabBarLabelStyle: {
+          fontFamily: 'Inter_700Bold',
+          fontSize: 10,
+        },
         tabBarBackground: () => (
           <BlurView
             intensity={80}

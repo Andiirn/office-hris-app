@@ -16,6 +16,6 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Tokens.colors.background },
   content: { padding: Tokens.spacing.page, flex: 1, justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 24, fontWeight: 'bold', color: Tokens.colors.text },
-  subtitle: { fontSize: 16, color: Tokens.colors.outline, marginTop: 8 },
+  title: { fontFamily: 'Manrope_700Bold', fontSize: 24, color: Tokens.colors.text },
+  subtitle: { fontFamily: 'Inter_400Regular', fontSize: 16, color: Tokens.colors.outline, marginTop: 8 },
 });
