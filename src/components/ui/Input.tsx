@@ -43,7 +43,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: 'Inter_700Bold',
-    fontSize: 14,
+    fontSize: 12,
     color: Tokens.colors.text,
     marginBottom: 8,
     marginLeft: 4,
