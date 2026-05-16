@@ -2,10 +2,22 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Tokens } from '../../core/theme/tokens';
 
-export const StatusBadge = ({ label, type = 'error' }) => {
-  const isError = type === 'error';
-  const bgColor = isError ? Tokens.colors.errorContainer : Tokens.colors.secondaryContainer;
-  const textColor = isError ? Tokens.colors.onErrorContainer : Tokens.colors.onSecondaryContainer;
+interface StatusBadgeProps {
+  label?: string;
+  type?: 'secondary' | 'error' | 'warning';
+}
+
+export const StatusBadge = ({ label, type = 'secondary' }: StatusBadgeProps) => {
+  let bgColor = Tokens.colors.secondaryContainer;
+  let textColor = Tokens.colors.onSecondaryContainer;
+
+  if (type === 'error') {
+    bgColor = Tokens.colors.errorContainer;
+    textColor = Tokens.colors.onErrorContainer;
+  } else if (type === 'warning') {
+    bgColor = Tokens.colors.tertiaryFixed;
+    textColor = Tokens.colors.onTertiaryContainer;
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: bgColor }]}>

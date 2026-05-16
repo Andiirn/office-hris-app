@@ -168,12 +168,12 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        <View className="flex-row flex-wrap justify-between">
+        <View className="flex-row flex-wrap justify-between mt-[18px]">
           {[
-            { icon: 'event-available', title: 'Leave (Cuti)', subtitle: leaveText, onPress: () => router.push('/leave') },
-            { icon: 'work-history', title: 'Overtime', subtitle: 'Request/history', onPress: () => router.push('/overtime') },
-            { icon: 'payments', title: 'Payroll', subtitle: 'Preview Payslip', onPress: () => router.push('/payroll') },
-            { icon: 'list-alt', title: 'History', subtitle: 'Attendance log', onPress: () => router.push('/attendance-history') },
+            { icon: 'event-available', title: 'Leave', subtitle: leaveText, onPress: () => router.push('/leave') },
+            { icon: 'work-history', title: 'Overtime', subtitle: 'Request Extra', onPress: () => router.push('/overtime') },
+            { icon: 'exit-to-app', title: 'Resign', subtitle: 'Offboarding', onPress: () => router.push('/resign') },
+            { icon: 'payments', title: 'Payroll', subtitle: 'Preview Slip', onPress: () => router.push('/payroll') },
           ].map((item) => (
             <Pressable 
               key={item.title} 
@@ -184,7 +184,7 @@ export default function HomeScreen() {
                 <MaterialIcons name={item.icon as any} size={20} color={Tokens.colors.primary} />
               </View>
               <Text className="font-inter-bold text-[12px] text-on-surface">{item.title}</Text>
-              <Text className="font-inter text-[11px] text-text-muted mt-1">{item.subtitle}</Text>
+              <Text className="font-inter text-[10px] text-text-muted mt-1" numberOfLines={1}>{item.subtitle}</Text>
             </Pressable>
           ))}
         </View>

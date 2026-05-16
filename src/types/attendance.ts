@@ -33,6 +33,7 @@ export interface AttendanceItem {
   attendance_date?: string;
   checkin_at?: string | null;
   checkout_at?: string | null;
+  attendance_status?: string;
 }
 
 export interface AttendanceListQuery {

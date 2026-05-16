@@ -27,15 +27,15 @@ export const attendanceService = {
   },
   async getAttendanceHistory(query?: AttendanceListQuery): Promise<AttendanceItem[]> {
     try {
+      console.log('[AttendanceService] Fetching history with query:', JSON.stringify(query));
       const response = await api.get('/attendance/', {
         params: query,
       });
-      console.log('[AttendanceService] URL:', response.config.url);
-      console.log('[AttendanceService] Params:', JSON.stringify(response.config.params));
-      console.log('[AttendanceService] Raw response:', JSON.stringify(response.data, null, 2));
+      
+      console.log('[AttendanceService] Full URL:', response.config.baseURL + response.config.url);
       
       const data: any = unwrapData(response.data);
-      console.log('[AttendanceService] Unwrapped data:', JSON.stringify(data, null, 2));
+      console.log('[AttendanceService] Unwrapped data sample:', JSON.stringify(Array.isArray(data) ? data.slice(0, 1) : data));
 
       // Handle different possible backend pagination shapes
       let result: AttendanceItem[] = [];
@@ -45,16 +45,17 @@ export const attendanceService = {
         result = data.items;
       } else if (data && Array.isArray(data.data)) {
         result = data.data;
+      } else if (data && typeof data === 'object') {
+        // Fallback: check if the object itself is the wrapper and has an array property we don't know about
+        const arrays = Object.values(data).filter(v => Array.isArray(v));
+        if (arrays.length > 0) result = arrays[0] as AttendanceItem[];
       }
 
-      console.log('[AttendanceService] Final processed items:', JSON.stringify(result, null, 2));
+      console.log('[AttendanceService] Returning', result.length, 'items');
       return result;
     } catch (error: any) {
-      console.error('[AttendanceService] getAttendanceHistory error:', error);
-      if (error.response) {
-        console.error('[AttendanceService] Error response data:', JSON.stringify(error.response.data, null, 2));
-      }
-      throw error;
+      console.error('[AttendanceService] getAttendanceHistory error:', error?.message);
+      return [];
     }
   },
 

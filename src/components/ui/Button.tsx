@@ -1,11 +1,11 @@
 import React from 'react';
-import { 
-  TouchableOpacity, 
-  Text, 
-  ActivityIndicator, 
-  StyleSheet, 
-  StyleProp, 
-  ViewStyle, 
+import {
+  TouchableOpacity,
+  Text,
+  ActivityIndicator,
+  StyleSheet,
+  StyleProp,
+  ViewStyle,
   TextStyle,
   Platform
 } from 'react-native';
@@ -21,23 +21,23 @@ interface ButtonProps {
   className?: string;
 }
 
-export const Button: React.FC<ButtonProps> = ({ 
-  title, 
-  onPress, 
-  loading, 
-  disabled, 
-  style, 
+export const Button: React.FC<ButtonProps> = ({
+  title,
+  onPress,
+  loading,
+  disabled,
+  style,
   textStyle,
   className
 }) => {
   return (
-    <TouchableOpacity 
+    <TouchableOpacity
       className={className}
       style={[
-        styles.button, 
-        disabled && styles.disabled, 
+        styles.button,
+        disabled && styles.disabled,
         style
-      ]} 
+      ]}
       onPress={onPress}
       disabled={disabled || loading}
       activeOpacity={0.8}

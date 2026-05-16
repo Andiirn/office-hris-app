@@ -8,14 +8,14 @@ import {
 } from '../types/overtime';
 
 export const overtimeService = {
-  async getSummary(employeeId: string, year: number, month: number): Promise<OvertimeSummary> {
+  async getSummary(employeeId: string, params: { year: number; month: number }): Promise<OvertimeSummary> {
     const response = await api.get(`/overtime/summary/${employeeId}`, {
-      params: { year, month },
+      params,
     });
     return unwrapData<OvertimeSummary>(response.data);
   },
 
-  async getRecords(query: OvertimeHistoryQuery): Promise<OvertimeRecord[]> {
+  async listRecords(query: OvertimeHistoryQuery): Promise<OvertimeRecord[]> {
     const response = await api.get('/overtime/records', {
       params: query,
     });
@@ -26,6 +26,10 @@ export const overtimeService = {
     if (data && Array.isArray(data.data)) return data.data;
     
     return [];
+  },
+
+  async getRecords(query: OvertimeHistoryQuery): Promise<OvertimeRecord[]> {
+    return this.listRecords(query);
   },
 
   async createRecord(payload: CreateOvertimeRequest): Promise<OvertimeRecord> {

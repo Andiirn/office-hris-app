@@ -64,30 +64,42 @@ export default function LeaveScreen() {
   // 4. Create Request Mutation
   const createMutation = useMutation({
     mutationFn: (payload: CreateLeaveRequest) => leaveService.createRequest(payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['leave-history'] });
-      queryClient.invalidateQueries({ queryKey: ['leave-balances'] });
+    onSuccess: async () => {
+      console.log('[Leave] Request submitted successfully, refreshing data...');
+
+      // Invalidate and refetch to ensure UI updates immediately
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['leave-history'] }),
+        queryClient.invalidateQueries({ queryKey: ['leave-balances'] }),
+        queryClient.invalidateQueries({ queryKey: ['calendar-leaves'] })
+      ]);
+
       setModalVisible(false);
       setSelectedRange({});
       setForm({
         leave_type_id: '',
         start_date: '',
-        end_date: '',
+        end_date: null,
         reason: '',
       });
       Alert.alert('Success', 'Leave request submitted successfully');
     },
     onError: (error: any) => {
-      Alert.alert('Error', error?.response?.data?.message || 'Failed to submit leave request');
+      console.error('[Leave] Create Error:', error.response?.data || error.message);
+      const msg = error.response?.data?.message || 'Failed to submit leave request';
+      Alert.alert('Error', msg);
     }
   });
 
   // 5. Cancel Mutation
   const cancelMutation = useMutation({
     mutationFn: (id: string) => leaveService.cancelRequest(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['leave-history'] });
-      queryClient.invalidateQueries({ queryKey: ['leave-balances'] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['leave-history'] }),
+        queryClient.invalidateQueries({ queryKey: ['leave-balances'] }),
+        queryClient.invalidateQueries({ queryKey: ['calendar-leaves'] })
+      ]);
       Alert.alert('Success', 'Leave request cancelled');
     },
     onError: (error: any) => {
@@ -173,11 +185,12 @@ export default function LeaveScreen() {
   }, [history, selectedRange]);
 
   const handleCreate = () => {
-    if (!form.leave_type_id || !form.start_date || !form.reason) {
-      Alert.alert('Error', 'Please fill all required fields');
-      return;
-    }
-    createMutation.mutate(form);
+    const payload = {
+      ...form,
+      end_date: form.end_date || null
+    };
+    console.log('[Leave] Submitting payload:', payload);
+    createMutation.mutate(payload);
   };
 
   const handleCancel = (id: string) => {
@@ -328,7 +341,7 @@ export default function LeaveScreen() {
               <View>
                 <Text className="font-manrope-extrabold text-2xl text-primary">Request Leave</Text>
                 <Text className="font-inter-medium text-xs text-text-muted mt-0.5">
-                  Selected: {form.start_date} to {form.end_date}
+                  Selected: {form.start_date} Sampai {form.end_date}
                 </Text>
               </View>
               <Pressable
@@ -366,7 +379,7 @@ export default function LeaveScreen() {
                 label="Reason"
                 value={form.reason}
                 onChangeText={(text) => setForm({ ...form, reason: text })}
-                placeholder="Why do you need this leave?"
+                placeholder="Masukkan Alasan Cuti?"
                 multiline
                 numberOfLines={3}
                 style={{ height: 100, textAlignVertical: 'top', paddingTop: 12 }}
