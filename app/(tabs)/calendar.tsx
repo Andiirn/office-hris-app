@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -10,10 +10,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Calendar } from 'react-native-calendars';
 import { useQuery } from '@tanstack/react-query';
+import { useFocusEffect } from 'expo-router';
 import { Tokens } from '../../src/core/theme/tokens';
 import { useAuthStore } from '../../src/stores/auth.store';
 import { attendanceService } from '../../src/services/attendance.service';
 import { leaveService } from '../../src/services/leave.service';
+import { holidayService } from '../../src/services/holiday.service';
 import { GlassCard } from '../../src/components/ui/GlassCard';
 
 export default function CalendarScreen() {
@@ -34,17 +36,46 @@ export default function CalendarScreen() {
     enabled: !!user?.id,
   });
 
+  // 3. Fetch Holidays
+  const { data: holidays = [], isLoading: isLoadingHolidays, refetch: refetchHolidays } = useQuery({
+    queryKey: ['calendar-holidays'],
+    queryFn: () => holidayService.getHolidays({ year: new Date().getFullYear() }),
+    refetchInterval: 1000 * 60 * 5, // Polling every 5 minutes for background updates
+  });
+
+  // Real-time feel: Refetch when tab is focused
+  useFocusEffect(
+    useCallback(() => {
+      refetchAtt();
+      refetchLeave();
+      refetchHolidays();
+    }, [refetchAtt, refetchLeave, refetchHolidays])
+  );
+
   const onRefresh = () => {
     refetchAtt();
     refetchLeave();
+    refetchHolidays();
   };
 
   const markedDates = useMemo(() => {
     const marks: any = {};
     
+    // Mark Holidays (highest priority for color/marking usually)
+    holidays.forEach(h => {
+      marks[h.holiday_date] = {
+        selected: true,
+        selectedColor: 'rgba(186, 26, 26, 0.1)',
+        textColor: Tokens.colors.error,
+        marked: true,
+        dotColor: Tokens.colors.error,
+      };
+    });
+
     // Mark Attendance
     attendance.forEach(att => {
       marks[att.date] = {
+        ...marks[att.date],
         marked: true,
         dotColor: att.status === 'LATE' ? Tokens.colors.error : '#1f6b42',
       };
@@ -70,19 +101,31 @@ export default function CalendarScreen() {
       }
     });
 
-    // Mark Selected
+    // Mark Selected (Override)
     marks[selectedDate] = {
       ...marks[selectedDate],
       selected: true,
       selectedColor: Tokens.colors.primary,
+      textColor: '#ffffff',
     };
 
     return marks;
-  }, [attendance, leaves, selectedDate]);
+  }, [attendance, leaves, holidays, selectedDate]);
 
   const dailyAgenda = useMemo(() => {
     const events = [];
     
+    const holiday = holidays.find(h => h.holiday_date === selectedDate);
+    if (holiday) {
+      events.push({
+        type: 'HOLIDAY',
+        title: holiday.name,
+        time: holiday.holiday_type.replace(/_/g, ' '),
+        icon: 'celebration',
+        color: Tokens.colors.error
+      });
+    }
+
     const att = attendance.find(a => a.date === selectedDate);
     if (att) {
       events.push({
@@ -106,7 +149,9 @@ export default function CalendarScreen() {
     }
 
     return events;
-  }, [attendance, leaves, selectedDate]);
+  }, [attendance, leaves, holidays, selectedDate]);
+
+  const isLoading = isLoadingAtt || isLoadingLeave || isLoadingHolidays;
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -120,7 +165,7 @@ export default function CalendarScreen() {
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={isLoadingAtt || isLoadingLeave} onRefresh={onRefresh} tintColor={Tokens.colors.primary} />
+          <RefreshControl refreshing={isLoading} onRefresh={onRefresh} tintColor={Tokens.colors.primary} />
         }
       >
         <GlassCard style={{ padding: 10, marginBottom: 24 }}>

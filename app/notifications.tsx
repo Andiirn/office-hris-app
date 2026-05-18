@@ -1,13 +1,5 @@
 import React from 'react';
-import { 
-  View, 
-  Text, 
-  ScrollView, 
-  Pressable, 
-  ActivityIndicator,
-  RefreshControl,
-  Alert
-} from 'react-native';
+import { View, Text, ScrollView, Pressable, RefreshControl, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -15,6 +7,7 @@ import { Tokens } from '../src/core/theme/tokens';
 import { useAuthStore } from '../src/stores/auth.store';
 import { notificationService } from '../src/services/notification.service';
 import { GlassCard } from '../src/components/ui/GlassCard';
+import { SkeletonCard } from '../src/components/ui/Skeleton';
 
 export default function NotificationsScreen() {
   const { user } = useAuthStore();
@@ -79,7 +72,11 @@ export default function NotificationsScreen() {
         }
       >
         {isLoading ? (
-          <ActivityIndicator size="large" color={Tokens.colors.primary} className="mt-20" />
+          <View className="mt-2">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </View>
         ) : notifications.length === 0 ? (
           <View className="items-center py-20">
             <MaterialIcons name="notifications-none" size={64} color={Tokens.colors.outline} />

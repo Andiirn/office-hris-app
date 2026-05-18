@@ -1,6 +1,7 @@
 // src/core/api/client.ts
 import axios from 'axios';
 import { tokenStore } from '../auth/token-store';
+import { useAuthStore } from '../../stores/auth.store';
 
 const rawBaseURL = process.env.EXPO_PUBLIC_API_URL || '';
 const baseURL = `${rawBaseURL.replace(/\/$/, '')}/api/v1`;
@@ -22,8 +23,8 @@ api.interceptors.response.use(
   (res) => res,
   async (err) => {
     if (err.response?.status === 401) {
-      // TODO: Implement refresh logic or logout in future tasks
-      // For now, we'll just propagate the error
+      await tokenStore.clearTokens();
+      useAuthStore.setState({ user: null, isLoggedIn: false });
     }
     return Promise.reject(err);
   }

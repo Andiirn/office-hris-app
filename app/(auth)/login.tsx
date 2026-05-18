@@ -48,8 +48,6 @@ export default function LoginScreen() {
     mutationFn: (values: LoginFormValues) =>
       authService.login(values.nik, values.password),
     onSuccess: async (data) => {
-      console.log('[Login] Success, checking for user data...');
-
       const { access_token, refresh_token } = data;
 
       // Save tokens first so they can be used by the API interceptor for getProfile
@@ -60,7 +58,6 @@ export default function LoginScreen() {
       // If backend doesn't return user data on login, fetch it from /profile
       if (!userData) {
         try {
-          console.log('[Login] No user data in login response, fetching profile...');
           const profile = await authService.getProfile();
           userData = {
             id: profile.id,

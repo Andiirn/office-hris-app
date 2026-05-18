@@ -1,9 +1,7 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import React, { useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
+import { Alert,
   Dimensions,
   Modal,
   Pressable,
@@ -17,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../src/components/ui/Button';
 import { GlassCard } from '../src/components/ui/GlassCard';
 import { Input } from '../src/components/ui/Input';
+import { SkeletonCard } from '../src/components/ui/Skeleton';
 import { StatusBadge } from '../src/components/ui/StatusBadge';
 import { Tokens } from '../src/core/theme/tokens';
 import { leaveService } from '../src/services/leave.service';
@@ -283,7 +282,10 @@ export default function LeaveScreen() {
         </View>
 
         {isLoadingHistory ? (
-          <ActivityIndicator size="large" color={Tokens.colors.primary} className="mt-5" />
+          <View className="mt-2">
+            <SkeletonCard />
+            <SkeletonCard />
+          </View>
         ) : history.length === 0 ? (
           <GlassCard style={{ padding: 0, marginTop: 10 }}>
             <View className="items-center justify-center py-10 w-full">

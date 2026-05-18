@@ -1,10 +1,17 @@
 import React from 'react';
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { StyleSheet, View, Platform } from 'react-native';
 import { Tokens } from '../../src/core/theme/tokens';
+import { useAuthStore } from '../../src/stores/auth.store';
 
 export default function TabLayout() {
+  const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
+
+  if (!isLoggedIn) {
+    return <Redirect href="/(auth)/login" />;
+  }
+
   return (
     <Tabs
       screenOptions={{

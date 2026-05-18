@@ -1,11 +1,5 @@
 import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  ScrollView, 
-  ActivityIndicator,
-  RefreshControl,
-} from 'react-native';
+import { View, Text, ScrollView, RefreshControl, } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useQuery } from '@tanstack/react-query';
@@ -13,6 +7,7 @@ import { Tokens } from '../src/core/theme/tokens';
 import { useAuthStore } from '../src/stores/auth.store';
 import { attendanceService } from '../src/services/attendance.service';
 import { GlassCard } from '../src/components/ui/GlassCard';
+import { SkeletonCard } from '../src/components/ui/Skeleton';
 import { StatusBadge } from '../src/components/ui/StatusBadge';
 
 export default function AttendanceHistoryScreen() {
@@ -69,13 +64,17 @@ export default function AttendanceHistoryScreen() {
         }
       >
         {isLoading ? (
-          <ActivityIndicator size="large" color={Tokens.colors.primary} className="mt-20" />
+          <View className="mt-2">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </View>
         ) : history.length === 0 ? (
           <GlassCard style={{ alignItems: 'center', padding: 40, marginTop: 20 }}>
             <MaterialIcons name="event-busy" size={64} color={Tokens.colors.outline} />
             <Text className="font-manrope-bold text-lg text-primary mt-4">No records found</Text>
             <Text className="font-inter text-sm text-text-muted text-center mt-2">
-              You haven't recorded any attendance yet.
+              {"You haven't recorded any attendance yet."}
             </Text>
           </GlassCard>
         ) : (

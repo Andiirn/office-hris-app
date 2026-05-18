@@ -1,9 +1,14 @@
-import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { ReactNode } from 'react';
+import { StyleSheet, View, ViewStyle, StyleProp } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Tokens } from '../../core/theme/tokens';
 
-export const GlassCard = ({ children, style }) => {
+interface GlassCardProps {
+  children?: ReactNode;
+  style?: StyleProp<ViewStyle>;
+}
+
+export const GlassCard = ({ children, style }: GlassCardProps) => {
   const flattenedStyle = StyleSheet.flatten(style) || {};
   
   // Extract layout/padding styles to apply to content

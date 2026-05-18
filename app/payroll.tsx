@@ -1,14 +1,5 @@
 import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  ScrollView, 
-  Pressable, 
-  ActivityIndicator,
-  RefreshControl,
-  Alert,
-  Linking
-} from 'react-native';
+import { View, Text, ScrollView, Pressable, RefreshControl, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -17,6 +8,7 @@ import { useAuthStore } from '../src/stores/auth.store';
 import { payrollService } from '../src/services/payroll.service';
 import { GlassCard } from '../src/components/ui/GlassCard';
 import { Button } from '../src/components/ui/Button';
+import { Skeleton, SkeletonCard } from '../src/components/ui/Skeleton';
 
 export default function PayrollScreen() {
   const { user } = useAuthStore();
@@ -148,9 +140,12 @@ export default function PayrollScreen() {
         }
       >
         {isLoading ? (
-          <View className="mt-20 items-center">
-            <ActivityIndicator size="large" color={Tokens.colors.primary} />
-            <Text className="font-inter-medium text-sm text-text-muted mt-4">Memuat data slip gaji...</Text>
+          <View className="mt-2">
+            <Skeleton height={160} width="100%" />
+            <View className="mt-4">
+              <SkeletonCard />
+              <SkeletonCard />
+            </View>
           </View>
         ) : !user?.id ? (
           <GlassCard style={{ alignItems: 'center', padding: 40, marginTop: 10 }}>

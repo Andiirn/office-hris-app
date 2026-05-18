@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Linking, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Tokens } from '../../src/core/theme/tokens';
 import { Button } from '../../src/components/ui/Button';
+import { Skeleton, SkeletonCard } from '../../src/components/ui/Skeleton';
 import { attendanceService } from '../../src/services/attendance.service';
 
 type LocationStatus = 'loading' | 'granted' | 'denied';
@@ -145,7 +146,13 @@ export default function AttendanceScreen() {
     <SafeAreaView className="flex-1 bg-background">
       <View className="flex-1 px-5 items-center justify-center gap-3">
         <Text className="font-manrope-bold text-2xl text-on-surface">Attendance Scanner</Text>
-        {status === 'loading' && <ActivityIndicator size="large" color={Tokens.colors.primary} />}
+        {status === 'loading' && (
+          <View className="w-full gap-3">
+            <Skeleton height={24} width="60%" />
+            <SkeletonCard />
+            <Skeleton height={44} width="100%" />
+          </View>
+        )}
         {status === 'denied' && (
           <View className="items-center gap-4">
             <Text className="font-inter text-sm text-error text-center">{errorMessage}</Text>
@@ -185,4 +192,3 @@ export default function AttendanceScreen() {
 }
 
 // StyleSheet removed!
-

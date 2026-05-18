@@ -1,14 +1,5 @@
 import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  ScrollView, 
-  Pressable, 
-  Modal, 
-  ActivityIndicator,
-  RefreshControl,
-  Alert
-} from 'react-native';
+import { View, Text, ScrollView, Pressable, Modal, RefreshControl, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -18,6 +9,7 @@ import { resignService } from '../src/services/resign.service';
 import { GlassCard } from '../src/components/ui/GlassCard';
 import { Button } from '../src/components/ui/Button';
 import { Input } from '../src/components/ui/Input';
+import { SkeletonCard } from '../src/components/ui/Skeleton';
 import { StatusBadge } from '../src/components/ui/StatusBadge';
 import { CreateResignRequest } from '../src/types/resign';
 
@@ -106,7 +98,10 @@ export default function ResignScreen() {
         <Text className="font-manrope-bold text-lg text-primary mb-4">Submission Status</Text>
 
         {isLoading ? (
-          <ActivityIndicator size="large" color={Tokens.colors.primary} className="mt-10" />
+          <View className="mt-2">
+            <SkeletonCard />
+            <SkeletonCard />
+          </View>
         ) : history.length === 0 ? (
           <View className="items-center py-10">
             <MaterialIcons name="assignment-late" size={64} color={Tokens.colors.outline} />
