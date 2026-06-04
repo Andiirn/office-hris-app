@@ -1,13 +1,14 @@
-import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, ActivityIndicator, RefreshControl } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { router } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+import { router } from 'expo-router';
+import React from 'react';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Tokens } from '../../src/core/theme/tokens';
-import { useAuthStore } from '../../src/stores/auth.store';
-import { leaveService } from '../../src/services/leave.service';
 import { attendanceService } from '../../src/services/attendance.service';
+import { leaveService } from '../../src/services/leave.service';
+import { resignService } from '../../src/services/resign.service';
+import { useAuthStore } from '../../src/stores/auth.store';
 
 export default function HomeScreen() {
   const { user, isLoggedIn } = useAuthStore();
@@ -16,11 +17,11 @@ export default function HomeScreen() {
 
   // Debugging logs to see when user object is available
   React.useEffect(() => {
-    console.log('[HomeScreen] Auth State:', { 
-      isLoggedIn, 
-      hasUser: !!user, 
+    console.log('[HomeScreen] Auth State:', {
+      isLoggedIn,
+      hasUser: !!user,
       userId: user?.id,
-      userName: user?.full_name 
+      userName: user?.full_name
     });
   }, [isLoggedIn, user]);
 
@@ -33,7 +34,7 @@ export default function HomeScreen() {
   const dateText = now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
 
   // 1. Fetch Leave Balance
-  const { data: leaveBalances, isLoading: isLoadingLeave } = useQuery({
+  const { data: leaveBalances, isLoading: isLoadingLeave, refetch: refetchLeave } = useQuery({
     queryKey: ['leave-balances', user?.id],
     queryFn: async () => {
       console.log('[HomeQuery] Executing Leave fetch for userId:', user?.id);
@@ -47,23 +48,33 @@ export default function HomeScreen() {
   const totalRemaining = leaveBalances?.reduce((acc, item) => acc + (item.remaining_days ?? 0), 0) ?? '-';
   const leaveText = isLoadingLeave ? 'Sisa: ...' : `Sisa: ${totalRemaining} Hari`;
 
-  // 2. Recent Activities
-  const { 
-    data: activities = [], 
-    isLoading: isLoadingActivities, 
+  // 2. Fetch Resign Status
+  const { data: resignHistory = [], isLoading: isLoadingResign, refetch: refetchResign } = useQuery({
+    queryKey: ['resign-status', user?.id],
+    queryFn: () => resignService.getMyRequests({ limit: 1 }),
+    enabled: !!user?.id,
+  });
+
+  const latestResign = resignHistory[0];
+  const resignText = isLoadingResign ? 'Checking...' : latestResign ? `Status: ${latestResign.status}` : 'Offboarding';
+
+  // 3. Recent Activities
+  const {
+    data: activities = [],
+    isLoading: isLoadingActivities,
     isFetching: isFetchingActivities,
-    refetch: refetchActivities 
+    refetch: refetchActivities
   } = useQuery({
     queryKey: ['attendance-recent', user?.id],
     queryFn: async () => {
       console.log('[HomeQuery] Executing Activity fetch for userId:', user?.id);
       if (!user?.id) return [];
-      
+
       const dateTo = new Date();
       const dateFrom = new Date();
       dateFrom.setDate(dateFrom.getDate() - 7);
-      
-      const query = { 
+
+      const query = {
         employee_id: user.id,
         date_from: dateFrom.toISOString().slice(0, 10),
         date_to: dateTo.toISOString().slice(0, 10),
@@ -89,6 +100,8 @@ export default function HomeScreen() {
 
   const onRefresh = () => {
     refetchActivities();
+    refetchLeave();
+    refetchResign();
   };
 
   // 3. Process activities into flattened events
@@ -136,7 +149,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScrollView 
+      <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120, gap: 18 }}
         showsVerticalScrollIndicator={false}
@@ -159,8 +172,8 @@ export default function HomeScreen() {
         <View className="items-center pt-2">
           <Text className="font-manrope-extrabold text-5xl text-primary leading-[52px]">{timeText}</Text>
           <Text className="font-inter-medium text-base text-text-muted mt-1 mb-3.5">{dateText}</Text>
-          <Pressable 
-            className="w-[190px] h-[190px] rounded-full bg-primary-container items-center justify-center gap-2 shadow-lg shadow-black/10 elevation-6" 
+          <Pressable
+            className="w-[190px] h-[190px] rounded-full bg-primary-container items-center justify-center gap-2 shadow-lg shadow-black/10 elevation-6"
             onPress={() => router.push('/attendance')}
           >
             <MaterialIcons name="qr-code-scanner" size={44} color="#fff" />
@@ -170,14 +183,14 @@ export default function HomeScreen() {
 
         <View className="flex-row flex-wrap justify-between mt-[18px]">
           {[
-            { icon: 'event-available', title: 'Leave', subtitle: leaveText, onPress: () => router.push('/leave') },
-            { icon: 'work-history', title: 'Overtime', subtitle: 'Request Extra', onPress: () => router.push('/overtime') },
-            { icon: 'exit-to-app', title: 'Resign', subtitle: 'Offboarding', onPress: () => router.push('/resign') },
-            { icon: 'payments', title: 'Payroll', subtitle: 'Preview Slip', onPress: () => router.push('/payroll') },
+            { icon: 'event-available', title: 'Izin & Cuti', subtitle: leaveText, onPress: () => router.push('/leave') },
+            { icon: 'work-history', title: 'Lembur', subtitle: 'Request Extra', onPress: () => router.push('/overtime') },
+            { icon: 'exit-to-app', title: 'Resign', subtitle: resignText, onPress: () => router.push('/resign') },
+            { icon: 'payments', title: 'Gaji', subtitle: 'Preview Slip', onPress: () => router.push('/payroll') },
           ].map((item) => (
-            <Pressable 
-              key={item.title} 
-              className="w-[48%] bg-white/80 rounded-2xl p-4 border border-white/90 mb-3" 
+            <Pressable
+              key={item.title}
+              className="w-[48%] bg-white/80 rounded-2xl p-4 border border-white/90 mb-3"
               onPress={item.onPress}
             >
               <View className="w-10 h-10 rounded-full bg-primary/10 items-center justify-center mb-2.5">
@@ -192,7 +205,7 @@ export default function HomeScreen() {
         <View className="mt-1">
           <View className="flex-row justify-between items-center mb-3">
             <Text className="font-manrope-bold text-base text-primary">Recent Activity</Text>
-            <Pressable onPress={() => router.push('/attendance-history')}>
+            <Pressable onPress={() => router.push('/notifications')}>
               <Text className="font-inter-semibold text-[12px] text-primary-container">View All</Text>
             </Pressable>
           </View>
@@ -207,8 +220,8 @@ export default function HomeScreen() {
             <View className="gap-2.5">
               {events.slice(0, 5).map((item) => (
                 <View key={item.id} className="flex-row items-center bg-white/80 rounded-xl p-3 border border-white/90">
-                  <View 
-                    className="w-9 h-9 rounded-lg items-center justify-center mr-3" 
+                  <View
+                    className="w-9 h-9 rounded-lg items-center justify-center mr-3"
                     style={{ backgroundColor: item.bgColor }}
                   >
                     <MaterialIcons name={item.icon} size={18} color={item.color} />
@@ -232,5 +245,4 @@ export default function HomeScreen() {
   );
 }
 
-// StyleSheet removed as we now use NativeWind!
 

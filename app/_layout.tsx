@@ -15,6 +15,7 @@ import {
   Inter_400Regular, 
   Inter_700Bold 
 } from '@expo-google-fonts/inter';
+import { sessionManager } from '../src/core/auth/session-manager';
 
 // Interop for components that don't support className by default
 cssInterop(SafeAreaView, {
@@ -39,14 +40,28 @@ export default function RootLayout() {
     Inter_400Regular,
     Inter_700Bold,
   });
+  const [isSessionLoaded, setIsSessionLoaded] = React.useState(false);
 
   useEffect(() => {
-    if (loaded || error) {
+    async function initSession() {
+      try {
+        await sessionManager.initialize();
+      } catch (err) {
+        console.error('[RootLayout] Session initialization failed:', err);
+      } finally {
+        setIsSessionLoaded(true);
+      }
+    }
+    initSession();
+  }, []);
+
+  useEffect(() => {
+    if ((loaded || error) && isSessionLoaded) {
       SplashScreen.hideAsync();
     }
-  }, [loaded, error]);
+  }, [loaded, error, isSessionLoaded]);
 
-  if (!loaded && !error) {
+  if ((!loaded && !error) || !isSessionLoaded) {
     return null;
   }
 
