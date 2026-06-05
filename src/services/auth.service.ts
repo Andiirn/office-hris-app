@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import { api } from '../core/api/client';
 import { unwrapData } from '../core/api/envelope';
 import { LoginResponse } from '../types/auth';
+import { ProfileData } from '../types/profile';
 
 export const authService = {
   async login(nik: string, password: string): Promise<LoginResponse> {
@@ -22,10 +23,10 @@ export const authService = {
     }
   },
 
-  async getProfile(): Promise<any> {
+  async getProfile(): Promise<ProfileData> {
     try {
       const response = await api.get('/profile');
-      return unwrapData<any>(response.data);
+      return unwrapData<ProfileData>(response.data);
     } catch (error: any) {
       console.warn('[AuthService] Get Profile failed:', error.response?.data?.message || error.message);
       throw error;

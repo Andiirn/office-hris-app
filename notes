@@ -1,0 +1,137 @@
+Sudah pasti masuk app employee
+
+  - Auth: /auth/login, /auth/refresh, /auth/logout
+  - Profile: /profile, /profile/password, /profile/avatar
+  - Dashboard: /dashboard/stats
+  - Attendance:
+      - POST /attendance/checkin
+      - POST /attendance/checkout
+      - GET /attendance/
+      - GET /attendance/{id}
+      - POST /attendance/corrections
+      - POST /attendance/visit
+      - GET /attendance/qr/{branch_id}
+
+  - Leave:
+      - GET /leave/balances/{employee_id}
+      - GET /leave/requests
+      - POST /leave/requests
+      - GET /leave/requests/{id}
+      - POST /leave/requests/{id}/upload-document
+      - POST /leave/requests/{id}/cancel
+      - GET /leave/calendar
+
+  - Overtime:
+      - GET /overtime/summary/{employee_id}
+      - GET /overtime/records
+      - GET /overtime/records/{record_id}
+      - POST /overtime/records
+
+  - Payroll:
+      - GET /payroll/preview/{employee_id}
+      - GET /payroll/preview/{employee_id}/pdf
+
+  - Notifications:
+      - GET /notifications/
+      - POST /notifications/{id}/read
+      - POST /notifications/read-all
+
+  - Resign:
+      - POST /resign/requests
+      - GET /resign/requests/my
+      - GET /resign/requests/{id}
+      - DELETE /resign/requests/{id}
+
+  Yang menurut saya paling masuk akal untuk ditambahkan next
+
+  1. Attendance Correction
+
+  - Ini memang sudah ada kontraknya.
+  - Cocok jadi screen tersendiri dari history atau detail attendance.
+  - Flow yang logis:
+      - user buka attendance history
+      - tap salah satu attendance
+      - kalau ada masalah, ajukan koreksi
+
+  - Endpoint yang dipakai:
+      - GET /attendance/corrections
+      - POST /attendance/corrections
+      - GET /attendance/{id}
+
+  2. Notification Center
+
+  - Ini wajib kalau mau semua notif muncul di satu tempat.
+  - Endpoint yang sudah pas:
+      - GET /notifications/ dengan query is_read, page, limit
+      - POST /notifications/{id}/read
+      - POST /notifications/read-all
+
+  - Yang cocok di UI:
+      - tab list semua notif
+      - filter unread/read
+      - badge unread count
+      - mark all read
+
+  3. Attendance Detail
+
+  - Ini berguna banget untuk detail per hari.
+  - Endpoint ada:
+      - GET /attendance/{id}
+
+  - Cocok untuk:
+      - lihat raw check-in/check-out
+      - lihat overtime minutes/hours
+      - lihat validation flags
+      - lihat apakah hari itu weekend/holiday
+
+  4. Visit Attendance
+
+  - Ada di OpenAPI, jadi memang kemungkinan fitur employee.
+  - Endpoint:
+      - POST /attendance/visit
+
+  - Cocok kalau app employee perlu absensi kunjungan ke lokasi lain.
+  - Biasanya UI-nya mirip attendance request + GPS + reason + lokasi.
+
+  5. Leave Calendar
+
+  - Endpoint ini ada dan relevan:
+      - GET /leave/calendar
+
+  - Cocok untuk kalender gabungan cuti/absensi/libur.
+  - Ini bisa bantu calendar screen jadi lebih kaya, bukan cuma attendance plain.
+
+  Yang ada di backend tapi saya tidak sarankan langsung dipakai employee app tanpa alasan kuat
+
+  - GET /resign/requests dan POST /resign/requests/{id}/approve
+      - ini admin/HR only, harus tetap di luar scope employee
+
+  - overtime/settings/{company_id}
+      - ini setting company, bukan layar employee
+
+  - endpoint approval untuk correction/visit/leave/resign
+      - semua approval flow adalah HR/admin
+
+  Soal pertanyaan kamu tentang weekend hadir
+  Dari kontrak yang ada, yang paling masuk akal adalah:
+
+  - kalau Sabtu/Minggu ada attendance, tetap tampil sebagai attendance
+  - kalau backend mengisi overtime_minutes/overtime_hours, baru UI boleh kasih label lembur
+  - jangan UI yang memutuskan sendiri semua weekend hadir = overtime, karena itu policy backend
+
+  Saran prioritas implementasi
+
+  1. Notifications center
+  2. Attendance correction
+  3. Attendance detail
+  4. Leave calendar
+  5. Visit attendance
+
+  Kalau kamu mau, next saya bisa bikin mapping yang lebih operasional:
+
+  - screen apa saja yang perlu ditambah
+  - endpoint mana dipakai per screen
+  - field request/response pentingnya
+  - mana yang sudah ada di app sekarang, mana yang belum
+
+  Atau saya bisa langsung lanjut bikin “daftar fitur employee app final” berdasarkan OpenAPI ini.

@@ -185,8 +185,8 @@ export default function HomeScreen() {
           {[
             { icon: 'event-available', title: 'Izin & Cuti', subtitle: leaveText, onPress: () => router.push('/leave') },
             { icon: 'work-history', title: 'Lembur', subtitle: 'Request Extra', onPress: () => router.push('/overtime') },
+            { icon: 'event', title: 'Absensi', subtitle: 'History & koreksi', onPress: () => router.push('/attendance') },
             { icon: 'exit-to-app', title: 'Resign', subtitle: resignText, onPress: () => router.push('/resign') },
-            { icon: 'payments', title: 'Gaji', subtitle: 'Preview Slip', onPress: () => router.push('/payroll') },
           ].map((item) => (
             <Pressable
               key={item.title}
@@ -244,5 +244,3 @@ export default function HomeScreen() {
     </SafeAreaView>
   );
 }
-
-

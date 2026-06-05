@@ -30,8 +30,10 @@ export interface OvertimeSummary {
 }
 
 export interface CreateOvertimeRequest {
-  attendance_id: string;
-  overtime_minutes: number;
+  attendance_id: string | null;
+  overtime_date: string;
+  start_time: string;
+  end_time: string;
   overtime_type: OvertimeType;
   reason?: string;
 }

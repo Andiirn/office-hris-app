@@ -16,6 +16,11 @@ export interface CheckinRequest {
   checkin_photo_url?: string | null;
 }
 
+export interface CheckoutRequest {
+  gps_lat: number;
+  gps_long: number;
+}
+
 export interface AttendanceActionResponse {
   id?: string;
   message?: string;

@@ -32,7 +32,9 @@ export const attendanceService = {
         params: query,
       });
       
-      console.log('[AttendanceService] Full URL:', response.config.baseURL + response.config.url);
+      const baseURL = response.config?.baseURL || '';
+      const requestUrl = response.config?.url || '';
+      console.log('[AttendanceService] Full URL:', `${baseURL}${requestUrl}`);
       
       const data: any = unwrapData(response.data);
       console.log('[AttendanceService] Unwrapped data sample:', JSON.stringify(Array.isArray(data) ? data.slice(0, 1) : data));

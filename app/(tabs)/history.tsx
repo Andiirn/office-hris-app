@@ -48,19 +48,28 @@ function getPeriodDates(offset = 0) {
   };
 }
 
+function toDateString(date: Date) {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 export default function AttendanceHistoryScreen() {
   const { user } = useAuthStore();
   const [periodOffset, setPeriodOffset] = useState(0);
 
   const period = React.useMemo(() => getPeriodDates(periodOffset), [periodOffset]);
+  const queryEndDate = React.useMemo(() => {
+    const today = new Date();
+    return period.endDate > today ? toDateString(today) : period.dateTo;
+  }, [period]);
 
   // 1. Fetch History
   const { data: history = [], isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['attendance-history-full', user?.id, period.dateFrom, period.dateTo],
+    queryKey: ['attendance-history-full', user?.id, period.dateFrom, queryEndDate],
     queryFn: () => attendanceService.getAttendanceHistory({ 
       employee_id: user?.id, 
       date_from: period.dateFrom,
-      date_to: period.dateTo,
+      date_to: queryEndDate,
       limit: 100,
     }),
     enabled: !!user?.id,
@@ -84,6 +93,11 @@ export default function AttendanceHistoryScreen() {
       default: return 'secondary';
     }
   };
+
+  const getAttendanceDate = (item: any) => item.attendance_date || item.date || '-';
+  const getCheckinTime = (item: any) => item.checkin_at || item.checkin_time;
+  const getCheckoutTime = (item: any) => item.checkout_at || item.checkout_time;
+  const getAttendanceStatus = (item: any) => item.attendance_status || item.status || 'PRESENT';
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -157,20 +171,20 @@ export default function AttendanceHistoryScreen() {
                 <View className="flex-row justify-between items-center mb-4">
                   <View className="flex-row items-center gap-2">
                     <MaterialIcons name="calendar-today" size={16} color={Tokens.colors.primary} />
-                    <Text className="font-inter-bold text-base text-black">{item.date}</Text>
+                    <Text className="font-inter-bold text-base text-black">{getAttendanceDate(item)}</Text>
                   </View>
-                  <StatusBadge label={item.status || 'PRESENT'} type={getStatusType(item.status) as any} />
+                  <StatusBadge label={getAttendanceStatus(item)} type={getStatusType(getAttendanceStatus(item)) as any} />
                 </View>
 
                 <View className="flex-row justify-between bg-black/5 p-3 rounded-xl">
                   <View className="items-center flex-1">
                     <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-1">Check In</Text>
-                    <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(item.checkin_time)}</Text>
+                    <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(getCheckinTime(item))}</Text>
                   </View>
                   <View className="w-[1px] bg-black/10 mx-2" />
                   <View className="items-center flex-1">
                     <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-1">Check Out</Text>
-                    <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(item.checkout_time)}</Text>
+                    <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(getCheckoutTime(item))}</Text>
                   </View>
                 </View>
                 

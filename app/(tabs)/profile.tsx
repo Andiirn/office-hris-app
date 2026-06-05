@@ -1,14 +1,30 @@
 import React from 'react';
-import { View, Text, ScrollView, Pressable, Alert } from 'react-native';
+import { View, Text, ScrollView, Pressable, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useQuery } from '@tanstack/react-query';
 import { Tokens } from '../../src/core/theme/tokens';
 import { useAuthStore } from '../../src/stores/auth.store';
 import { GlassCard } from '../../src/components/ui/GlassCard';
 import { router } from 'expo-router';
+import { authService } from '../../src/services/auth.service';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuthStore();
+  const { data: profile, isLoading, refetch } = useQuery({
+    queryKey: ['profile', user?.id],
+    queryFn: () => authService.getProfile(),
+    enabled: !!user?.id,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const displayName = profile?.full_name || user?.full_name || 'Employee';
+  const displayNik = profile?.nik || user?.nik || '-';
+  const displayEmail = profile?.email || '-';
+  const displayPhone = profile?.phone || '-';
+  const displayBranch = profile?.branch_name || '-';
+  const displayDepartment = profile?.department_name || '-';
+  const displayPosition = profile?.position_name || '-';
 
   const handleLogout = () => {
     Alert.alert(
@@ -38,20 +54,20 @@ export default function ProfileScreen() {
           <View className="w-24 h-24 rounded-full bg-primary/10 items-center justify-center border-4 border-white shadow-sm mb-4">
             <MaterialIcons name="person" size={56} color={Tokens.colors.primary} />
           </View>
-          <Text className="font-manrope-extrabold text-2xl text-primary">{user?.full_name}</Text>
-          <Text className="font-inter-medium text-sm text-text-muted mt-1">NIK: {user?.nik}</Text>
+          <Text className="font-manrope-extrabold text-2xl text-primary">{displayName}</Text>
+          <Text className="font-inter-medium text-sm text-text-muted mt-1">NIK: {displayNik}</Text>
           <View className="bg-secondary-container px-4 py-1.5 rounded-full mt-3">
-            <Text className="font-inter-bold text-[10px] text-on-secondary-container uppercase tracking-widest">Senior Developer</Text>
+            <Text className="font-inter-bold text-[10px] text-on-secondary-container uppercase tracking-widest">{displayPosition}</Text>
           </View>
         </View>
 
         <Text className="font-manrope-bold text-lg text-primary mb-4 ml-1">Personal Info</Text>
         <GlassCard style={{ padding: 0, marginBottom: 24 }}>
           {[
-            { icon: 'email', label: 'Email', value: 'john.doe@company.com' },
-            { icon: 'phone', label: 'Phone', value: '+62 812 3456 7890' },
-            { icon: 'location-on', label: 'Branch', value: 'Jakarta Head Office' },
-            { icon: 'work', label: 'Department', value: 'Engineering' },
+            { icon: 'email', label: 'Email', value: displayEmail },
+            { icon: 'phone', label: 'Phone', value: displayPhone },
+            { icon: 'location-on', label: 'Branch', value: displayBranch },
+            { icon: 'work', label: 'Department', value: displayDepartment },
           ].map((item, idx, arr) => (
             <View key={item.label} className={`flex-row items-center p-4 ${idx !== arr.length - 1 ? 'border-b border-black/5' : ''}`}>
               <View className="w-9 h-9 rounded-lg bg-primary/5 items-center justify-center mr-4">
@@ -64,6 +80,21 @@ export default function ProfileScreen() {
             </View>
           ))}
         </GlassCard>
+
+        {isLoading ? (
+          <View className="items-center py-4">
+            <ActivityIndicator size="small" color={Tokens.colors.primary} />
+            <Text className="font-inter text-xs text-text-muted mt-2">Memuat profile...</Text>
+          </View>
+        ) : (
+          <Pressable
+            className="flex-row items-center justify-center bg-white/80 p-4 rounded-2xl border border-white/90 mb-4"
+            onPress={() => refetch()}
+          >
+            <MaterialIcons name="refresh" size={18} color={Tokens.colors.primary} />
+            <Text className="font-inter-bold text-sm text-primary ml-2">Refresh Profile</Text>
+          </Pressable>
+        )}
 
         <Pressable 
           className="flex-row items-center justify-center bg-error-container p-4 rounded-2xl border border-error/10"
