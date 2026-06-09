@@ -11,6 +11,7 @@ import { Alert,
   View
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
+import * as DocumentPicker from 'expo-document-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../src/components/ui/Button';
 import { GlassCard } from '../src/components/ui/GlassCard';
@@ -29,6 +30,7 @@ export default function LeaveScreen() {
   const queryClient = useQueryClient();
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedRange, setSelectedRange] = useState<{ start?: string, end?: string }>({});
+  const [documentFile, setDocumentFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
   const [form, setForm] = useState<CreateLeaveRequest>({
     leave_type_id: '',
     start_date: '',
@@ -62,7 +64,21 @@ export default function LeaveScreen() {
 
   // 4. Create Request Mutation
   const createMutation = useMutation({
-    mutationFn: (payload: CreateLeaveRequest) => leaveService.createRequest(payload),
+    mutationFn: async (payload: { request: CreateLeaveRequest; documentFile: DocumentPicker.DocumentPickerAsset | null }) => {
+      const request = await leaveService.createRequest(payload.request);
+      if (payload.documentFile) {
+        try {
+          await leaveService.uploadDocument(request.id, {
+            uri: payload.documentFile.uri,
+            name: payload.documentFile.name,
+            type: payload.documentFile.mimeType,
+          });
+        } catch (uploadError) {
+          console.warn('[Leave] Upload document failed:', uploadError);
+        }
+      }
+      return request;
+    },
     onSuccess: async () => {
       console.log('[Leave] Request submitted successfully, refreshing data...');
 
@@ -75,6 +91,7 @@ export default function LeaveScreen() {
 
       setModalVisible(false);
       setSelectedRange({});
+      setDocumentFile(null);
       setForm({
         leave_type_id: '',
         start_date: '',
@@ -189,8 +206,37 @@ export default function LeaveScreen() {
       end_date: form.end_date || null
     };
     console.log('[Leave] Submitting payload:', payload);
-    createMutation.mutate(payload);
+    createMutation.mutate({
+      request: payload,
+      documentFile,
+    });
   };
+
+  const selectedLeaveType = useMemo(
+    () => leaveTypes.find((type) => type.id === form.leave_type_id),
+    [form.leave_type_id, leaveTypes],
+  );
+
+  const requiresDocument = /sakit/i.test(
+    `${selectedLeaveType?.name || ''} ${selectedLeaveType?.description || ''}`,
+  );
+
+  const pickDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/*'],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+
+      if (result.canceled || !result.assets?.length) return;
+      setDocumentFile(result.assets[0]);
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Gagal memilih file');
+    }
+  };
+
+  const clearDocument = () => setDocumentFile(null);
 
   const handleCancel = (id: string) => {
     Alert.alert(
@@ -332,10 +378,11 @@ export default function LeaveScreen() {
         animationType="slide"
         transparent={true}
         visible={modalVisible}
-        onRequestClose={() => {
-          setModalVisible(false);
-          setSelectedRange({});
-        }}
+      onRequestClose={() => {
+        setModalVisible(false);
+        setSelectedRange({});
+        setDocumentFile(null);
+      }}
       >
         <View className="flex-1 bg-primary/40 justify-end">
           <View className="bg-background rounded-t-[32px] p-6 max-h-[85%] shadow-2xl">
@@ -386,6 +433,46 @@ export default function LeaveScreen() {
                 numberOfLines={3}
                 style={{ height: 100, textAlignVertical: 'top', paddingTop: 12 }}
               />
+
+              {requiresDocument ? (
+                <GlassCard style={{ padding: 14, marginTop: 12 }}>
+                  <Text className="font-inter-bold text-sm text-primary mb-2">Dokumen Pendukung</Text>
+                  <Text className="font-inter text-xs text-text-muted mb-3">
+                    Opsional. Kalau ada surat dokter / bukti sakit, silakan upload. Kalau tidak, langsung kirim saja.
+                  </Text>
+
+                  {documentFile ? (
+                    <View className="flex-row items-center justify-between bg-black/5 px-3 py-3 rounded-xl">
+                      <View className="flex-1 pr-3">
+                        <Text className="font-inter-bold text-sm text-on-surface" numberOfLines={1}>
+                          {documentFile.name}
+                        </Text>
+                        <Text className="font-inter text-[10px] text-text-muted mt-1">
+                          {documentFile.mimeType || 'file'}
+                        </Text>
+                      </View>
+                      <Pressable onPress={clearDocument} className="w-8 h-8 rounded-full bg-white items-center justify-center">
+                        <MaterialIcons name="close" size={18} color={Tokens.colors.error} />
+                      </Pressable>
+                    </View>
+                  ) : null}
+
+                  <View className="flex-row gap-2 mt-3">
+                    <Pressable
+                      onPress={pickDocument}
+                      className="flex-1 py-3 rounded-xl bg-primary/5 border border-primary/10 items-center"
+                    >
+                      <Text className="font-inter-bold text-[12px] text-primary">Upload File</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={clearDocument}
+                      className="flex-1 py-3 rounded-xl bg-[#f8f8f8] items-center"
+                    >
+                      <Text className="font-inter-bold text-[12px] text-text-muted">Lewati</Text>
+                    </Pressable>
+                  </View>
+                </GlassCard>
+              ) : null}
 
               <Button
                 title="Submit Request"

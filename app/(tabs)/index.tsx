@@ -160,7 +160,7 @@ export default function HomeScreen() {
         <View className="bg-white/80 rounded-2xl p-3.5 flex-row justify-between items-center mt-5 border border-white/90">
           <View>
             <Text className="font-manrope-bold text-sm text-primary">{name}</Text>
-            <Text className="font-inter text-[11px] text-text-muted mt-0.5">Senior Developer</Text>
+            <Text className="font-inter text-[11px] text-text-muted mt-0.5">{user?.position_name || '-'}</Text>
           </View>
           <View className={`rounded-full px-2.5 py-1 ${isClockedIn ? 'bg-secondary-container' : 'bg-error-container'}`}>
             <Text className={`font-inter-bold text-[10px] ${isClockedIn ? 'text-on-secondary-container' : 'text-on-error-container'}`}>

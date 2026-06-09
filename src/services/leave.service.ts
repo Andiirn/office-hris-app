@@ -38,6 +38,21 @@ export const leaveService = {
     return unwrapData<LeaveRequest>(response.data);
   },
 
+  async uploadDocument(requestId: string, file: { uri: string; name: string; type?: string | null }): Promise<void> {
+    const formData = new FormData();
+    formData.append('file', {
+      uri: file.uri,
+      name: file.name,
+      type: file.type || 'application/octet-stream',
+    } as any);
+
+    await api.post(`/leave/requests/${requestId}/upload-document`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+  },
+
   async cancelRequest(requestId: string): Promise<void> {
     await api.post(`/leave/requests/${requestId}/cancel`);
   },

@@ -12,7 +12,18 @@ export const sessionManager = {
 
     try {
       console.log('[SessionManager] Fetching profile...');
-      const user = await authService.getProfile();
+      const profile = await authService.getProfile();
+      const user = {
+        id: profile.id,
+        nik: profile.nik || '',
+        full_name: profile.full_name || '',
+        position_name: profile.position_name,
+        department_name: profile.department_name,
+        branch_name: profile.branch_name,
+        email: profile.email,
+        phone: profile.phone,
+        photo_url: profile.photo_url,
+      };
       const refreshToken = await tokenStore.getRefreshToken();
       await useAuthStore.getState().setAuth(user, accessToken, refreshToken || '');
       console.log('[SessionManager] Session initialized for:', user.full_name);

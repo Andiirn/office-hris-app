@@ -32,6 +32,7 @@ export interface CreateLeaveRequest {
   start_date: string;
   end_date: string | null;
   reason: string;
+  document_url?: string | null;
 }
 
 export interface LeaveHistoryQuery {

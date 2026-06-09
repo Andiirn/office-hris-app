@@ -53,26 +53,25 @@ export default function LoginScreen() {
       // Save tokens first so they can be used by the API interceptor for getProfile
       await tokenStore.setTokens(access_token, refresh_token);
 
-      let userData = data.user;
-
-      // If backend doesn't return user data on login, fetch it from /profile
-      if (!userData) {
-        try {
-          const profile = await authService.getProfile();
-          userData = {
-            id: profile.id,
-            nik: profile.nik,
-            full_name: profile.full_name
-          };
-        } catch (err) {
-          console.error('[Login] Failed to fetch profile after login:', err);
-          Alert.alert('Error', 'Failed to retrieve user profile');
-          return;
-        }
+      try {
+        const profile = await authService.getProfile();
+        const userData = {
+          id: profile.id,
+          nik: profile.nik || '',
+          full_name: profile.full_name || '',
+          position_name: profile.position_name,
+          department_name: profile.department_name,
+          branch_name: profile.branch_name,
+          email: profile.email,
+          phone: profile.phone,
+          photo_url: profile.photo_url,
+        };
+        await setAuth(userData, access_token, refresh_token);
+        router.replace('/(tabs)');
+      } catch (err) {
+        console.error('[Login] Failed to fetch profile after login:', err);
+        Alert.alert('Error', 'Failed to retrieve user profile');
       }
-
-      await setAuth(userData, access_token, refresh_token);
-      router.replace('/(tabs)');
     },
     onError: (error: any) => {
       const errorMessage = error.response?.data?.message || error.message || 'Login failed';

@@ -6,19 +6,30 @@ import { Calendar } from 'react-native-calendars';
 import { useQuery } from '@tanstack/react-query';
 import { Tokens } from '../../src/core/theme/tokens';
 import { holidayService } from '../../src/services/holiday.service';
+import { leaveService } from '../../src/services/leave.service';
+import { useAuthStore } from '../../src/stores/auth.store';
 import { GlassCard } from '../../src/components/ui/GlassCard';
 
 export default function CalendarScreen() {
+  const { user } = useAuthStore();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
-  const { data: holidays = [], isLoading, refetch, isFetching } = useQuery({
+  const { data: holidays = [], isLoading: isLoadingHolidays, refetch: refetchHolidays, isFetching: isFetchingHolidays } = useQuery({
     queryKey: ['calendar-holidays'],
     queryFn: () => holidayService.getHolidays({ year: new Date().getFullYear() }),
     refetchInterval: 1000 * 60 * 5,
   });
 
+  const { data: leaves = [], isLoading: isLoadingLeaves, refetch: refetchLeaves, isFetching: isFetchingLeaves } = useQuery({
+    queryKey: ['calendar-leaves', user?.id],
+    queryFn: () => leaveService.getRequests({ employee_id: user?.id, limit: 50 }),
+    enabled: !!user?.id,
+    refetchInterval: 1000 * 60 * 5,
+  });
+
   const onRefresh = () => {
-    refetch();
+    refetchHolidays();
+    refetchLeaves();
   };
 
   const isWeekend = (dateString: string) => {
@@ -39,12 +50,29 @@ export default function CalendarScreen() {
       };
     });
 
+    leaves.forEach((leave) => {
+      if (leave.status !== 'APPROVED') return;
+      marks[leave.start_date] = {
+        ...marks[leave.start_date],
+        startingDay: true,
+        color: 'rgba(31, 107, 66, 0.1)',
+        textColor: '#1f6b42',
+      };
+      if (leave.end_date) {
+        marks[leave.end_date] = {
+          ...marks[leave.end_date],
+          endingDay: true,
+          color: 'rgba(31, 107, 66, 0.1)',
+          textColor: '#1f6b42',
+        };
+      }
+    });
+
     const firstVisible = new Date(`${selectedDate.slice(0, 7)}-01T00:00:00`);
     for (let i = 0; i < 42; i += 1) {
       const d = new Date(firstVisible);
       d.setDate(firstVisible.getDate() + i);
       const date = d.toISOString().slice(0, 10);
-
       if (!isWeekend(date)) continue;
       if (marks[date]?.marked || marks[date]?.startingDay || marks[date]?.selectedColor) continue;
 
@@ -65,11 +93,12 @@ export default function CalendarScreen() {
     };
 
     return marks;
-  }, [holidays, selectedDate]);
+  }, [holidays, leaves, selectedDate]);
 
   const dailyAgenda = useMemo(() => {
     const events: Array<{ type: string; title: string; time: string; icon: string; color: string }> = [];
     const holiday = holidays.find((h) => h.holiday_date === selectedDate);
+    const leave = leaves.find((l) => l.start_date === selectedDate || (l.end_date && selectedDate >= l.start_date && selectedDate <= l.end_date));
 
     if (holiday) {
       events.push({
@@ -79,7 +108,17 @@ export default function CalendarScreen() {
         icon: 'celebration',
         color: Tokens.colors.error,
       });
-    } else if (isWeekend(selectedDate)) {
+    }
+
+    if (leave && leave.status === 'APPROVED') {
+      events.push({
+        type: 'LEAVE',
+        title: leave.leave_type_name || 'Approved Leave',
+        time: leave.status,
+        icon: 'event-busy',
+        color: Tokens.colors.primary,
+      });
+    } else if (!holiday && isWeekend(selectedDate)) {
       events.push({
         type: 'OFF DAY',
         title: 'Sabtu / Minggu',
@@ -90,13 +129,15 @@ export default function CalendarScreen() {
     }
 
     return events;
-  }, [holidays, selectedDate]);
+  }, [holidays, leaves, selectedDate]);
+
+  const isLoading = isLoadingHolidays || isLoadingLeaves;
 
   return (
     <SafeAreaView className="flex-1 bg-background">
       <View className="px-5 pt-2 pb-5">
         <Text className="font-manrope-extrabold text-3xl text-primary">Calendar</Text>
-        <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Company holidays and off days</Text>
+        <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Company holidays and approved leave</Text>
       </View>
 
       <ScrollView
@@ -104,7 +145,7 @@ export default function CalendarScreen() {
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={isFetching || isLoading} onRefresh={onRefresh} tintColor={Tokens.colors.primary} />
+          <RefreshControl refreshing={isFetchingHolidays || isFetchingLeaves || isLoading} onRefresh={onRefresh} tintColor={Tokens.colors.primary} />
         }
       >
         <GlassCard style={{ padding: 10, marginBottom: 24 }}>
@@ -141,7 +182,7 @@ export default function CalendarScreen() {
           <View className="items-center py-10">
             <MaterialIcons name="event-note" size={48} color={Tokens.colors.outline} />
             <Text className="font-inter-medium text-sm text-text-muted mt-3 text-center">
-              No holidays or off days for this date.
+              No holidays or approved leave for this date.
             </Text>
           </View>
         ) : (

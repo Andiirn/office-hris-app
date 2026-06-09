@@ -39,6 +39,13 @@ export interface AttendanceItem {
   checkin_at?: string | null;
   checkout_at?: string | null;
   attendance_status?: string;
+  branch_name?: string | null;
+  branch?: {
+    id?: string;
+    name?: string;
+    code?: string;
+    timezone?: string;
+  } | null;
 }
 
 export interface AttendanceListQuery {

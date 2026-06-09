@@ -1,10 +1,16 @@
 import { create } from 'zustand';
 import { tokenStore } from '../core/auth/token-store';
 
-interface User {
+export interface User {
   id: string;
   nik: string;
   full_name: string;
+  position_name?: string | null;
+  department_name?: string | null;
+  branch_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  photo_url?: string | null;
 }
 
 interface AuthState {

@@ -26,7 +26,13 @@ export const authService = {
   async getProfile(): Promise<ProfileData> {
     try {
       const response = await api.get('/profile');
-      return unwrapData<ProfileData>(response.data);
+      const rawData = unwrapData<any>(response.data);
+      return {
+        ...rawData,
+        position_name: rawData.position?.name || rawData.position_name || null,
+        department_name: rawData.division?.name || rawData.department_name || null,
+        branch_name: rawData.branch?.name || rawData.branch_name || null,
+      };
     } catch (error: any) {
       console.warn('[AuthService] Get Profile failed:', error.response?.data?.message || error.message);
       throw error;

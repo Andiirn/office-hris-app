@@ -98,6 +98,7 @@ export default function AttendanceHistoryScreen() {
   const getCheckinTime = (item: any) => item.checkin_at || item.checkin_time;
   const getCheckoutTime = (item: any) => item.checkout_at || item.checkout_time;
   const getAttendanceStatus = (item: any) => item.attendance_status || item.status || 'PRESENT';
+  const getBranchName = (item: any) => item.branch_name || item.branch?.name || item.branch?.code || '';
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -188,12 +189,12 @@ export default function AttendanceHistoryScreen() {
                   </View>
                 </View>
                 
-                {(item as any).branch_name && (
+                {getBranchName(item) ? (
                   <View className="flex-row items-center mt-3 gap-1.5 ml-1">
                     <MaterialIcons name="location-on" size={12} color={Tokens.colors.textMuted} />
-                    <Text className="font-inter-medium text-xs text-text-muted">{(item as any).branch_name}</Text>
+                    <Text className="font-inter-medium text-xs text-text-muted">{getBranchName(item)}</Text>
                   </View>
-                )}
+                ) : null}
               </GlassCard>
             ))}
           </View>
