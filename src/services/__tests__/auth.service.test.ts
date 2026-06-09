@@ -17,6 +17,9 @@ describe('authService', () => {
           nik: '12345',
           full_name: 'Andi',
           email: 'andi@example.com',
+          position: { name: 'Developer' },
+          division: { name: 'IT' },
+          branch: { name: 'HQ' }
         },
       },
     });
@@ -29,6 +32,13 @@ describe('authService', () => {
       nik: '12345',
       full_name: 'Andi',
       email: 'andi@example.com',
+      position: { name: 'Developer' },
+      division: { name: 'IT' },
+      branch: { name: 'HQ' },
+      position_name: 'Developer',
+      department_name: 'IT',
+      branch_name: 'HQ',
+      role: 'employee',
     });
   });
 });

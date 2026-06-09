@@ -70,6 +70,12 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="approvals" options={{ headerShown: false }} />
+        <Stack.Screen name="leave" options={{ headerShown: false }} />
+        <Stack.Screen name="overtime" options={{ headerShown: false }} />
+        <Stack.Screen name="payroll" options={{ headerShown: false }} />
+        <Stack.Screen name="resign" options={{ headerShown: false }} />
+        <Stack.Screen name="attendance-scan" options={{ headerShown: false }} />
       </Stack>
     </QueryClientProvider>
   );

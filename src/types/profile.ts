@@ -2,6 +2,7 @@ export interface ProfileData {
   id: string;
   nik?: string;
   full_name?: string;
+  role?: string | null;
   email?: string | null;
   phone?: string | null;
   address_domicile?: string | null;

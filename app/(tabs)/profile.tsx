@@ -85,7 +85,7 @@ export default function ProfileScreen() {
           onPress={handleLogout}
         >
           <MaterialIcons name="logout" size={20} color={Tokens.colors.error} />
-          <Text className="font-inter-bold text-sm text-error ml-2">Logout Sesi</Text>
+          <Text className="font-inter-bold text-sm text-error ml-2">Keluar</Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>

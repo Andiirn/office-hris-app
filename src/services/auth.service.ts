@@ -3,6 +3,7 @@ import { api } from '../core/api/client';
 import { unwrapData } from '../core/api/envelope';
 import { LoginResponse } from '../types/auth';
 import { ProfileData } from '../types/profile';
+import { normalizeRole } from '../core/auth/rbac';
 
 export const authService = {
   async login(nik: string, password: string): Promise<LoginResponse> {
@@ -29,6 +30,7 @@ export const authService = {
       const rawData = unwrapData<any>(response.data);
       return {
         ...rawData,
+        role: normalizeRole(rawData.role),
         position_name: rawData.position?.name || rawData.position_name || null,
         department_name: rawData.division?.name || rawData.department_name || null,
         branch_name: rawData.branch?.name || rawData.branch_name || null,

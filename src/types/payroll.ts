@@ -26,6 +26,29 @@ export interface PayrollPreview {
   overtime_hours: number;
   slip_pdf_url: string | null;
   generated_at: string;
+  
+  // New matching properties from backend
+  work_days?: number;
+  bruto_salary?: number;
+  employee_custom_earning?: number;
+  employee_custom_deduction?: number;
+  minor_late_days?: number;
+  major_late_days?: number;
+  late_deduction?: number;
+  leave_deduction?: number;
+  total_leave_days?: number;
+  employee?: {
+    id: string;
+    full_name: string;
+    nik: string;
+    photo_url?: string | null;
+  };
+  component_lines?: Array<{
+    name: string;
+    component_type: "EARNING" | "DEDUCTION";
+    amount: number;
+    keterangan?: string | null;
+  }>;
   // Fallbacks for compatibility
   components?: PayrollComponent[];
   status?: string;
