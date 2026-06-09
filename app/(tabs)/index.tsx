@@ -174,7 +174,7 @@ export default function HomeScreen() {
           <Text className="font-inter-medium text-base text-text-muted mt-1 mb-3.5">{dateText}</Text>
           <Pressable
             className="w-[190px] h-[190px] rounded-full bg-primary-container items-center justify-center gap-2 shadow-lg shadow-black/10 elevation-6"
-            onPress={() => router.push('/attendance')}
+            onPress={() => router.push('/attendance-scan')}
           >
             <MaterialIcons name="qr-code-scanner" size={44} color="#fff" />
             <Text className="font-inter-bold text-sm text-white">Scan QR Code</Text>
@@ -185,6 +185,7 @@ export default function HomeScreen() {
           {[
             { icon: 'event-available', title: 'Izin & Cuti', subtitle: leaveText, onPress: () => router.push('/leave') },
             { icon: 'work-history', title: 'Lembur', subtitle: 'Request Extra', onPress: () => router.push('/overtime') },
+            { icon: 'payments', title: 'Slip Gaji', subtitle: 'Preview bulanan', onPress: () => router.push('/payroll') },
             { icon: 'event', title: 'Absensi', subtitle: 'History & koreksi', onPress: () => router.push('/attendance') },
             { icon: 'exit-to-app', title: 'Resign', subtitle: resignText, onPress: () => router.push('/resign') },
           ].map((item) => (
