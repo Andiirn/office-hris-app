@@ -17,8 +17,10 @@ export interface CheckinRequest {
 }
 
 export interface CheckoutRequest {
+  qr_token?: string;
   gps_lat: number;
   gps_long: number;
+  checkout_photo_url?: string | null;
 }
 
 export interface AttendanceActionResponse {

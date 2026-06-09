@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Tokens } from '../../src/core/theme/tokens';
 import { attendanceService } from '../../src/services/attendance.service';
 import { leaveService } from '../../src/services/leave.service';
-import { resignService } from '../../src/services/resign.service';
+// import { resignService } from '../../src/services/resign.service';
 import { useAuthStore } from '../../src/stores/auth.store';
 
 export default function HomeScreen() {
@@ -48,7 +48,8 @@ export default function HomeScreen() {
   const totalRemaining = leaveBalances?.reduce((acc, item) => acc + (item.remaining_days ?? 0), 0) ?? '-';
   const leaveText = isLoadingLeave ? 'Sisa: ...' : `Sisa: ${totalRemaining} Hari`;
 
-  // 2. Fetch Resign Status
+  // 2. Fetch Resign Status (commented out as Resign menu item is currently disabled)
+  /*
   const { data: resignHistory = [], isLoading: isLoadingResign, refetch: refetchResign } = useQuery({
     queryKey: ['resign-status', user?.id],
     queryFn: () => resignService.getMyRequests({ limit: 1 }),
@@ -57,6 +58,7 @@ export default function HomeScreen() {
 
   const latestResign = resignHistory[0];
   const resignText = isLoadingResign ? 'Checking...' : latestResign ? `Status: ${latestResign.status}` : 'Offboarding';
+  */
 
   // 3. Recent Activities
   const {
@@ -101,7 +103,6 @@ export default function HomeScreen() {
   const onRefresh = () => {
     refetchActivities();
     refetchLeave();
-    refetchResign();
   };
 
   // 3. Process activities into flattened events
@@ -149,26 +150,29 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120, gap: 18 }}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={isFetchingActivities} onRefresh={onRefresh} tintColor={Tokens.colors.primary} />
-        }
-      >
-        <View className="bg-white/80 rounded-2xl p-3.5 flex-row justify-between items-center mt-5 border border-white/90">
+      {/* Fixed Sticky Header Card */}
+      <View className="px-5 pt-3 pb-1 bg-background z-20">
+        <View className="bg-white/80 rounded-2xl p-3.5 flex-row justify-between items-center border border-white/90 shadow-sm">
           <View>
             <Text className="font-manrope-bold text-sm text-primary">{name}</Text>
             <Text className="font-inter text-[11px] text-text-muted mt-0.5">{user?.position_name || '-'}</Text>
           </View>
           <View className={`rounded-full px-2.5 py-1 ${isClockedIn ? 'bg-secondary-container' : 'bg-error-container'}`}>
             <Text className={`font-inter-bold text-[10px] ${isClockedIn ? 'text-on-secondary-container' : 'text-on-error-container'}`}>
-              {isClockedIn ? 'Clocked In' : 'Clocked Out'}
+              {isClockedIn ? 'Sudah Absen' : 'Belum Absen'}
             </Text>
           </View>
         </View>
+      </View>
 
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 120, gap: 18 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={isFetchingActivities} onRefresh={onRefresh} tintColor={Tokens.colors.primary} />
+        }
+      >
         <View className="items-center pt-2">
           <Text className="font-manrope-extrabold text-5xl text-primary leading-[52px]">{timeText}</Text>
           <Text className="font-inter-medium text-base text-text-muted mt-1 mb-3.5">{dateText}</Text>
@@ -186,8 +190,8 @@ export default function HomeScreen() {
             { icon: 'event-available', title: 'Izin & Cuti', subtitle: leaveText, onPress: () => router.push('/leave') },
             { icon: 'work-history', title: 'Lembur', subtitle: 'Request Extra', onPress: () => router.push('/overtime') },
             { icon: 'payments', title: 'Slip Gaji', subtitle: 'Preview bulanan', onPress: () => router.push('/payroll') },
-            { icon: 'event', title: 'Absensi', subtitle: 'History & koreksi', onPress: () => router.push('/attendance') },
-            { icon: 'exit-to-app', title: 'Resign', subtitle: resignText, onPress: () => router.push('/resign') },
+            { icon: 'event', title: 'Kehadiran', subtitle: 'History & koreksi', onPress: () => router.push('/attendance') },
+            // { icon: 'exit-to-app', title: 'Resign', subtitle: resignText, onPress: () => router.push('/resign') },
           ].map((item) => (
             <Pressable
               key={item.title}

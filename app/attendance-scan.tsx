@@ -25,13 +25,14 @@ export default function AttendanceScanScreen() {
   const [coords, setCoords] = useState<{ lat: number; long: number } | null>(null);
   const [isMocked, setIsMocked] = useState(false);
   const [todayRecord, setTodayRecord] = useState<any | null>(null);
+  const [lastQrPayload, setLastQrPayload] = useState<{ qrToken: string; branchId: string } | null>(null);
   const { width, height } = useWindowDimensions();
 
   const parseQrPayload = useCallback((raw: string) => {
     try {
       const json = JSON.parse(raw) as { qr_token?: string; branch_id?: string };
       if (json.qr_token && json.branch_id) return { qrToken: json.qr_token, branchId: json.branch_id };
-    } catch {}
+    } catch { }
     const parts = raw.split(':');
     if (parts.length >= 2) return { qrToken: raw.trim(), branchId: parts[0].trim() };
     throw new Error('Format QR tidak valid');
@@ -66,7 +67,7 @@ export default function AttendanceScanScreen() {
       }
 
       setStatus('denied');
-      setErrorMessage('Lokasi tidak tersedia. Pastikan GPS aktif lalu coba lagi.');
+      setErrorMessage('Lokasi tidak tersedia. Pastikan GPS aktif, lalu coba lagi.');
     } catch (err) {
       console.error(err);
       setStatus('denied');
@@ -113,8 +114,9 @@ export default function AttendanceScanScreen() {
         return;
       }
 
+      const { qrToken, branchId } = parseQrPayload(rawQrData);
       if (!hasCheckin) {
-        const { qrToken, branchId } = parseQrPayload(rawQrData);
+        setLastQrPayload({ qrToken, branchId });
         const payload = {
           qr_token: qrToken,
           branch_id: branchId,
@@ -136,8 +138,10 @@ export default function AttendanceScanScreen() {
         setCheckinMessage(result.message ?? 'Check-in berhasil');
       } else {
         const result = await attendanceService.checkout({
+          qr_token: qrToken,
           gps_lat: coords.lat,
           gps_long: coords.long,
+          checkout_photo_url: '',
         });
         setCheckinMessage(result.message ?? 'Check-out berhasil');
       }
@@ -149,13 +153,24 @@ export default function AttendanceScanScreen() {
     } finally {
       setSubmitting(false);
     }
-  }, [coords, isMocked, height, parseQrPayload, todayRecord, width]);
+  }, [coords, isMocked, height, lastQrPayload, parseQrPayload, todayRecord, width]);
 
   const handleRetryScanner = () => {
     setScanned(false);
     setErrorMessage(null);
     setCheckinMessage(null);
   };
+
+  const isScannerVisible =
+    status === 'granted' &&
+    cameraStatus === 'granted' &&
+    !scanned &&
+    !submitting &&
+    !checkinMessage &&
+    !errorMessage;
+
+  const hasSuccessState = !!checkinMessage && !errorMessage;
+  const hasFailureState = !!errorMessage;
 
   const hasCheckin = !!todayRecord?.checkin_time || !!todayRecord?.checkin_at;
   const hasCheckout = !!todayRecord?.checkout_time || !!todayRecord?.checkout_at;
@@ -200,12 +215,6 @@ export default function AttendanceScanScreen() {
               {errorMessage || 'Aplikasi memerlukan izin lokasi untuk melakukan absensi.'}
             </Text>
             <Button title="Buka Pengaturan" onPress={() => Linking.openSettings()} className="w-full mt-2" />
-            <Button
-              title="Coba Lagi"
-              onPress={requestLocationPermission}
-              className="w-full bg-white border border-primary/20"
-              textStyle={{ color: Tokens.colors.primary }}
-            />
           </View>
         )}
 
@@ -231,79 +240,88 @@ export default function AttendanceScanScreen() {
               </Text>
             </View>
 
-            <View className="w-full max-w-[320px] aspect-square rounded-3xl overflow-hidden border-[4px] border-primary-container/20 shadow-2xl relative">
-              <CameraView
-                style={{ flex: 1 }}
-                barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-                onBarcodeScanned={scanned ? undefined : ({ data }) => {
-                  setScanned(true);
-                  submitAttendance(data);
-                }}
-              />
-              {!scanned && (
-                <View className="absolute inset-0 items-center justify-center pointer-events-none">
-                  <View className="w-48 h-48 border-2 border-dashed border-white/80 rounded-2xl" />
-                  <View className="absolute left-1/2 top-12 w-[1px] h-40 bg-red-500 opacity-60" style={{ transform: [{ translateX: -0.5 }] }} />
+            {isScannerVisible && (
+              <>
+                <View className="w-full max-w-[320px] aspect-square rounded-3xl overflow-hidden border-[4px] border-primary-container/20 shadow-2xl relative">
+                  <CameraView
+                    style={{ flex: 1 }}
+                    barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                    onBarcodeScanned={scanned ? undefined : ({ data }) => {
+                      setScanned(true);
+                      submitAttendance(data);
+                    }}
+                  />
+                  <View className="absolute inset-0 items-center justify-center pointer-events-none">
+                    <View className="w-48 h-48 border-2 border-dashed border-white/80 rounded-2xl" />
+                    <View className="absolute left-1/2 top-12 w-[1px] h-40 bg-red-500 opacity-60" style={{ transform: [{ translateX: -0.5 }] }} />
+                  </View>
                 </View>
-              )}
-            </View>
 
-            {hasCheckin && !hasCheckout && (
-              <View className="bg-secondary-container/30 border border-secondary-container rounded-2xl p-3.5 w-full flex-row items-center gap-3 mt-2">
-                <MaterialIcons name="info" size={20} color={Tokens.colors.primary} />
-                <Text className="font-inter text-xs text-primary flex-1 leading-relaxed">
-                  Status: Sudah Check In. Scan QR untuk melakukan <Text className="font-inter-bold">Check Out</Text>.
+                <Text className="font-inter text-xs text-text-muted italic text-center mt-2 px-6">
+                  Arahkan kamera ke QR Code cabang untuk check-in atau check-out
                 </Text>
-              </View>
-            )}
-
-            {hasCheckin && hasCheckout && (
-              <View className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 w-full flex-row items-center gap-3 mt-2">
-                <MaterialIcons name="check-circle" size={20} color="#059669" />
-                <Text className="font-inter text-xs text-emerald-800 flex-1 leading-relaxed">
-                  Anda telah menyelesaikan absensi hari ini (Sudah Check-In dan Check-Out).
-                </Text>
-              </View>
-            )}
-
-            {errorMessage && (
-              <View className="bg-red-50 border border-red-200 rounded-2xl p-4 w-full flex-row items-start gap-3 mt-2">
-                <MaterialIcons name="error" size={20} color={Tokens.colors.error} />
-                <Text className="font-inter text-xs text-error flex-1 leading-relaxed">
-                  {errorMessage}
-                </Text>
-              </View>
-            )}
-
-            {checkinMessage && (
-              <View className="bg-[#d9e6da] border border-[#b2cfb5] rounded-2xl p-4 w-full flex-row items-start gap-3 mt-2">
-                <MaterialIcons name="check-circle" size={20} color="#1f6b42" />
-                <Text className="font-inter-semibold text-xs text-[#1f6b42] flex-1 leading-relaxed">
-                  {checkinMessage}
-                </Text>
-              </View>
-            )}
-
-            {scanned && !submitting && (
-              <Button
-                title="Scan Ulang"
-                onPress={handleRetryScanner}
-                className="w-full mt-2 h-13 rounded-2xl bg-white border border-primary/25"
-                textStyle={{ color: Tokens.colors.primary }}
-              />
+              </>
             )}
 
             {submitting && (
-              <View className="flex-row items-center justify-center gap-2 w-full mt-2 py-3">
-                <ActivityIndicator size="small" color={Tokens.colors.primary} />
-                <Text className="font-inter-medium text-sm text-text-muted">Memproses absensi...</Text>
+              <View className="w-full max-w-[320px] rounded-3xl bg-white border border-white/80 shadow-sm p-6 items-center gap-3">
+                <ActivityIndicator size="large" color={Tokens.colors.primary} />
+                <Text className="font-inter-bold text-lg text-primary text-center">
+                  Memproses absensi
+                </Text>
+                <Text className="font-inter text-sm text-text-muted text-center">
+                  Kamera dimatikan sementara sampai proses selesai.
+                </Text>
               </View>
             )}
 
-            {!scanned && (
-              <Text className="font-inter text-xs text-text-muted italic text-center mt-2 px-6">
-                Arahkan kamera ke QR Code cabang untuk check-in atau check-out
-              </Text>
+            {hasSuccessState && (
+              <View className="w-full max-w-[320px] rounded-3xl bg-white border border-emerald-200 shadow-sm p-6 items-center gap-3">
+                <View className="w-14 h-14 rounded-full bg-emerald-50 items-center justify-center">
+                  <MaterialIcons name="check-circle" size={34} color="#059669" />
+                </View>
+                <Text className="font-manrope-extrabold text-2xl text-emerald-700 text-center">
+                  {checkinMessage}
+                </Text>
+                <Text className="font-inter text-sm text-text-muted text-center">
+                  Silahkan aktifkan kamera kembali jika perlu scan ulang.
+                </Text>
+                <Button
+                  title="Scan Ulang"
+                  onPress={handleRetryScanner}
+                  className="w-full mt-2 h-13 rounded-2xl bg-primary"
+                  textStyle={{ color: '#ffffff' }}
+                />
+              </View>
+            )}
+
+            {hasFailureState && (
+              <View className="w-full max-w-[320px] rounded-3xl bg-white border border-red-200 shadow-sm p-6 items-center gap-3">
+                <View className="w-14 h-14 rounded-full bg-red-50 items-center justify-center">
+                  <MaterialIcons name="error" size={34} color={Tokens.colors.error} />
+                </View>
+                <Text className="font-manrope-extrabold text-2xl text-error text-center">
+                  Gagal memproses absensi
+                </Text>
+                <Text className="font-inter text-sm text-text-muted text-center">
+                  {errorMessage}
+                </Text>
+                <Button
+                  title="Coba Lagi"
+                  onPress={handleRetryScanner}
+                  className="w-full mt-2 h-13 rounded-2xl bg-primary"
+                  textStyle={{ color: '#ffffff' }}
+                />
+              </View>
+            )}
+
+            {hasCheckin && hasCheckout && !hasSuccessState && !hasFailureState && !submitting && (
+              <View className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 w-full flex-row items-center gap-3 mt-2">
+                <MaterialIcons name="check-circle" size={20} color="#059669" />
+                <Text className="font-inter text-xs text-emerald-800 flex-1 leading-relaxed">
+                  Terima Kasih. Anda telah selesai melakukan absensi hari ini.
+                </Text>
+              </View>
             )}
           </View>
         )}

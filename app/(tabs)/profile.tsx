@@ -1,13 +1,13 @@
-import React from 'react';
-import { View, Text, ScrollView, Pressable, Alert, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useQuery } from '@tanstack/react-query';
-import { Tokens } from '../../src/core/theme/tokens';
-import { useAuthStore } from '../../src/stores/auth.store';
-import { GlassCard } from '../../src/components/ui/GlassCard';
 import { router } from 'expo-router';
+import React from 'react';
+import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { GlassCard } from '../../src/components/ui/GlassCard';
+import { Tokens } from '../../src/core/theme/tokens';
 import { authService } from '../../src/services/auth.service';
+import { useAuthStore } from '../../src/stores/auth.store';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuthStore();
@@ -32,8 +32,8 @@ export default function ProfileScreen() {
       'Are you sure you want to logout?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Logout', 
+        {
+          text: 'Logout',
           onPress: async () => {
             await logout();
             router.replace('/(auth)/login');
@@ -48,7 +48,7 @@ export default function ProfileScreen() {
     <SafeAreaView className="flex-1 bg-background">
       {/* Background Decor */}
       <View className="absolute -top-20 -left-20 w-80 h-80 rounded-full bg-primary/10" />
-      
+
       <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 120 }}>
         <View className="items-center mb-8">
           <View className="w-24 h-24 rounded-full bg-primary/10 items-center justify-center border-4 border-white shadow-sm mb-4">
@@ -80,23 +80,7 @@ export default function ProfileScreen() {
             </View>
           ))}
         </GlassCard>
-
-        {isLoading ? (
-          <View className="items-center py-4">
-            <ActivityIndicator size="small" color={Tokens.colors.primary} />
-            <Text className="font-inter text-xs text-text-muted mt-2">Memuat profile...</Text>
-          </View>
-        ) : (
-          <Pressable
-            className="flex-row items-center justify-center bg-white/80 p-4 rounded-2xl border border-white/90 mb-4"
-            onPress={() => refetch()}
-          >
-            <MaterialIcons name="refresh" size={18} color={Tokens.colors.primary} />
-            <Text className="font-inter-bold text-sm text-primary ml-2">Refresh Profile</Text>
-          </Pressable>
-        )}
-
-        <Pressable 
+        <Pressable
           className="flex-row items-center justify-center bg-error-container p-4 rounded-2xl border border-error/10"
           onPress={handleLogout}
         >
