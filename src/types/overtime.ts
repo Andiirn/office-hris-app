@@ -14,7 +14,7 @@ export interface OvertimeRecord {
   is_approved?: boolean;
   approved_by?: string;
   approved_at?: string;
-  status: OvertimeStatus;
+  status?: OvertimeStatus | string;
   reason?: string;
   created_at: string;
   attendance_date?: string;

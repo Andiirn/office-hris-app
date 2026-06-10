@@ -36,6 +36,8 @@ type FeedItem = {
   icon: keyof typeof MaterialIcons.glyphMap;
   color: string;
   bgColor: string;
+  details?: string[];
+  isExpanded?: boolean;
 };
 
 export default function ActivityScreen() {
@@ -115,6 +117,14 @@ export default function ActivityScreen() {
     return Number.isFinite(parsed) ? parsed : 0;
   };
 
+  const getOvertimeStatus = (item: any) => {
+    const rawStatus = String(item?.status || item?.overtime_status || '').toUpperCase();
+    if (rawStatus === 'APPROVED' || item?.is_approved || item?.approved_at) return 'APPROVED';
+    if (rawStatus === 'REJECTED' || rawStatus === 'DECLINED') return 'REJECTED';
+    if (rawStatus === 'CANCELLED') return 'CANCELLED';
+    return 'PENDING';
+  };
+
   const onRefresh = () => {
     refetchAttendance();
     refetchLeave();
@@ -191,16 +201,17 @@ export default function ActivityScreen() {
     });
 
     overtimeRecords.forEach((item: any) => {
+      const status = getOvertimeStatus(item);
       items.push({
         id: `overtime-${item.id}`,
-        type: item.status === 'APPROVED' ? 'overtime.approved' : item.status === 'REJECTED' ? 'overtime.rejected' : item.status === 'CANCELLED' ? 'overtime.cancelled' : 'overtime.created',
-        title: `Lembur ${item.status?.toLowerCase?.() || 'created'}`,
+        type: status === 'APPROVED' ? 'overtime.approved' : status === 'REJECTED' ? 'overtime.rejected' : status === 'CANCELLED' ? 'overtime.cancelled' : 'overtime.created',
+        title: `Lembur ${status.toLowerCase()}`,
         summary: `${item.overtime_date || item.attendance_date || '-'} · ${item.overtime_hours ?? item.overtime_minutes ?? '-'} jam`,
         timestamp: item.created_at || item.overtime_date || item.attendance_date || '',
         sortTime: toSortTime(item.created_at) || toSortTime(item.approved_at) || toSortTime(item.end_time) || toSortTime(item.start_time) || toSortTime(item.overtime_date) || toSortTime(item.attendance_date),
-        icon: item.status === 'APPROVED' ? 'check-circle' : item.status === 'REJECTED' ? 'cancel' : item.status === 'CANCELLED' ? 'cancel' : 'work-history',
-        color: item.status === 'APPROVED' ? '#1f6b42' : item.status === 'REJECTED' ? '#93000a' : '#000666',
-        bgColor: item.status === 'APPROVED' ? '#d9e6da' : item.status === 'REJECTED' ? '#ffdad6' : '#e7ebff',
+        icon: status === 'APPROVED' ? 'check-circle' : status === 'REJECTED' ? 'cancel' : status === 'CANCELLED' ? 'cancel' : 'work-history',
+        color: status === 'APPROVED' ? '#1f6b42' : status === 'REJECTED' ? '#93000a' : '#000666',
+        bgColor: status === 'APPROVED' ? '#d9e6da' : status === 'REJECTED' ? '#ffdad6' : '#e7ebff',
       });
     });
 

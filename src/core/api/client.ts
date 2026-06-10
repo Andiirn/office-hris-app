@@ -57,7 +57,10 @@ api.interceptors.response.use(
       try {
         const refreshToken = await tokenStore.getRefreshToken();
         if (!refreshToken) {
-          throw new Error('No refresh token available');
+          console.log('[API Client] No refresh token found, logging out...');
+          await tokenStore.clearTokens();
+          await useAuthStore.getState().logout();
+          return Promise.reject(err);
         }
 
         console.log('[API Client] Token expired, attempting refresh...');
@@ -67,9 +70,9 @@ api.interceptors.response.use(
           refresh_token: refreshToken,
         });
 
-        const { access_token, refresh_token } = response.data.data;
+        const { access_token, refresh_token: new_refresh_token } = response.data.data;
 
-        await tokenStore.setTokens(access_token, refresh_token);
+        await tokenStore.setTokens(access_token, new_refresh_token);
         
         console.log('[API Client] Token refreshed successfully');
         processQueue(null, access_token);

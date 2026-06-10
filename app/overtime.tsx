@@ -42,6 +42,14 @@ function formatTime(timeStr?: string | null) {
   return timeStr.slice(0, 5);
 }
 
+function getOvertimeStatus(item: any) {
+  const rawStatus = String(item?.status || item?.overtime_status || '').toUpperCase();
+  if (rawStatus === 'APPROVED' || item?.is_approved || item?.approved_at) return 'APPROVED';
+  if (rawStatus === 'REJECTED' || rawStatus === 'DECLINED') return 'REJECTED';
+  if (rawStatus === 'CANCELLED') return 'CANCELLED';
+  return 'PENDING';
+}
+
 export default function OvertimeScreen() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
@@ -297,58 +305,61 @@ export default function OvertimeScreen() {
             <Text className="font-inter-medium text-sm text-text-muted mt-3 text-center">Belum ada riwayat lembur</Text>
           </GlassCard>
         ) : (
-          history.map((item) => (
-            <GlassCard key={item.id} style={{ marginBottom: 12, padding: 16 }}>
-              <View className="flex-row justify-between items-start mb-2.5">
-                <View className="flex-1">
-                  <Text className="font-inter-bold text-[10px] text-text-muted uppercase mb-1 tracking-widest">
-                    Overtime Request
-                  </Text>
-                  <View className="flex-row items-center gap-1.5 mb-1.5">
-                    <MaterialIcons name="calendar-today" size={12} color={Tokens.colors.primary} />
-                    <Text className="font-inter-bold text-sm text-black">
-                      {item.attendance_date || item.overtime_date || item.created_at?.split('T')[0] || '-'}
+          history.map((item) => {
+            const status = getOvertimeStatus(item);
+            return (
+              <GlassCard key={item.id} style={{ marginBottom: 12, padding: 16 }}>
+                <View className="flex-row justify-between items-start mb-2.5">
+                  <View className="flex-1">
+                    <Text className="font-inter-bold text-[10px] text-text-muted uppercase mb-1 tracking-widest">
+                      Overtime Request
                     </Text>
-                  </View>
-                  <View className="flex-row items-center gap-3">
-                    <View className="flex-row items-center gap-1">
-                      <MaterialIcons name="history" size={12} color={Tokens.colors.primary} />
-                      <Text className="font-inter-bold text-xs text-primary">
-                        {item.overtime_hours ? `${item.overtime_hours} Jam` : item.overtime_minutes ? `${item.overtime_minutes} Menit` : '-'}
+                    <View className="flex-row items-center gap-1.5 mb-1.5">
+                      <MaterialIcons name="calendar-today" size={12} color={Tokens.colors.primary} />
+                      <Text className="font-inter-bold text-sm text-black">
+                        {item.attendance_date || item.overtime_date || item.created_at?.split('T')[0] || '-'}
                       </Text>
                     </View>
-                    <View className="w-1 h-1 rounded-full bg-outline/30" />
-                    <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-tighter">
-                      {item.overtime_type?.replace('_', ' ')}
-                    </Text>
+                    <View className="flex-row items-center gap-3">
+                      <View className="flex-row items-center gap-1">
+                        <MaterialIcons name="history" size={12} color={Tokens.colors.primary} />
+                        <Text className="font-inter-bold text-xs text-primary">
+                          {item.overtime_hours ? `${item.overtime_hours} Jam` : item.overtime_minutes ? `${item.overtime_minutes} Menit` : '-'}
+                        </Text>
+                      </View>
+                      <View className="w-1 h-1 rounded-full bg-outline/30" />
+                      <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-tighter">
+                        {item.overtime_type?.replace('_', ' ')}
+                      </Text>
+                    </View>
+                  </View>
+                  <View className="items-end">
+                    <StatusBadge
+                      label={status}
+                      type={getStatusType(status) as any}
+                    />
+                    {!!item.overtime_amount && item.overtime_amount > 0 && (
+                      <Text className="font-inter-bold text-[10px] text-secondary mt-1">
+                        +{new Intl.NumberFormat('id-ID', {
+                          style: 'currency',
+                          currency: 'IDR',
+                          minimumFractionDigits: 0,
+                        }).format(item.overtime_amount)}
+                      </Text>
+                    )}
                   </View>
                 </View>
-                <View className="items-end">
-                  <StatusBadge
-                    label={item.status || 'PENDING'}
-                    type={getStatusType(item.status) as any}
-                  />
-                  {!!item.overtime_amount && item.overtime_amount > 0 && (
-                    <Text className="font-inter-bold text-[10px] text-secondary mt-1">
-                      +{new Intl.NumberFormat('id-ID', {
-                        style: 'currency',
-                        currency: 'IDR',
-                        minimumFractionDigits: 0,
-                      }).format(item.overtime_amount)}
-                    </Text>
-                  )}
-                </View>
-              </View>
 
-              {item.reason && (
-                <View className="bg-black/5 px-3 py-2 rounded-lg mt-2">
-                  <Text className="font-inter text-xs text-text-muted italic" numberOfLines={2}>
-                    &quot;{item.reason}&quot;
-                  </Text>
-                </View>
-              )}
-            </GlassCard>
-          ))
+                {item.reason && (
+                  <View className="bg-black/5 px-3 py-2 rounded-lg mt-2">
+                    <Text className="font-inter text-xs text-text-muted italic" numberOfLines={2}>
+                      &quot;{item.reason}&quot;
+                    </Text>
+                  </View>
+                )}
+              </GlassCard>
+            );
+          })
         )}
       </ScrollView>
 

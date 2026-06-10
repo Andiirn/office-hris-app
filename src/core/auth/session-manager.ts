@@ -7,6 +7,7 @@ export const sessionManager = {
     const accessToken = await tokenStore.getAccessToken();
     if (!accessToken) {
       console.log('[SessionManager] No access token found');
+      await useAuthStore.getState().setInitialized(true);
       return;
     }
 

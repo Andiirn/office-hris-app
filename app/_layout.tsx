@@ -16,20 +16,54 @@ import {
 } from '@expo-google-fonts/inter';
 import { sessionManager } from '../src/core/auth/session-manager';
 import { useAuthStore } from '../src/stores/auth.store';
+import { AppState, AppStateStatus, Platform } from 'react-native';
+import { focusManager } from '@tanstack/react-query';
+import { ErrorBoundaryProps } from 'expo-router';
+import { Alert, Text, View, Pressable } from 'react-native';
 
 SplashScreen.preventAutoHideAsync();
+
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  useEffect(() => {
+    // Log error to console for adb logcat visibility
+    console.error('[CRITICAL_STARTUP_ERROR]', error);
+  }, [error]);
+
+  return (
+    <View style={{ flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+      <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#93000a', marginBottom: 10 }}>Oops! Terjadi Kesalahan</Text>
+      <Text style={{ fontSize: 14, color: '#444', textAlign: 'center', marginBottom: 20 }}>{error.message}</Text>
+      <Pressable onPress={retry} style={{ backgroundColor: '#003366', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 }}>
+        <Text style={{ color: '#fff', fontWeight: 'bold' }}>Coba Lagi</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function onAppStateChange(status: AppStateStatus) {
+  if (Platform.OS !== 'web') {
+    focusManager.setFocused(status === 'active');
+  }
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: 2,
       staleTime: 1000 * 60 * 5,
+      refetchOnWindowFocus: true,
     },
   },
 });
 
 export default function RootLayout() {
   const { isInitialized, isLoggedIn } = useAuthStore();
+  
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', onAppStateChange);
+    return () => subscription.remove();
+  }, []);
+
   const [loaded, error] = useFonts({
     Manrope_800ExtraBold,
     Manrope_700Bold,
