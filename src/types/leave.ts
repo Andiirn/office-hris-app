@@ -3,6 +3,10 @@ export type LeaveStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
 export interface LeaveType {
   id: string;
   name: string;
+  code?: string;
+  category?: string;
+  company_id?: string;
+  requires_document?: boolean;
   description?: string;
   is_active: boolean;
 }
@@ -31,6 +35,8 @@ export interface CreateLeaveRequest {
   leave_type_id: string;
   start_date: string;
   end_date: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
   reason: string;
   document_url?: string | null;
 }

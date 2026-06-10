@@ -57,8 +57,10 @@ export const leaveService = {
     await api.post(`/leave/requests/${requestId}/cancel`);
   },
 
-  async getTypes(): Promise<LeaveType[]> {
-    const response = await api.get('/leave/types');
+  async getTypes(companyId?: string | null): Promise<LeaveType[]> {
+    const response = await api.get('/leave/types', {
+      params: companyId ? { company_id: companyId, is_active: true, limit: 100 } : { is_active: true, limit: 100 },
+    });
     const data = unwrapData<any>(response.data);
 
     if (Array.isArray(data)) return data;

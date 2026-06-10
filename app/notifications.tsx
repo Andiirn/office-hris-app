@@ -1,75 +1,93 @@
-import React from 'react';
-import { View, Text, ScrollView, Pressable, RefreshControl, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Tokens } from '../src/core/theme/tokens';
-import { useAuthStore } from '../src/stores/auth.store';
-import { notificationService } from '../src/services/notification.service';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import React from 'react';
+import { Modal, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { GlassCard } from '../src/components/ui/GlassCard';
 import { SkeletonCard } from '../src/components/ui/Skeleton';
+import { Tokens } from '../src/core/theme/tokens';
+import { notificationService } from '../src/services/notification.service';
+import { useAuthStore } from '../src/stores/auth.store';
+
+type NotificationItem = {
+  id: string;
+  title: string;
+  message: string;
+  type: string;
+  created_at: string;
+  is_read?: boolean;
+};
+
+function getIcon(type: string) {
+  if (type === 'LEAVE') return 'event-busy';
+  if (type === 'ATTENDANCE') return 'fingerprint';
+  if (type === 'OVERTIME') return 'work-history';
+  if (type === 'RESIGN') return 'exit-to-app';
+  return 'notifications';
+}
 
 export default function NotificationsScreen() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
+  const [selectedNotification, setSelectedNotification] = React.useState<NotificationItem | null>(null);
 
-  // 1. Fetch Notifications
   const { data: notifications = [], isLoading, refetch, isFetching } = useQuery({
     queryKey: ['notifications', user?.id],
     queryFn: () => notificationService.getNotifications({ limit: 50 }),
     enabled: !!user?.id,
   });
 
-  // 2. Mark as Read Mutation
   const readMutation = useMutation({
     mutationFn: (id: string) => notificationService.markAsRead(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
-    }
+    },
   });
 
-  // 3. Mark All as Read Mutation
   const readAllMutation = useMutation({
     mutationFn: () => notificationService.markAllAsRead(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      Alert.alert('Success', 'All notifications marked as read');
-    }
+    },
   });
 
-  const onRefresh = () => {
-    refetch();
+  const onRefresh = () => refetch();
+
+  const openNotification = (item: NotificationItem) => {
+    setSelectedNotification(item);
+    if (!item.is_read) {
+      readMutation.mutate(item.id);
+    }
   };
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      {/* Background Decor */}
       <View className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-primary/10" />
 
-      <View className="flex-row justify-between items-center px-5 pt-2 pb-5 z-10">
-        <View>
-          <Text className="font-manrope-extrabold text-3xl text-primary">Notifications</Text>
-          <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Stay updated</Text>
+      <View className="px-5 pt-2 pb-4">
+        <View className="flex-row items-start justify-between gap-3">
+          <View className="flex-1">
+            <Text className="font-manrope-extrabold text-3xl text-primary">Notifikasi</Text>
+            <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Pemberitahuan terbaru di satu tempat</Text>
+          </View>
+          <Pressable
+            className="bg-white/80 p-2.5 rounded-xl border border-white/90"
+            onPress={() => {
+              if (notifications.some((n: NotificationItem) => !n.is_read)) {
+                readAllMutation.mutate();
+              }
+            }}
+          >
+            <MaterialIcons name="done-all" size={20} color={Tokens.colors.primary} />
+          </Pressable>
         </View>
-        <Pressable 
-          className="bg-white/80 p-2 rounded-xl border border-white/90"
-          onPress={() => {
-            if (notifications.some(n => !n.is_read)) {
-              readAllMutation.mutate();
-            }
-          }}
-        >
-          <MaterialIcons name="done-all" size={20} color={Tokens.colors.primary} />
-        </Pressable>
       </View>
 
-      <ScrollView 
+      <ScrollView
         className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={isFetching} onRefresh={onRefresh} tintColor={Tokens.colors.primary} />
-        }
+        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={onRefresh} tintColor={Tokens.colors.primary} />}
       >
         {isLoading ? (
           <View className="mt-2">
@@ -81,42 +99,48 @@ export default function NotificationsScreen() {
           <View className="items-center py-20">
             <MaterialIcons name="notifications-none" size={64} color={Tokens.colors.outline} />
             <Text className="font-manrope-bold text-lg text-primary mt-4">All caught up!</Text>
-            <Text className="font-inter text-sm text-text-muted text-center mt-2">
-              No notifications yet.
-            </Text>
+            <Text className="font-inter text-sm text-text-muted text-center mt-2">No notifications yet.</Text>
           </View>
         ) : (
           <View className="gap-3">
-            {notifications.map((item) => (
-              <Pressable 
-                key={item.id} 
-                onPress={() => !item.is_read && readMutation.mutate(item.id)}
-              >
-                <GlassCard 
-                  style={{ 
-                    padding: 16, 
-                    borderLeftWidth: item.is_read ? 0 : 4, 
+            {notifications.map((item: NotificationItem) => (
+              <Pressable key={item.id} onPress={() => openNotification(item)}>
+                <GlassCard
+                  style={{
+                    paddingVertical: 14,
+                    paddingHorizontal: 14,
+                    borderLeftWidth: item.is_read ? 0 : 4,
                     borderLeftColor: Tokens.colors.primary,
-                    opacity: item.is_read ? 0.7 : 1
+                    opacity: item.is_read ? 0.82 : 1,
                   }}
                 >
-                  <View className="flex-row items-start">
-                    <View className={`w-10 h-10 rounded-full items-center justify-center mr-4 ${item.is_read ? 'bg-black/5' : 'bg-primary/10'}`}>
-                      <MaterialIcons 
-                        name={item.type === 'LEAVE' ? 'event-busy' : item.type === 'ATTENDANCE' ? 'fingerprint' : 'notifications'} 
-                        size={20} 
-                        color={item.is_read ? Tokens.colors.textMuted : Tokens.colors.primary} 
+                  <View className="flex-row items-center gap-3">
+                    <View className={`w-10 h-10 rounded-full items-center justify-center ${item.is_read ? 'bg-black/5' : 'bg-primary/10'}`}>
+                      <MaterialIcons
+                        name={getIcon(item.type) as any}
+                        size={20}
+                        color={item.is_read ? Tokens.colors.textMuted : Tokens.colors.primary}
                       />
                     </View>
+
                     <View className="flex-1">
-                      <View className="flex-row justify-between items-center">
-                        <Text className={`font-inter-bold text-[13px] ${item.is_read ? 'text-text-muted' : 'text-black'}`}>{item.title}</Text>
-                        <Text className="font-inter-medium text-[10px] text-text-muted">{item.created_at.split('T')[0]}</Text>
+                      <View className="flex-row items-center justify-between gap-2">
+                        <Text className={`font-inter-bold text-[13px] flex-1 ${item.is_read ? 'text-text-muted' : 'text-on-surface'}`} numberOfLines={1}>
+                          {item.title}
+                        </Text>
+                        <Text className="font-inter-medium text-[10px] text-text-muted">
+                          {item.created_at?.split('T')?.[0] || '-'}
+                        </Text>
                       </View>
-                      <Text className={`font-inter text-xs mt-1 leading-4 ${item.is_read ? 'text-text-muted' : 'text-black/80'}`} numberOfLines={2}>
+                      <Text
+                        className={`font-inter text-xs mt-1 leading-4 ${item.is_read ? 'text-text-muted' : 'text-on-surface-variant'}`}
+                        numberOfLines={1}
+                      >
                         {item.message}
                       </Text>
                     </View>
+
+                    <MaterialIcons name="chevron-right" size={20} color={Tokens.colors.outline} />
                   </View>
                 </GlassCard>
               </Pressable>
@@ -124,6 +148,63 @@ export default function NotificationsScreen() {
           </View>
         )}
       </ScrollView>
+
+      <Modal
+        visible={!!selectedNotification}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedNotification(null)}
+      >
+        <View className="flex-1 bg-black/40 justify-end">
+          <Pressable className="flex-1" onPress={() => setSelectedNotification(null)} />
+          <View className="bg-background rounded-t-[28px] px-5 pt-3 pb-8 border-t border-white/70">
+            <View className="items-center mb-4">
+              <View className="w-12 h-1.5 rounded-full bg-black/10 mb-4" />
+              <View className="self-stretch flex-row items-start justify-between">
+                <View className="flex-1 pr-4">
+                  <Text className="font-manrope-extrabold text-2xl text-primary" numberOfLines={2}>
+                    {selectedNotification?.title || 'Detail notifikasi'}
+                  </Text>
+                  <Text className="font-inter text-[12px] text-text-muted mt-1">
+                    {selectedNotification?.created_at?.split('T')?.[0] || '-'}
+                  </Text>
+                </View>
+                <Pressable
+                  className="w-9 h-9 rounded-full bg-black/5 items-center justify-center"
+                  onPress={() => setSelectedNotification(null)}
+                >
+                  <MaterialIcons name="close" size={20} color={Tokens.colors.onSurface} />
+                </Pressable>
+              </View>
+            </View>
+
+            <GlassCard style={{ padding: 16 }}>
+              <View className="flex-row items-start gap-3">
+                <View className="w-11 h-11 rounded-2xl items-center justify-center bg-primary/10">
+                  <MaterialIcons
+                    name={getIcon(selectedNotification?.type || '') as any}
+                    size={22}
+                    color={Tokens.colors.primary}
+                  />
+                </View>
+                <View className="flex-1">
+                  <Text className="font-inter-bold text-[13px] text-on-surface">Isi notifikasi</Text>
+                  <Text className="font-inter text-[13px] text-on-surface-variant mt-2 leading-5">
+                    {selectedNotification?.message || '-'}
+                  </Text>
+                </View>
+              </View>
+            </GlassCard>
+
+            <Pressable
+              className="mt-4 bg-primary rounded-2xl py-3.5 items-center"
+              onPress={() => setSelectedNotification(null)}
+            >
+              <Text className="font-inter-bold text-sm text-white">Tutup</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

@@ -3,6 +3,7 @@ export interface ProfileData {
   nik?: string;
   full_name?: string;
   role?: string | null;
+  company_id?: string | null;
   email?: string | null;
   phone?: string | null;
   address_domicile?: string | null;
@@ -11,6 +12,10 @@ export interface ProfileData {
   position_name?: string | null;
   photo_url?: string | null;
   gender?: string | null;
+  company?: {
+    id: string;
+    name?: string | null;
+  } | null;
 }
 
 export interface UpdateProfileRequest {

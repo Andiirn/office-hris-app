@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import { api } from '../core/api/client';
 import { unwrapData } from '../core/api/envelope';
-import { AttendanceActionResponse, AttendanceItem, AttendanceListQuery, CheckinRequest, CheckoutRequest } from '../types/attendance';
+import { AttendanceActionResponse, AttendanceItem, AttendanceListQuery, CheckinRequest, CheckoutRequest, VisitItem, VisitListQuery, VisitRequest } from '../types/attendance';
 
 export const attendanceService = {
   async checkin(payload: CheckinRequest): Promise<AttendanceActionResponse> {
@@ -61,4 +61,28 @@ export const attendanceService = {
     }
   },
 
+  async listVisits(query?: VisitListQuery): Promise<VisitItem[]> {
+    try {
+      console.log('[AttendanceService] Fetching visits with query:', JSON.stringify(query));
+      const response = await api.get('/attendance/visit', {
+        params: query,
+      });
+      const data = unwrapData<any>(response.data);
+      
+      if (Array.isArray(data)) return data;
+      if (data && Array.isArray(data.items)) return data.items;
+      if (data && Array.isArray(data.data)) return data.data;
+      
+      return [];
+    } catch (error: any) {
+      console.error('[AttendanceService] listVisits error:', error?.message);
+      return [];
+    }
+  },
+
+  async requestVisit(payload: VisitRequest): Promise<any> {
+    const response = await api.post('/attendance/visit', payload);
+    return unwrapData<any>(response.data);
+  },
 };
+

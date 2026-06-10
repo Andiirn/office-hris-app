@@ -2,14 +2,14 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import React from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Tokens } from '../../src/core/theme/tokens';
 import { attendanceService } from '../../src/services/attendance.service';
 import { leaveService } from '../../src/services/leave.service';
 import { overtimeService } from '../../src/services/overtime.service';
 import { resignService } from '../../src/services/resign.service';
-import { canApprove } from '../../src/core/auth/rbac';
+import { buildHomeMenuItems } from '../../src/features/home/home-menu';
 import { useAuthStore } from '../../src/stores/auth.store';
 
 type FeedType =
@@ -45,8 +45,17 @@ type FeedItem = {
   isExpanded: boolean;
 };
 
+type MenuItem = {
+  icon: string;
+  title: string;
+  onPress: () => void;
+};
+
+type MenuSlot = MenuItem | null;
+
 export default function HomeScreen() {
   const { user, isLoggedIn } = useAuthStore();
+  const { width: windowWidth } = useWindowDimensions();
   const name = user?.full_name || 'Employee';
   const [now, setNow] = React.useState(new Date());
   const [expandedFeedId, setExpandedFeedId] = React.useState<string | null>(null);
@@ -70,20 +79,6 @@ export default function HomeScreen() {
   const dateText = now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
 
   // 1. Fetch Leave Balance
-  const { data: leaveBalances, isLoading: isLoadingLeave, refetch: refetchLeave } = useQuery({
-    queryKey: ['leave-balances', user?.id],
-    queryFn: async () => {
-      console.log('[HomeQuery] Executing Leave fetch for userId:', user?.id);
-      if (!user?.id) return [];
-      const year = new Date().getFullYear();
-      return leaveService.getBalances(user.id, year);
-    },
-    enabled: !!user?.id,
-  });
-
-  const totalRemaining = leaveBalances?.reduce((acc, item) => acc + (item.remaining_days ?? 0), 0) ?? '-';
-  const leaveText = isLoadingLeave ? 'Sisa: ...' : `Sisa: ${totalRemaining} Hari`;
-
   const dateRange = React.useMemo(() => {
     const dateTo = new Date();
     const dateFrom = new Date();
@@ -157,7 +152,6 @@ export default function HomeScreen() {
 
   const onRefresh = () => {
     refetchAttendanceFeed();
-    refetchLeave();
     refetchLeaveFeed();
     refetchOvertimeFeed();
     refetchResignFeed();
@@ -289,28 +283,27 @@ export default function HomeScreen() {
   const latestAttendance = attendanceFeed[0];
   const isClockedIn = !!(latestAttendance?.checkin_time || latestAttendance?.checkin_at) && !(latestAttendance?.checkout_time || latestAttendance?.checkout_at) && (latestAttendance?.attendance_date || latestAttendance?.date) === new Date().toISOString().slice(0, 10);
 
-  const menuItems = React.useMemo(() => {
-    const isManager = canApprove(user?.role);
-    const base = [
-      { icon: 'event-available', title: 'Izin & Cuti', onPress: () => router.push('/leave') },
-      { icon: 'work-history', title: 'Lembur', onPress: () => router.push('/overtime') },
-      { icon: 'payments', title: 'Slip Gaji', onPress: () => router.push('/payroll') },
-      { icon: 'event', title: 'Kehadiran', onPress: () => router.push('/attendance') },
-      { icon: 'exit-to-app', title: 'Resign', onPress: () => router.push('/resign') },
-    ];
-    if (isManager) {
-      base.push({ icon: 'assignment-turned-in', title: 'Persetujuan', onPress: () => router.push('/approvals') });
-    }
-    return base;
-  }, [user]);
-
+  const menuItems = React.useMemo<MenuItem[]>(() => buildHomeMenuItems(user?.role), [user?.role]);
   const menuColumns = React.useMemo(() => {
-    const columns: typeof menuItems[] = [];
-    for (let i = 0; i < menuItems.length; i += 2) {
-      columns.push(menuItems.slice(i, i + 2));
+    const paddedItems: MenuSlot[] = [...menuItems];
+    if (paddedItems.length % 2 !== 0) {
+      paddedItems.push(null);
+    }
+
+    while (paddedItems.length < 8) {
+      paddedItems.push(null);
+    }
+
+    const columns: MenuSlot[][] = [];
+    for (let i = 0; i < paddedItems.length; i += 2) {
+      columns.push(paddedItems.slice(i, i + 2));
     }
     return columns;
   }, [menuItems]);
+  const visibleMenuColumns = 4;
+  const menuGap = 12;
+  const menuSidePadding = 20;
+  const menuColumnWidth = Math.floor((windowWidth - (menuSidePadding * 2) - (menuGap * (visibleMenuColumns - 1))) / visibleMenuColumns);
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -342,33 +335,48 @@ export default function HomeScreen() {
           </Pressable>
         </View>
 
-        <View className="h-[168px] mt-[18px] mb-1">
+        <View className="h-[196px] mt-[18px] mb-2">
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingTop: 4, paddingBottom: 8 }}
+            contentContainerStyle={{ paddingTop: 4, paddingBottom: 8, paddingRight: 4 }}
           >
-            <View className="flex-row">
+            <View className="flex-row items-stretch">
               {menuColumns.map((column, columnIndex) => (
                 <View
                   key={`menu-col-${columnIndex}`}
-                  className="mr-3 justify-between"
+                  className="justify-between"
+                  style={{ width: menuColumnWidth, marginRight: columnIndex === menuColumns.length - 1 ? 0 : menuGap }}
                 >
-                  {column.map((item) => (
+                  {column.map((item, itemIndex) => (
+                    item ? (
                     <Pressable
                       key={item.title}
-                      className="w-[112px] bg-transparent rounded-2xl px-2 py-2 mb-4"
+                      className="rounded-2xl bg-white/80 border border-white/80 px-2.5 py-2.5 mb-3 shadow-sm"
+                      style={{ width: menuColumnWidth }}
                       onPress={item.onPress}
                     >
-                      <View className="items-center justify-center">
-                        <View className="w-11 h-11 rounded-2xl bg-primary/10 items-center justify-center">
-                          <MaterialIcons name={item.icon as any} size={24} color={Tokens.colors.primary} />
+                      <View className="items-center justify-center gap-1">
+                        <View className="w-9 h-9 rounded-2xl bg-primary/10 items-center justify-center">
+                          <MaterialIcons name={item.icon as any} size={20} color={Tokens.colors.primary} />
                         </View>
-                        <Text className="font-inter-bold text-[12px] text-on-surface text-center mt-2">
+                        <Text
+                          className="font-inter-bold text-[10px] text-on-surface text-center leading-3"
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.85}
+                        >
                           {item.title}
                         </Text>
                       </View>
                     </Pressable>
+                    ) : (
+                      <View
+                        key={`menu-empty-${columnIndex}-${itemIndex}`}
+                        className="rounded-2xl bg-transparent border border-transparent px-2.5 py-2.5 mb-3"
+                        style={{ width: menuColumnWidth }}
+                      />
+                    )
                   ))}
                 </View>
               ))}
@@ -376,10 +384,10 @@ export default function HomeScreen() {
           </ScrollView>
         </View>
 
-        <View className="mt-4">
+        <View className="mt-3">
           <View className="flex-row justify-between items-center mb-3">
             <Text className="font-manrope-bold text-base text-primary">Aktivitas Terbaru</Text>
-            <Pressable onPress={() => router.push('/notifications')}>
+            <Pressable onPress={() => router.push('/activity')}>
               <Text className="font-inter-semibold text-[12px] text-primary-container">View All</Text>
             </Pressable>
           </View>

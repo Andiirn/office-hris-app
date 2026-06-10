@@ -18,6 +18,7 @@ export const sessionManager = {
         nik: profile.nik || '',
         full_name: profile.full_name || '',
         role: profile.role,
+        company_id: profile.company_id || profile.company?.id || null,
         position_name: profile.position_name,
         department_name: profile.department_name,
         branch_name: profile.branch_name,

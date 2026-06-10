@@ -31,6 +31,7 @@ export const authService = {
       return {
         ...rawData,
         role: normalizeRole(rawData.role),
+        company_id: rawData.company?.id || rawData.company_id || null,
         position_name: rawData.position?.name || rawData.position_name || null,
         department_name: rawData.division?.name || rawData.department_name || null,
         branch_name: rawData.branch?.name || rawData.branch_name || null,

@@ -6,7 +6,9 @@ import { Tokens } from '../../src/core/theme/tokens';
 import { useAuthStore } from '../../src/stores/auth.store';
 
 export default function TabLayout() {
-  const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
+  const { isLoggedIn, isInitialized } = useAuthStore();
+
+  console.log('[TabLayout] Render:', { isLoggedIn, isInitialized });
 
   if (!isLoggedIn) {
     return <Redirect href="/(auth)/login" />;
@@ -16,29 +18,20 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#ffffff',
+        tabBarActiveTintColor: Tokens.colors.primary,
         tabBarInactiveTintColor: Tokens.colors.textMuted,
         tabBarStyle: styles.tabBar,
-        tabBarLabelStyle: styles.label,
+        tabBarShowLabel: false, // Correct way to hide labels
         tabBarBackground: () => <View style={styles.tabBarBackground} />,
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: '',
-          tabBarIcon: ({ color, size, focused }) => (
-            <View
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 16,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: focused ? Tokens.colors.primary : 'transparent',
-              }}
-            >
-              <MaterialIcons name="home-filled" size={size} color={focused ? '#ffffff' : color} />
+          title: 'Home',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
+              <MaterialIcons name="home-filled" size={24} color={focused ? '#ffffff' : color} />
             </View>
           ),
         }}
@@ -46,19 +39,10 @@ export default function TabLayout() {
       <Tabs.Screen
         name="calendar"
         options={{
-          title: '',
-          tabBarIcon: ({ color, size, focused }) => (
-            <View
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 16,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: focused ? Tokens.colors.primary : 'transparent',
-              }}
-            >
-              <MaterialIcons name="calendar-today" size={size} color={focused ? '#ffffff' : color} />
+          title: 'Calendar',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
+              <MaterialIcons name="calendar-today" size={24} color={focused ? '#ffffff' : color} />
             </View>
           ),
         }}
@@ -67,19 +51,10 @@ export default function TabLayout() {
       <Tabs.Screen
         name="notifications"
         options={{
-          title: '',
-          tabBarIcon: ({ color, size, focused }) => (
-            <View
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 16,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: focused ? Tokens.colors.primary : 'transparent',
-              }}
-            >
-              <MaterialIcons name="notifications" size={size} color={focused ? '#ffffff' : color} />
+          title: 'Notifications',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
+              <MaterialIcons name="notifications" size={24} color={focused ? '#ffffff' : color} />
             </View>
           ),
         }}
@@ -87,39 +62,10 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: '',
-          tabBarIcon: ({ color, size, focused }) => (
-            <View
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 16,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: focused ? Tokens.colors.primary : 'transparent',
-              }}
-            >
-              <MaterialIcons name="person" size={size} color={focused ? '#ffffff' : color} />
-            </View>
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: '',
-          tabBarIcon: ({ color, size, focused }) => (
-            <View
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 16,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: focused ? Tokens.colors.primary : 'transparent',
-              }}
-            >
-              <MaterialIcons name="settings" size={size} color={focused ? '#ffffff' : color} />
+          title: 'Profile',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
+              <MaterialIcons name="person" size={24} color={focused ? '#ffffff' : color} />
             </View>
           ),
         }}
@@ -135,24 +81,18 @@ const styles = StyleSheet.create({
     height: 82,
     borderTopWidth: 0,
     elevation: 0,
-    borderTopLeftRadius: 0,
-    borderTopRightRadius: 0,
-    marginHorizontal: 0,
-    marginBottom: 0,
     backgroundColor: 'rgba(251, 249, 248, 1)',
-    borderWidth: 0,
-    paddingTop: 8,
-    paddingBottom: 8,
-    overflow: 'hidden',
+    paddingBottom: Platform.OS === 'ios' ? 20 : 10,
+    paddingTop: 10,
     ...Platform.select({
       ios: {
-        shadowColor: 'transparent',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0,
-        shadowRadius: 0,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
       },
       android: {
-        elevation: 2,
+        elevation: 8,
       }
     })
   },
@@ -160,11 +100,15 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(251, 249, 248, 1)',
   },
-  label: {
-    fontSize: 0,
-    height: 0,
-    marginBottom: 0,
-    marginTop: 0,
-    opacity: 0,
+  iconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  iconContainerActive: {
+    backgroundColor: Tokens.colors.primary,
   },
 });
