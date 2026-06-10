@@ -113,6 +113,8 @@ export default function OvertimeScreen() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['overtime-history'] }),
         queryClient.invalidateQueries({ queryKey: ['overtime-summary'] }),
+        queryClient.invalidateQueries({ queryKey: ['home-overtime-feed'] }),
+        queryClient.invalidateQueries({ queryKey: ['activity-overtime-feed'] }),
       ]);
       setModalVisible(false);
       setAttendancePickerVisible(false);
@@ -535,7 +537,7 @@ export default function OvertimeScreen() {
                               {att.attendance_status ? (
                                 <View className={`px-1.5 py-0.5 rounded-md ${att.attendance_status === 'PRESENT' ? 'bg-secondary-container' : 'bg-error-container/10'}`}>
                                   <Text className={`font-inter-bold text-[8px] ${att.attendance_status === 'PRESENT' ? 'text-secondary' : 'text-error'}`}>
-                                    {att.attendance_status}
+                                    {att.attendance_status === 'PRESENT' ? 'HADIR' : att.attendance_status === 'LATE' ? 'TERLAMBAT' : 'TIDAK HADIR'}
                                   </Text>
                                 </View>
                               ) : null}

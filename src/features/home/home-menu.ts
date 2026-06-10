@@ -12,7 +12,8 @@ export function buildHomeMenuItems(role?: string | null): HomeMenuItem[] {
     { icon: 'event-available', title: 'Izin & Cuti', onPress: () => router.push('/leave') },
     { icon: 'work-history', title: 'Lembur', onPress: () => router.push('/overtime') },
     { icon: 'payments', title: 'Slip Gaji', onPress: () => router.push('/payroll') },
-    { icon: 'event', title: 'Kehadiran', onPress: () => router.push('/attendance') },
+    { icon: 'event', title: 'Absensi', onPress: () => router.push('/attendance') },
+    { icon: 'fact-check', title: 'Koreksi', onPress: () => router.push('/correction' as any) },
     { icon: 'exit-to-app', title: 'Resign', onPress: () => router.push('/resign') },
     { icon: 'place', title: 'Visit', onPress: () => router.push('/visit' as any) },
   ];

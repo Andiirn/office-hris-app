@@ -32,6 +32,7 @@ type FeedItem = {
   title: string;
   summary: string;
   timestamp: string;
+  sortTime: number;
   icon: keyof typeof MaterialIcons.glyphMap;
   color: string;
   bgColor: string;
@@ -106,6 +107,14 @@ export default function ActivityScreen() {
     return date;
   };
 
+  const getLeaveTypeLabel = (item: any) => item.leave_type_name || item.leave_type?.name || item.leave_type?.code || 'Cuti';
+
+  const toSortTime = (value?: string | null) => {
+    if (!value) return 0;
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
   const onRefresh = () => {
     refetchAttendance();
     refetchLeave();
@@ -120,7 +129,9 @@ export default function ActivityScreen() {
       const attendanceDate = item.attendance_date || item.date || '-';
       const checkinTime = item.checkin_at || item.checkin_time;
       const checkoutTime = item.checkout_at || item.checkout_time;
-      const status = item.attendance_status || item.status || 'PRESENT';
+      const rawStatus = item.attendance_status || item.status || 'PRESENT';
+      const statusUpper = rawStatus.toUpperCase();
+      const status = statusUpper === 'PRESENT' ? 'HADIR' : statusUpper === 'LATE' ? 'TERLAMBAT' : statusUpper === 'ABSENT' ? 'TIDAK HADIR' : rawStatus;
 
       if (checkinTime) {
         items.push({
@@ -129,6 +140,7 @@ export default function ActivityScreen() {
           title: 'Check-in',
           summary: `${attendanceDate} · ${formatTime(checkinTime)} · ${status}`,
           timestamp: checkinTime,
+          sortTime: toSortTime(checkinTime),
           icon: 'login',
           color: '#1f6b42',
           bgColor: '#d9e6da',
@@ -142,6 +154,7 @@ export default function ActivityScreen() {
           title: 'Check-out',
           summary: `${attendanceDate} · ${formatTime(checkoutTime)} · ${status}`,
           timestamp: checkoutTime,
+          sortTime: toSortTime(checkoutTime),
           icon: 'logout',
           color: '#93000a',
           bgColor: '#ffdad6',
@@ -150,12 +163,27 @@ export default function ActivityScreen() {
     });
 
     leaveRequests.forEach((item: any) => {
+      const leaveTypeLabel = getLeaveTypeLabel(item);
+      const isHourlyLeave = /jam|hour/i.test(`${leaveTypeLabel} ${item.leave_type?.code || ''} ${item.leave_type?.category || ''}`);
+      const timeRange = item.start_time && item.end_time ? ` · ${item.start_time.slice(0, 5)} - ${item.end_time.slice(0, 5)}` : '';
+
       items.push({
         id: `leave-${item.id}`,
         type: item.status === 'APPROVED' ? 'leave.approved' : item.status === 'REJECTED' ? 'leave.rejected' : item.status === 'CANCELLED' ? 'leave.cancelled' : 'leave.created',
-        title: `Cuti ${item.status?.toLowerCase?.() || 'created'}`,
-        summary: `${item.leave_type_name || 'Cuti'} · ${formatDateOnly(item.start_date)}${item.end_date ? ` - ${formatDateOnly(item.end_date)}` : ''}`,
+        title:
+          item.status === 'APPROVED' ? 'Cuti disetujui' :
+            item.status === 'REJECTED' ? 'Cuti ditolak' :
+              item.status === 'CANCELLED' ? 'Cuti dibatalkan' :
+                'Pengajuan cuti dibuat',
+        summary: `${leaveTypeLabel} · ${formatDateOnly(item.start_date)}${item.end_date ? ` - ${formatDateOnly(item.end_date)}` : ''}${timeRange}`,
+        details: [
+          `Jenis cuti: ${leaveTypeLabel}`,
+          `Tanggal: ${formatDateOnly(item.start_date)}${item.end_date ? ` - ${formatDateOnly(item.end_date)}` : ''}`,
+          ...(isHourlyLeave ? [`Jam: ${item.start_time?.slice(0, 5) || '--:--'} - ${item.end_time?.slice(0, 5) || '--:--'}`] : []),
+          `Alasan: ${item.reason || '-'}`,
+        ],
         timestamp: item.created_at || item.start_date,
+        sortTime: toSortTime(item.created_at) || toSortTime(item.updated_at) || toSortTime(item.start_time) || toSortTime(item.end_time) || toSortTime(item.start_date),
         icon: item.status === 'APPROVED' ? 'check-circle' : item.status === 'REJECTED' ? 'cancel' : item.status === 'CANCELLED' ? 'cancel' : 'event-available',
         color: item.status === 'APPROVED' ? '#1f6b42' : item.status === 'REJECTED' ? '#93000a' : '#000666',
         bgColor: item.status === 'APPROVED' ? '#d9e6da' : item.status === 'REJECTED' ? '#ffdad6' : '#e7ebff',
@@ -169,6 +197,7 @@ export default function ActivityScreen() {
         title: `Lembur ${item.status?.toLowerCase?.() || 'created'}`,
         summary: `${item.overtime_date || item.attendance_date || '-'} · ${item.overtime_hours ?? item.overtime_minutes ?? '-'} jam`,
         timestamp: item.created_at || item.overtime_date || item.attendance_date || '',
+        sortTime: toSortTime(item.created_at) || toSortTime(item.approved_at) || toSortTime(item.end_time) || toSortTime(item.start_time) || toSortTime(item.overtime_date) || toSortTime(item.attendance_date),
         icon: item.status === 'APPROVED' ? 'check-circle' : item.status === 'REJECTED' ? 'cancel' : item.status === 'CANCELLED' ? 'cancel' : 'work-history',
         color: item.status === 'APPROVED' ? '#1f6b42' : item.status === 'REJECTED' ? '#93000a' : '#000666',
         bgColor: item.status === 'APPROVED' ? '#d9e6da' : item.status === 'REJECTED' ? '#ffdad6' : '#e7ebff',
@@ -182,13 +211,18 @@ export default function ActivityScreen() {
         title: `Resign ${item.status?.toLowerCase?.() || 'created'}`,
         summary: `${item.resign_date || '-'} · ${item.reason || '-'}`,
         timestamp: item.created_at || item.resign_date || '',
+        sortTime: toSortTime(item.created_at) || toSortTime(item.updated_at) || toSortTime(item.resign_date),
         icon: item.status === 'APPROVED' ? 'check-circle' : item.status === 'REJECTED' ? 'cancel' : item.status === 'CANCELLED' ? 'cancel' : 'exit-to-app',
         color: item.status === 'APPROVED' ? '#1f6b42' : item.status === 'REJECTED' ? '#93000a' : '#000666',
         bgColor: item.status === 'APPROVED' ? '#d9e6da' : item.status === 'REJECTED' ? '#ffdad6' : '#e7ebff',
       });
     });
 
-    return items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    return items.sort((a, b) => {
+      const dateA = a.sortTime || 0;
+      const dateB = b.sortTime || 0;
+      return dateB - dateA;
+    });
   }, [attendanceFeed, leaveRequests, overtimeRecords, resignRequests]);
 
   const isLoading = isLoadingAttendance || isLoadingLeave || isLoadingOvertime || isLoadingResign;
@@ -232,9 +266,23 @@ export default function ActivityScreen() {
                     <Text className="font-inter-bold text-[13px] text-on-surface" numberOfLines={1}>{item.title}</Text>
                     <Text className="font-inter text-[10px] text-text-muted mt-0.5" numberOfLines={1}>{item.summary}</Text>
                     {expandedId === item.id ? (
-                      <Text className="font-inter text-[10px] text-on-surface-variant mt-2">
-                        {item.type}
-                      </Text>
+                      <ScrollView
+                        className="mt-2"
+                        style={{ maxHeight: 88 }}
+                        nestedScrollEnabled
+                        showsVerticalScrollIndicator={false}
+                      >
+                        <View className="gap-1 pr-1">
+                          <Text className="font-inter text-[10px] text-on-surface-variant">
+                            Tipe: {item.type}
+                          </Text>
+                          {(item.details || []).filter(Boolean).map((detail: string) => (
+                            <Text key={detail} className="font-inter text-[10px] text-on-surface-variant">
+                              {detail}
+                            </Text>
+                          ))}
+                        </View>
+                      </ScrollView>
                     ) : null}
                   </View>
                 </View>

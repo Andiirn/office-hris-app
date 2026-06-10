@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, RefreshControl, Pressable } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useQuery } from '@tanstack/react-query';
-import { Tokens } from '../../src/core/theme/tokens';
-import { useAuthStore } from '../../src/stores/auth.store';
-import { attendanceService } from '../../src/services/attendance.service';
+import React, { useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { GlassCard } from '../../src/components/ui/GlassCard';
 import { SkeletonCard } from '../../src/components/ui/Skeleton';
 import { StatusBadge } from '../../src/components/ui/StatusBadge';
+import { Tokens } from '../../src/core/theme/tokens';
+import { attendanceService } from '../../src/services/attendance.service';
+import { useAuthStore } from '../../src/stores/auth.store';
 
 const MONTH_NAMES = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -66,8 +66,8 @@ export default function AttendanceHistoryScreen() {
   // 1. Fetch History
   const { data: history = [], isLoading, refetch, isFetching } = useQuery({
     queryKey: ['attendance-history-full', user?.id, period.dateFrom, queryEndDate],
-    queryFn: () => attendanceService.getAttendanceHistory({ 
-      employee_id: user?.id, 
+    queryFn: () => attendanceService.getAttendanceHistory({
+      employee_id: user?.id,
       date_from: period.dateFrom,
       date_to: queryEndDate,
       limit: 100,
@@ -87,9 +87,9 @@ export default function AttendanceHistoryScreen() {
 
   const getStatusType = (status?: string) => {
     switch (status) {
-      case 'PRESENT': return 'secondary';
-      case 'LATE': return 'error';
-      case 'ABSENT': return 'error';
+      case 'HADIR': return 'secondary';
+      case 'TERLAMBAT': return 'error';
+      case 'TIDAK HADIR': return 'error';
       default: return 'secondary';
     }
   };
@@ -97,7 +97,14 @@ export default function AttendanceHistoryScreen() {
   const getAttendanceDate = (item: any) => item.attendance_date || item.date || '-';
   const getCheckinTime = (item: any) => item.checkin_at || item.checkin_time;
   const getCheckoutTime = (item: any) => item.checkout_at || item.checkout_time;
-  const getAttendanceStatus = (item: any) => item.attendance_status || item.status || 'PRESENT';
+  const getAttendanceStatus = (item: any) => {
+    const status = item.attendance_status || item.status || 'PRESENT';
+    const s = status.toUpperCase();
+    if (s === 'PRESENT') return 'HADIR';
+    if (s === 'LATE') return 'TERLAMBAT';
+    if (s === 'ABSENT') return 'TIDAK HADIR';
+    return status;
+  };
   const getBranchName = (item: any) => item.branch_name || item.branch?.name || item.branch?.code || '';
 
   return (
@@ -112,13 +119,13 @@ export default function AttendanceHistoryScreen() {
       </View>
 
       <View className="px-5 pb-4 flex-row justify-between items-center z-10">
-        <Pressable 
+        <Pressable
           onPress={() => setPeriodOffset(prev => prev - 1)}
           className="w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm active:opacity-60"
         >
           <MaterialIcons name="chevron-left" size={24} color={Tokens.colors.primary} />
         </Pressable>
-        
+
         <View className="bg-white/80 border border-white/90 px-4 py-2 rounded-2xl items-center justify-center flex-1 mx-3 shadow-sm">
           <Text className="font-inter-bold text-[13px] text-primary">
             {formatDateLabel(period.startDate)} - {formatDateLabel(period.endDate)}
@@ -128,22 +135,21 @@ export default function AttendanceHistoryScreen() {
           </Text>
         </View>
 
-        <Pressable 
+        <Pressable
           onPress={() => {
             if (periodOffset < 0) {
               setPeriodOffset(prev => prev + 1);
             }
           }}
           disabled={periodOffset >= 0}
-          className={`w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm ${
-            periodOffset >= 0 ? 'opacity-30' : 'active:opacity-60'
-          }`}
+          className={`w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm ${periodOffset >= 0 ? 'opacity-30' : 'active:opacity-60'
+            }`}
         >
           <MaterialIcons name="chevron-right" size={24} color={Tokens.colors.primary} />
         </Pressable>
       </View>
 
-      <ScrollView 
+      <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
@@ -188,7 +194,7 @@ export default function AttendanceHistoryScreen() {
                     <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(getCheckoutTime(item))}</Text>
                   </View>
                 </View>
-                
+
                 {getBranchName(item) ? (
                   <View className="flex-row items-center mt-3 gap-1.5 ml-1">
                     <MaterialIcons name="location-on" size={12} color={Tokens.colors.textMuted} />
