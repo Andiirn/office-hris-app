@@ -3,6 +3,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { ActivityIndicator, Linking, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../src/components/ui/Button';
@@ -15,6 +16,7 @@ type CameraStatus = 'loading' | 'granted' | 'denied';
 
 export default function AttendanceScanScreen() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState<LocationStatus>('loading');
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>('loading');
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
@@ -148,6 +150,13 @@ export default function AttendanceScanScreen() {
 
       const latest = await attendanceService.getTodayRecord();
       setTodayRecord(latest ?? null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['attendance-history'] }),
+        queryClient.invalidateQueries({ queryKey: ['attendance-history-full'] }),
+        queryClient.invalidateQueries({ queryKey: ['home-approvals'] }),
+        queryClient.invalidateQueries({ queryKey: ['home-approvals', 'pending'] }),
+        queryClient.invalidateQueries({ queryKey: ['activity-attendance-feed'] }),
+      ]);
     } catch (error: any) {
       setErrorMessage(error?.response?.data?.message ?? error?.message ?? 'Gagal memproses absensi');
     } finally {

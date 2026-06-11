@@ -2,18 +2,17 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import React from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Skeleton } from '../../src/components/ui/Skeleton';
 import { Tokens } from '../../src/core/theme/tokens';
-import { attendanceService } from '../../src/services/attendance.service';
+import { buildHomeMenuItems } from '../../src/features/home/home-menu';
 import { approvalService } from '../../src/services/approval.service';
+import { attendanceService } from '../../src/services/attendance.service';
 import { leaveService } from '../../src/services/leave.service';
 import { overtimeService } from '../../src/services/overtime.service';
 import { resignService } from '../../src/services/resign.service';
-import { buildHomeMenuItems } from '../../src/features/home/home-menu';
 import { useAuthStore } from '../../src/stores/auth.store';
-import { DigitalClock } from '../../src/features/home/components/DigitalClock';
-import { Skeleton } from '../../src/components/ui/Skeleton';
 
 type FeedType =
   | 'attendance.checkin'
@@ -54,6 +53,7 @@ type MenuItem = {
   icon: string;
   title: string;
   onPress: () => void;
+  badgeCount?: number;
 };
 
 type MenuSlot = MenuItem | null;
@@ -320,7 +320,23 @@ export default function HomeScreen() {
   }, [attendanceFeed, expandedFeedId, leaveRequests, overtimeRecords, resignRequests]);
 
   const latestAttendance = attendanceFeed[0];
-  const isClockedIn = !!(latestAttendance?.checkin_time || latestAttendance?.checkin_at) && !(latestAttendance?.checkout_time || latestAttendance?.checkout_at) && (latestAttendance?.attendance_date || latestAttendance?.date) === new Date().toISOString().slice(0, 10);
+  const todayString = new Date().toISOString().slice(0, 10);
+  const latestAttendanceDate = latestAttendance?.attendance_date || latestAttendance?.date;
+  const hasCheckIn = !!(latestAttendance?.checkin_time || latestAttendance?.checkin_at);
+  const hasCheckOut = !!(latestAttendance?.checkout_time || latestAttendance?.checkout_at);
+  const isTodayAttendance = latestAttendanceDate === todayString;
+  const isClockedIn = hasCheckIn && !hasCheckOut && isTodayAttendance;
+  const isClockedOut = hasCheckOut && isTodayAttendance;
+  const attendanceChipText = isClockedIn
+    ? 'Masuk. Selamat bekerja.'
+    : isClockedOut
+      ? 'Keluar. Selamat istirahat.'
+      : 'Belum absen hari ini.';
+  const attendanceChipTextClass = isClockedIn
+    ? 'text-primary'
+    : isClockedOut
+      ? 'text-primary'
+      : 'text-error';
 
   const menuItems = React.useMemo<MenuItem[]>(() => buildHomeMenuItems(user?.role, pendingApprovals.length), [user?.role, pendingApprovals.length]);
   const menuColumns = React.useMemo(() => {
@@ -348,29 +364,49 @@ export default function HomeScreen() {
     <SafeAreaView className="flex-1 bg-background">
       {/* Fixed Sticky Header Card */}
       <View className="px-5 pt-3 pb-1 bg-background z-20">
-        <View className="bg-white/80 rounded-2xl p-3.5 flex-row justify-between items-center border border-white/90 shadow-sm">
-          <View>
-            <Text className="font-manrope-bold text-sm text-primary">{name}</Text>
-            <Text className="font-inter text-[11px] text-text-muted mt-0.5">{user?.position_name || '-'}</Text>
+        <View className="flex-row items-start justify-between gap-3">
+          <View className="flex-1 pr-2">
+            <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-[0.25em] mb-1.5">
+              Halo
+            </Text>
+            <Text className="font-manrope-extrabold text-[20px] text-primary leading-7" numberOfLines={1}>
+              {name}
+            </Text>
+            <Text className="font-inter text-[12px] text-text-muted mt-1.5" numberOfLines={1}>
+              {user?.position_name || 'Employee'}
+            </Text>
           </View>
-          <View className={`rounded-full px-2.5 py-1 ${isClockedIn ? 'bg-secondary-container' : 'bg-error-container'}`}>
-            <Text className={`font-inter-bold text-[10px] ${isClockedIn ? 'text-on-secondary-container' : 'text-on-error-container'}`}>
-              {isClockedIn ? 'Sudah Absen' : 'Belum Absen'}
+          <View className="max-w-[118px] px-0 py-0">
+            <View className="flex-row items-center gap-1.5 mb-1">
+              <View className={`w-2 h-2 rounded-full ${isClockedIn ? 'bg-secondary' : isClockedOut ? 'bg-primary' : 'bg-error'}`} />
+              <Text className={`font-inter-bold text-[9px] uppercase tracking-wider ${attendanceChipTextClass}`}>
+                Status
+              </Text>
+            </View>
+            <Text
+              className={`font-inter-bold text-[10px] leading-4 ${attendanceChipTextClass}`}
+              numberOfLines={2}
+            >
+              {attendanceChipText}
             </Text>
           </View>
         </View>
       </View>
 
-      <View className="flex-1" style={{ paddingHorizontal: 20, paddingTop: 8 }}>
-        <DigitalClock />
+      <View className="flex-1" style={{ paddingHorizontal: 20, paddingTop: 10 }}>
         <View className="items-center">
           <Pressable
-            className="w-[148px] h-[148px] rounded-full bg-primary-container items-center justify-center gap-1.5 shadow-lg shadow-black/10 elevation-6"
+            className="w-[150px] h-[150px] rounded-full bg-primary-container items-center justify-center gap-1.5 shadow-lg shadow-black/10 elevation-6"
             onPress={() => router.push('/attendance-scan')}
           >
-            <MaterialIcons name="qr-code-scanner" size={34} color="#fff" />
+            <View className="w-[30px] h-[30px] rounded-full bg-white/15 items-center justify-center">
+              <MaterialIcons name="qr-code-scanner" size={30} color="#fff" />
+            </View>
             <Text className="font-inter-bold text-[12px] text-white">Scan QR Code</Text>
           </Pressable>
+          <Text className="font-inter text-[10px] text-text-muted mt-2">
+            Tap untuk mulai absensi
+          </Text>
         </View>
 
         <View className="h-[196px] mt-[18px] mb-2">
@@ -388,33 +424,33 @@ export default function HomeScreen() {
                 >
                   {column.map((item, itemIndex) => (
                     item ? (
-                    <Pressable
-                      key={item.title}
-                      className="relative rounded-2xl bg-white/80 border border-white/80 px-2.5 py-2.5 mb-3 shadow-sm"
-                      style={{ width: menuColumnWidth }}
-                      onPress={item.onPress}
-                    >
-                      <View className="items-center justify-center gap-1">
-                        {item.badgeCount ? (
-                          <View className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-error items-center justify-center px-1.5 z-20">
-                            <Text className="font-inter-bold text-[10px] text-white leading-[18px]">
-                              {item.badgeCount > 9 ? '9+' : item.badgeCount}
-                            </Text>
+                      <Pressable
+                        key={item.title}
+                        className="relative rounded-2xl bg-white/80 border border-white/80 px-2.5 py-2.5 mb-3 shadow-sm"
+                        style={{ width: menuColumnWidth }}
+                        onPress={item.onPress}
+                      >
+                        <View className="items-center justify-center gap-1">
+                          {item.badgeCount ? (
+                            <View className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-error items-center justify-center px-1.5 z-20">
+                              <Text className="font-inter-bold text-[10px] text-white leading-[18px]">
+                                {item.badgeCount > 9 ? '9+' : item.badgeCount}
+                              </Text>
+                            </View>
+                          ) : null}
+                          <View className="w-9 h-9 rounded-2xl bg-primary/10 items-center justify-center">
+                            <MaterialIcons name={item.icon as any} size={20} color={Tokens.colors.primary} />
                           </View>
-                        ) : null}
-                        <View className="w-9 h-9 rounded-2xl bg-primary/10 items-center justify-center">
-                          <MaterialIcons name={item.icon as any} size={20} color={Tokens.colors.primary} />
+                          <Text
+                            className="font-inter-bold text-[10px] text-on-surface text-center leading-3"
+                            numberOfLines={1}
+                            adjustsFontSizeToFit
+                            minimumFontScale={0.85}
+                          >
+                            {item.title}
+                          </Text>
                         </View>
-                        <Text
-                          className="font-inter-bold text-[10px] text-on-surface text-center leading-3"
-                          numberOfLines={1}
-                          adjustsFontSizeToFit
-                          minimumFontScale={0.85}
-                        >
-                          {item.title}
-                        </Text>
-                      </View>
-                    </Pressable>
+                      </Pressable>
                     ) : (
                       <View
                         key={`menu-empty-${columnIndex}-${itemIndex}`}
@@ -444,21 +480,21 @@ export default function HomeScreen() {
               nestedScrollEnabled
               showsVerticalScrollIndicator={false}
               refreshControl={
-              <RefreshControl
-                refreshing={isFetchingAttendanceFeed || isFetchingLeaveFeed || isFetchingOvertimeFeed || isFetchingResignFeed}
-                onRefresh={onRefresh}
-                tintColor={Tokens.colors.primary}
-              />
-            }
-          >
+                <RefreshControl
+                  refreshing={isFetchingAttendanceFeed || isFetchingLeaveFeed || isFetchingOvertimeFeed || isFetchingResignFeed}
+                  onRefresh={onRefresh}
+                  tintColor={Tokens.colors.primary}
+                />
+              }
+            >
               {isLoadingAttendanceFeed || isLoadingLeaveFeed || isLoadingOvertimeFeed || isLoadingResignFeed ? (
                 <View className="gap-2">
                   {[1, 2, 3, 4, 5].map((i) => (
                     <View key={i} className="bg-white/80 rounded-xl px-3 py-2.5 border border-white/90 shadow-sm flex-row items-center gap-3">
-                      <Skeleton className="w-10 h-10 rounded-2xl" />
+                      <Skeleton width={40} height={40} radius={16} />
                       <View className="flex-1 gap-2">
-                        <Skeleton className="w-1/2 h-3 rounded" />
-                        <Skeleton className="w-3/4 h-2 rounded" />
+                        <Skeleton width="50%" height={12} radius={9999} />
+                        <Skeleton width="75%" height={8} radius={9999} />
                       </View>
                     </View>
                   ))}
@@ -521,6 +557,7 @@ export default function HomeScreen() {
           </View>
         </View>
       </View>
+
     </SafeAreaView>
   );
 }

@@ -65,8 +65,7 @@ function getPeriodDates(offset = 0) {
   const pad = (n: number) => String(n).padStart(2, '0');
   const dateFrom = `${startDate.getFullYear()}-${pad(startDate.getMonth() + 1)}-${pad(startDate.getDate())}`;
   const dateTo = `${endDate.getFullYear()}-${pad(endDate.getMonth() + 1)}-${pad(endDate.getDate())}`;
-  const todayString = today.toISOString().slice(0, 10);
-  return { startDate, endDate, dateFrom, dateTo: endDate > today ? todayString : dateTo };
+  return { startDate, endDate, dateFrom, dateTo };
 }
 
 
@@ -92,7 +91,7 @@ export default function AttendanceScreen() {
     const uniqueDates = new Set<string>();
     history.forEach((item: any) => {
       const key = getAttendanceKey(item);
-      const hasAttendance = !!(getCheckIn(item) || getCheckOut(item) || item.attendance_status || item.status);
+      const hasAttendance = !!(getCheckIn(item) || getCheckOut(item));
       if (key && hasAttendance) uniqueDates.add(key);
     });
     return uniqueDates.size;
@@ -116,47 +115,60 @@ export default function AttendanceScreen() {
       <View className="absolute top-20 -right-20 w-64 h-64 rounded-full bg-primary/10" />
       <View className="absolute bottom-10 -left-20 w-72 h-72 rounded-full bg-secondary-container/15" />
 
-      <View className="px-5 pt-2 pb-3 z-10">
+      <View className="px-5 pt-2 pb-4 z-10">
         <Text className="font-manrope-extrabold text-3xl text-primary">Absensi</Text>
         <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Detail riwayat kehadiran anda</Text>
       </View>
 
       <View className="px-5 pb-4">
-        <GlassCard style={{ padding: 16 }}>
-          <Text className="font-inter-bold text-base text-on-surface leading-6">
-            Anda telah melakukan{' '}
-            <Text className="font-manrope-extrabold text-base text-primary">{attendanceCount}</Text>{' '}
-            kehadiran di periode ini
-          </Text>
+        <GlassCard style={{ padding: 18 }}>
+          <View className="flex-row items-start justify-between">
+            <View className="flex-1 pr-3">
+              <Text className="font-inter-bold text-xs text-text-muted uppercase tracking-wider mb-1">
+                Kehadiran Periode Ini
+              </Text>
+              <Text className="font-manrope-extrabold text-3xl text-primary leading-9">
+                {attendanceCount}
+              </Text>
+              <Text className="font-inter text-sm text-on-surface leading-6 mt-2">
+                Hanya tanggal yang punya check-in atau check-out yang dihitung.
+              </Text>
+            </View>
+            <View className="w-14 h-14 rounded-2xl bg-primary/10 items-center justify-center">
+              <MaterialIcons name="event-available" size={28} color={Tokens.colors.primary} />
+            </View>
+          </View>
         </GlassCard>
       </View>
 
-      <View className="px-5 pb-4 flex-row justify-between items-center z-10">
-        <Pressable
-          onPress={() => setPeriodOffset(prev => prev - 1)}
-          className="w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm active:opacity-60"
-        >
-          <MaterialIcons name="chevron-left" size={24} color={Tokens.colors.primary} />
-        </Pressable>
+      <View className="px-5 pb-4">
+        <View className="flex-row justify-between items-center z-10">
+          <Pressable
+            onPress={() => setPeriodOffset(prev => prev - 1)}
+            className="w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm active:opacity-60"
+          >
+            <MaterialIcons name="chevron-left" size={24} color={Tokens.colors.primary} />
+          </Pressable>
 
-        <View className="bg-white/80 border border-white/90 px-4 py-2 rounded-2xl items-center justify-center flex-1 mx-3 shadow-sm">
-          <Text className="font-inter-bold text-[13px] text-primary">
-            {period.dateFrom} - {period.dateTo}
-          </Text>
-          <Text className="font-inter text-[9px] text-text-muted mt-0.5 uppercase tracking-wider">
-            Periode Gaji & Absensi
-          </Text>
+          <View className="bg-white/80 border border-white/90 px-4 py-2 rounded-2xl items-center justify-center flex-1 mx-3 shadow-sm">
+            <Text className="font-inter-bold text-[13px] text-primary">
+              {period.dateFrom} - {period.dateTo}
+            </Text>
+            <Text className="font-inter text-[9px] text-text-muted mt-0.5 uppercase tracking-wider">
+              Periode Gaji & Absensi
+            </Text>
+          </View>
+
+          <Pressable
+            onPress={() => {
+              if (periodOffset < 0) setPeriodOffset(prev => prev + 1);
+            }}
+            disabled={periodOffset >= 0}
+            className={`w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm ${periodOffset >= 0 ? 'opacity-30' : 'active:opacity-60'}`}
+          >
+            <MaterialIcons name="chevron-right" size={24} color={Tokens.colors.primary} />
+          </Pressable>
         </View>
-
-        <Pressable
-          onPress={() => {
-            if (periodOffset < 0) setPeriodOffset(prev => prev + 1);
-          }}
-          disabled={periodOffset >= 0}
-          className={`w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm ${periodOffset >= 0 ? 'opacity-30' : 'active:opacity-60'}`}
-        >
-          <MaterialIcons name="chevron-right" size={24} color={Tokens.colors.primary} />
-        </Pressable>
       </View>
 
       <ScrollView
@@ -173,20 +185,29 @@ export default function AttendanceScreen() {
           </View>
         ) : history.length === 0 ? (
           <GlassCard style={{ alignItems: 'center', padding: 40, marginTop: 20 }}>
-            <MaterialIcons name="event-busy" size={64} color={Tokens.colors.outline} />
-            <Text className="font-manrope-bold text-lg text-primary mt-4">No records found</Text>
+            <View className="w-16 h-16 rounded-2xl bg-primary/10 items-center justify-center">
+              <MaterialIcons name="event-busy" size={34} color={Tokens.colors.primary} />
+            </View>
+            <Text className="font-manrope-bold text-lg text-primary mt-4">Belum Ada Kehadiran</Text>
             <Text className="font-inter text-sm text-text-muted text-center mt-2">
-              {"You haven't recorded any attendance for this period."}
+              Tidak ada check-in atau check-out pada periode ini.
             </Text>
           </GlassCard>
         ) : (
           <View className="gap-3">
             {history.map((item) => (
               <GlassCard key={item.id} style={{ padding: 16 }}>
-                <View className="flex-row justify-between items-center mb-4">
-                  <View className="flex-row items-center gap-2">
-                    <MaterialIcons name="calendar-today" size={16} color={Tokens.colors.primary} />
-                    <Text className="font-inter-bold text-base text-black">{getAttendanceDate(item)}</Text>
+                <View className="flex-row justify-between items-start mb-4">
+                  <View className="flex-1 mr-3">
+                    <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider mb-1">
+                      Riwayat Kehadiran
+                    </Text>
+                    <View className="flex-row items-center gap-2">
+                      <View className="w-8 h-8 rounded-2xl bg-primary/10 items-center justify-center">
+                        <MaterialIcons name="calendar-today" size={14} color={Tokens.colors.primary} />
+                      </View>
+                      <Text className="font-inter-bold text-base text-black">{getAttendanceDate(item)}</Text>
+                    </View>
                   </View>
                   <StatusBadge label={getAttendanceStatus(item)} type={getStatusType(getAttendanceStatus(item)) as any} />
                 </View>
