@@ -303,5 +303,5 @@ Saat implementasi selesai, minimum deliverables:
 -  always use superpowers skill for brainstroming and planning, and when generate code always follow the design.md, and follow the rules in this document. 
 - make sure all the API calls are following the API contract in the API docs.
 - and always make tdd method for any change
-
+- for more details, you have access to outside this folder with the name `hris-fe` in there you can find route for (employee) that i want to use and implementing to this app, but don't make any changes in `hris-fe` folder, use it only for reference to implementing this app. make sure implemented all route in that folder especialy employee route into this app
   

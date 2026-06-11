@@ -1,194 +1,235 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Linking, Text, useWindowDimensions, View } from 'react-native';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useQuery } from '@tanstack/react-query';
+import React, { useMemo, useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Location from 'expo-location';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { GlassCard } from '../../src/components/ui/GlassCard';
+import { SkeletonCard } from '../../src/components/ui/Skeleton';
+import { StatusBadge } from '../../src/components/ui/StatusBadge';
 import { Tokens } from '../../src/core/theme/tokens';
-import { Button } from '../../src/components/ui/Button';
-import { Skeleton, SkeletonCard } from '../../src/components/ui/Skeleton';
 import { attendanceService } from '../../src/services/attendance.service';
+import { useAuthStore } from '../../src/stores/auth.store';
 
-type LocationStatus = 'loading' | 'granted' | 'denied';
-type CameraStatus = 'loading' | 'granted' | 'denied';
+function formatTime(time?: string | null) {
+  if (!time) return '--:--';
+  const parsed = new Date(time);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    });
+  }
+  if (time.includes('T')) return time.split('T')[1].slice(0, 5);
+  if (time.includes(' ')) return time.split(' ')[1].slice(0, 5);
+  return time.slice(0, 5);
+}
+
+function getAttendanceDate(item: any) {
+  return item.attendance_date || item.date || '-';
+}
+
+function getAttendanceStatus(item: any) {
+  const status = item.attendance_status || item.status || 'PRESENT';
+  const s = status.toUpperCase();
+  if (s === 'PRESENT') return 'HADIR';
+  if (s === 'LATE') return 'TERLAMBAT';
+  if (s === 'ABSENT') return 'TIDAK HADIR';
+  return status;
+}
+
+function getCheckIn(item: any) {
+  return item.checkin_at || item.checkin_time;
+}
+
+function getCheckOut(item: any) {
+  return item.checkout_at || item.checkout_time;
+}
+
+function getAttendanceKey(item: any) {
+  return item.attendance_date || item.date || null;
+}
+
+
+
+function getPeriodDates(offset = 0) {
+  const today = new Date();
+  let year = today.getFullYear();
+  let month = today.getMonth();
+  const day = today.getDate();
+  let anchorMonth = day >= 26 ? month + 1 : month;
+  anchorMonth += offset;
+  const startDate = new Date(year, anchorMonth - 1, 26);
+  const endDate = new Date(year, anchorMonth, 25);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const dateFrom = `${startDate.getFullYear()}-${pad(startDate.getMonth() + 1)}-${pad(startDate.getDate())}`;
+  const dateTo = `${endDate.getFullYear()}-${pad(endDate.getMonth() + 1)}-${pad(endDate.getDate())}`;
+  return { startDate, endDate, dateFrom, dateTo };
+}
+
+
 
 export default function AttendanceScreen() {
-  const [status, setStatus] = useState<LocationStatus>('loading');
-  const [cameraStatus, setCameraStatus] = useState<CameraStatus>('loading');
-  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
-  const [scanned, setScanned] = useState(false);
-  const [checkinMessage, setCheckinMessage] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [coords, setCoords] = useState<{ lat: number; long: number } | null>(null);
-  const [todayRecord, setTodayRecord] = useState<any | null>(null);
-  const { width, height } = useWindowDimensions();
+  const { user } = useAuthStore();
+  const [periodOffset, setPeriodOffset] = useState(0);
 
-  const parseQrPayload = useCallback((raw: string) => {
-    try {
-      const json = JSON.parse(raw) as { qr_token?: string; branch_id?: string };
-      if (json.qr_token && json.branch_id) return { qrToken: json.qr_token, branchId: json.branch_id };
-    } catch {}
-    const parts = raw.split(':');
-    if (parts.length >= 2) return { qrToken: raw.trim(), branchId: parts[0].trim() };
-    throw new Error('Format QR tidak valid');
-  }, []);
+  const period = useMemo(() => getPeriodDates(periodOffset), [periodOffset]);
 
-  const requestLocationPermission = useCallback(async () => {
-    setStatus('loading');
-    setErrorMessage(null);
-    try {
-      const permission = await Location.requestForegroundPermissionsAsync();
-      if (permission.status !== 'granted') {
-        setStatus('denied');
-        setErrorMessage('Izinkan akses lokasi untuk check-in / check-out.');
-        return;
-      }
+  const { data: history = [], isLoading, refetch, isFetching } = useQuery({
+    queryKey: ['attendance-history-full', user?.id, period.dateFrom, period.dateTo],
+    queryFn: () => attendanceService.getAttendanceHistory({
+      employee_id: user?.id,
+      date_from: period.dateFrom,
+      date_to: period.dateTo,
+      limit: 100,
+    }),
+    enabled: !!user?.id,
+  });
 
-      try {
-        const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-        setCoords({ lat: position.coords.latitude, long: position.coords.longitude });
-        setStatus('granted');
-        return;
-      } catch {
-        const lastKnown = await Location.getLastKnownPositionAsync();
-        if (lastKnown?.coords) {
-          setCoords({ lat: lastKnown.coords.latitude, long: lastKnown.coords.longitude });
-          setStatus('granted');
-          return;
-        }
-      }
+  const attendanceCount = useMemo(() => {
+    const uniqueDates = new Set<string>();
+    history.forEach((item: any) => {
+      const key = getAttendanceKey(item);
+      const hasAttendance = !!(getCheckIn(item) || getCheckOut(item));
+      if (key && hasAttendance) uniqueDates.add(key);
+    });
+    return uniqueDates.size;
+  }, [history]);
 
-      setStatus('denied');
-      setErrorMessage('Lokasi tidak tersedia. Pastikan GPS perangkat aktif lalu coba lagi.');
-    } catch {
-      setStatus('denied');
-      setErrorMessage('Gagal mengakses lokasi. Coba lagi atau buka pengaturan lokasi.');
+  const onRefresh = () => {
+    refetch();
+  };
+
+  const getStatusType = (status?: string) => {
+    switch (status) {
+      case 'HADIR': return 'secondary';
+      case 'TERLAMBAT': return 'error';
+      case 'TIDAK HADIR': return 'error';
+      default: return 'secondary';
     }
-  }, []);
-
-  useEffect(() => {
-    requestLocationPermission();
-  }, [requestLocationPermission]);
-
-  useEffect(() => {
-    const loadTodayRecord = async () => {
-      try {
-        const record = await attendanceService.getTodayRecord();
-        setTodayRecord(record ?? null);
-      } catch {
-        setTodayRecord(null);
-      }
-    };
-    loadTodayRecord();
-  }, []);
-
-  useEffect(() => {
-    const run = async () => {
-      const permission = cameraPermission ?? (await requestCameraPermission());
-      setCameraStatus(permission.granted ? 'granted' : 'denied');
-    };
-    run();
-  }, [cameraPermission, requestCameraPermission]);
-
-  const submitAttendance = useCallback(async (rawQrData: string) => {
-    if (!coords) return;
-    setSubmitting(true);
-    setCheckinMessage(null);
-    setErrorMessage(null);
-    try {
-      const hasCheckin = !!todayRecord?.checkin_time;
-      const hasCheckout = !!todayRecord?.checkout_time;
-
-      if (hasCheckin && hasCheckout) {
-        setErrorMessage('Anda sudah check-in dan check-out hari ini.');
-        return;
-      }
-
-      if (!hasCheckin) {
-        const { qrToken, branchId } = parseQrPayload(rawQrData);
-        const payload = {
-          qr_token: qrToken,
-          branch_id: branchId,
-          gps_lat: coords.lat,
-          gps_long: coords.long,
-          device_fingerprint: 'local-dev-id',
-          user_agent: 'expo-hris-mobile',
-          device_os: 'android',
-          device_model: 'expo-device',
-          is_mock_location: false,
-          is_rooted: false,
-          battery_level: 0,
-          screen_resolution: `${Math.round(width)}x${Math.round(height)}`,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          device_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          checkin_photo_url: '',
-        };
-        const result = await attendanceService.checkin(payload);
-        setCheckinMessage(result.message ?? 'Check-in berhasil');
-      } else {
-        const result = await attendanceService.checkout({
-          gps_lat: coords.lat,
-          gps_long: coords.long,
-        });
-        setCheckinMessage(result.message ?? 'Check-out berhasil');
-      }
-
-      const latest = await attendanceService.getTodayRecord();
-      setTodayRecord(latest ?? null);
-    } catch (error: any) {
-      setErrorMessage(error?.response?.data?.message ?? error?.message ?? 'Gagal proses attendance');
-    } finally {
-      setSubmitting(false);
-    }
-  }, [coords, height, parseQrPayload, todayRecord, width]);
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <View className="flex-1 px-5 items-center justify-center gap-3">
-        <Text className="font-manrope-bold text-2xl text-on-surface">Attendance Scanner</Text>
-        {status === 'loading' && (
-          <View className="w-full gap-3">
-            <Skeleton height={24} width="60%" />
-            <SkeletonCard />
-            <Skeleton height={44} width="100%" />
-          </View>
-        )}
-        {status === 'denied' && (
-          <View className="items-center gap-4">
-            <Text className="font-inter text-sm text-error text-center">{errorMessage}</Text>
-            <Button title="Buka Pengaturan" onPress={() => Linking.openSettings()} className="w-full" />
-            <Button title="Coba Lagi" onPress={requestLocationPermission} className="w-full bg-white border border-primary" textStyle={{ color: Tokens.colors.primary }} />
-          </View>
-        )}
-        {status === 'granted' && cameraStatus === 'granted' && (
-          <View className="items-center w-full gap-5">
-            <View className="w-full max-w-[340px] aspect-square rounded-2xl overflow-hidden border-2 border-primary/20">
-              <CameraView
-                style={{ flex: 1 }}
-                barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-                onBarcodeScanned={scanned ? undefined : ({ data }) => {
-                  setScanned(true);
-                  submitAttendance(data);
-                }}
-              />
-            </View>
-            {errorMessage ? <Text className="font-inter text-sm text-error text-center">{errorMessage}</Text> : null}
-            {checkinMessage ? <Text className="font-inter text-sm text-on-secondary-container text-center bg-secondary-container px-4 py-2 rounded-lg">{checkinMessage}</Text> : null}
-            {scanned ? (
-              <Button 
-                title="Scan Ulang" 
-                loading={submitting} 
-                onPress={() => { setScanned(false); setErrorMessage(null); setCheckinMessage(null); }} 
-                className="w-full"
-              />
-            ) : (
-              <Text className="font-inter text-xs text-text-muted italic">Scan QR code untuk Check In/Out</Text>
-            )}
-          </View>
-        )}
+      <View className="absolute top-20 -right-20 w-64 h-64 rounded-full bg-primary/10" />
+      <View className="absolute bottom-10 -left-20 w-72 h-72 rounded-full bg-secondary-container/15" />
+
+      <View className="px-5 pt-2 pb-4 z-10">
+        <Text className="font-manrope-extrabold text-3xl text-primary">Absensi</Text>
+        <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Detail riwayat kehadiran anda</Text>
       </View>
+
+      <View className="px-5 pb-4">
+        <GlassCard style={{ padding: 18 }}>
+          <View className="flex-row items-start justify-between">
+            <View className="flex-1 pr-3">
+              <Text className="font-inter-bold text-xs text-text-muted uppercase tracking-wider mb-1">
+                Kehadiran Periode Ini
+              </Text>
+              <Text className="font-manrope-extrabold text-3xl text-primary leading-9">
+                {attendanceCount}
+              </Text>
+              <Text className="font-inter text-sm text-on-surface leading-6 mt-2">
+                Hanya tanggal yang punya check-in atau check-out yang dihitung.
+              </Text>
+            </View>
+            <View className="w-14 h-14 rounded-2xl bg-primary/10 items-center justify-center">
+              <MaterialIcons name="event-available" size={28} color={Tokens.colors.primary} />
+            </View>
+          </View>
+        </GlassCard>
+      </View>
+
+      <View className="px-5 pb-4">
+        <View className="flex-row justify-between items-center z-10">
+          <Pressable
+            onPress={() => setPeriodOffset(prev => prev - 1)}
+            className="w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm active:opacity-60"
+          >
+            <MaterialIcons name="chevron-left" size={24} color={Tokens.colors.primary} />
+          </Pressable>
+
+          <View className="bg-white/80 border border-white/90 px-4 py-2 rounded-2xl items-center justify-center flex-1 mx-3 shadow-sm">
+            <Text className="font-inter-bold text-[13px] text-primary">
+              {period.dateFrom} - {period.dateTo}
+            </Text>
+            <Text className="font-inter text-[9px] text-text-muted mt-0.5 uppercase tracking-wider">
+              Periode Gaji & Absensi
+            </Text>
+          </View>
+
+          <Pressable
+            onPress={() => {
+              if (periodOffset < 0) setPeriodOffset(prev => prev + 1);
+            }}
+            disabled={periodOffset >= 0}
+            className={`w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm ${periodOffset >= 0 ? 'opacity-30' : 'active:opacity-60'}`}
+          >
+            <MaterialIcons name="chevron-right" size={24} color={Tokens.colors.primary} />
+          </Pressable>
+        </View>
+      </View>
+
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={onRefresh} tintColor={Tokens.colors.primary} />}
+      >
+        {isLoading ? (
+          <View className="mt-2">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </View>
+        ) : history.length === 0 ? (
+          <GlassCard style={{ alignItems: 'center', padding: 40, marginTop: 20 }}>
+            <View className="w-16 h-16 rounded-2xl bg-primary/10 items-center justify-center">
+              <MaterialIcons name="event-busy" size={34} color={Tokens.colors.primary} />
+            </View>
+            <Text className="font-manrope-bold text-lg text-primary mt-4">Belum Ada Kehadiran</Text>
+            <Text className="font-inter text-sm text-text-muted text-center mt-2">
+              Tidak ada check-in atau check-out pada periode ini.
+            </Text>
+          </GlassCard>
+        ) : (
+          <View className="gap-3">
+            {history.map((item) => (
+              <GlassCard key={item.id} style={{ padding: 16 }}>
+                <View className="flex-row justify-between items-start mb-4">
+                  <View className="flex-1 mr-3">
+                    <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider mb-1">
+                      Riwayat Kehadiran
+                    </Text>
+                    <View className="flex-row items-center gap-2">
+                      <View className="w-8 h-8 rounded-2xl bg-primary/10 items-center justify-center">
+                        <MaterialIcons name="calendar-today" size={14} color={Tokens.colors.primary} />
+                      </View>
+                      <Text className="font-inter-bold text-base text-black">{getAttendanceDate(item)}</Text>
+                    </View>
+                  </View>
+                  <StatusBadge label={getAttendanceStatus(item)} type={getStatusType(getAttendanceStatus(item)) as any} />
+                </View>
+
+                <View className="flex-row justify-between bg-black/5 p-3 rounded-xl">
+                  <View className="items-center flex-1">
+                    <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-1">Check In</Text>
+                    <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(getCheckIn(item))}</Text>
+                  </View>
+                  <View className="w-[1px] bg-black/10 mx-2" />
+                  <View className="items-center flex-1">
+                    <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-1">Check Out</Text>
+                    <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(getCheckOut(item))}</Text>
+                  </View>
+                </View>
+              </GlassCard>
+            ))}
+          </View>
+        )}
+      </ScrollView>
+
+
     </SafeAreaView>
   );
 }
-
-// StyleSheet removed!

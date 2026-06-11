@@ -2,6 +2,7 @@
 import axios from 'axios';
 import { tokenStore } from '../auth/token-store';
 import { useAuthStore } from '../../stores/auth.store';
+import { Alert } from 'react-native';
 
 const rawBaseURL = process.env.EXPO_PUBLIC_API_URL || '';
 const baseURL = `${rawBaseURL.replace(/\/$/, '')}/api/v1`;
@@ -57,7 +58,15 @@ api.interceptors.response.use(
       try {
         const refreshToken = await tokenStore.getRefreshToken();
         if (!refreshToken) {
-          throw new Error('No refresh token available');
+          console.log('[API Client] No refresh token found, logging out...');
+          Alert.alert(
+            'Sesi Berakhir',
+            'Sesi Anda telah berakhir. Silakan login kembali.',
+            [{ text: 'OK' }]
+          );
+          await tokenStore.clearTokens();
+          await useAuthStore.getState().logout();
+          return Promise.reject(err);
         }
 
         console.log('[API Client] Token expired, attempting refresh...');
@@ -67,9 +76,9 @@ api.interceptors.response.use(
           refresh_token: refreshToken,
         });
 
-        const { access_token, refresh_token } = response.data.data;
+        const { access_token, refresh_token: new_refresh_token } = response.data.data;
 
-        await tokenStore.setTokens(access_token, refresh_token);
+        await tokenStore.setTokens(access_token, new_refresh_token);
         
         console.log('[API Client] Token refreshed successfully');
         processQueue(null, access_token);
@@ -79,6 +88,12 @@ api.interceptors.response.use(
       } catch (refreshError: any) {
         console.error('[API Client] Token refresh failed:', refreshError.response?.data || refreshError.message);
         processQueue(refreshError, null);
+        
+        Alert.alert(
+          'Sesi Berakhir',
+          'Sesi Anda telah habis atau tidak valid. Silakan login kembali.',
+          [{ text: 'OK' }]
+        );
         
         await tokenStore.clearTokens();
         await useAuthStore.getState().logout();

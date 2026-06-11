@@ -1,9 +1,8 @@
-import React from 'react';
-import { View, ViewStyle } from 'react-native';
+import { View, ViewStyle, DimensionValue } from 'react-native';
 
 type SkeletonProps = {
-  height?: number;
-  width?: number | string;
+  height?: DimensionValue;
+  width?: DimensionValue;
   radius?: number;
   style?: ViewStyle;
 };

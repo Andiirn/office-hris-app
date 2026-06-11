@@ -1,7 +1,8 @@
 import { Platform } from 'react-native';
 import { api } from '../core/api/client';
 import { unwrapData } from '../core/api/envelope';
-import { AttendanceActionResponse, AttendanceItem, AttendanceListQuery, CheckinRequest, CheckoutRequest } from '../types/attendance';
+import { AttendanceActionResponse, AttendanceItem, AttendanceListQuery, CheckinRequest, CheckoutRequest, VisitItem, VisitListQuery, VisitRequest } from '../types/attendance';
+import { AttendanceCorrection, CorrectionListQuery, CorrectionRequest } from '../types/correction';
 
 export const attendanceService = {
   async checkin(payload: CheckinRequest): Promise<AttendanceActionResponse> {
@@ -32,7 +33,9 @@ export const attendanceService = {
         params: query,
       });
       
-      console.log('[AttendanceService] Full URL:', response.config.baseURL + response.config.url);
+      const baseURL = response.config?.baseURL || '';
+      const requestUrl = response.config?.url || '';
+      console.log('[AttendanceService] Full URL:', `${baseURL}${requestUrl}`);
       
       const data: any = unwrapData(response.data);
       console.log('[AttendanceService] Unwrapped data sample:', JSON.stringify(Array.isArray(data) ? data.slice(0, 1) : data));
@@ -59,4 +62,55 @@ export const attendanceService = {
     }
   },
 
+  async listVisits(query?: VisitListQuery): Promise<VisitItem[]> {
+    try {
+      console.log('[AttendanceService] Fetching visits with query:', JSON.stringify(query));
+      const response = await api.get('/attendance/visit', {
+        params: query,
+      });
+      const data = unwrapData<any>(response.data);
+      
+      if (Array.isArray(data)) return data;
+      if (data && Array.isArray(data.items)) return data.items;
+      if (data && Array.isArray(data.data)) return data.data;
+      
+      return [];
+    } catch (error: any) {
+      console.error('[AttendanceService] listVisits error:', error?.message);
+      return [];
+    }
+  },
+
+  async requestVisit(payload: VisitRequest): Promise<any> {
+    const response = await api.post('/attendance/visit', payload);
+    return unwrapData<any>(response.data);
+  },
+
+  async listCorrections(query?: CorrectionListQuery): Promise<AttendanceCorrection[]> {
+    try {
+      console.log('[AttendanceService] Fetching corrections with query:', JSON.stringify(query));
+      const response = await api.get('/attendance/corrections', {
+        params: query,
+      });
+      const data = unwrapData<any>(response.data);
+      
+      if (Array.isArray(data)) return data;
+      if (data && Array.isArray(data.items)) return data.items;
+      if (data && Array.isArray(data.data)) return data.data;
+      if (data && data.data && Array.isArray(data.data.items)) return data.data.items;
+      if (data && data.results && Array.isArray(data.results)) return data.results;
+      if (data && data.data && data.data.results && Array.isArray(data.data.results)) return data.data.results;
+      
+      return [];
+    } catch (error: any) {
+      console.error('[AttendanceService] listCorrections error:', error?.message);
+      return [];
+    }
+  },
+
+  async createCorrection(payload: CorrectionRequest): Promise<AttendanceCorrection> {
+    const response = await api.post('/attendance/corrections', payload);
+    return unwrapData<AttendanceCorrection>(response.data);
+  },
 };
+

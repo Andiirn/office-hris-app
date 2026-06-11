@@ -1,12 +1,14 @@
-import React from 'react';
-import { Redirect, Tabs } from 'expo-router';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { StyleSheet, View, Platform } from 'react-native';
+import { Redirect, Tabs } from 'expo-router';
+import React from 'react';
+import { Platform, StyleSheet, View } from 'react-native';
 import { Tokens } from '../../src/core/theme/tokens';
 import { useAuthStore } from '../../src/stores/auth.store';
 
 export default function TabLayout() {
-  const isLoggedIn = useAuthStore((state) => state.isLoggedIn);
+  const { isLoggedIn, isInitialized } = useAuthStore();
+
+  console.log('[TabLayout] Render:', { isLoggedIn, isInitialized });
 
   if (!isLoggedIn) {
     return <Redirect href="/(auth)/login" />;
@@ -19,15 +21,55 @@ export default function TabLayout() {
         tabBarActiveTintColor: Tokens.colors.primary,
         tabBarInactiveTintColor: Tokens.colors.textMuted,
         tabBarStyle: styles.tabBar,
-        tabBarLabelStyle: styles.label,
+        tabBarShowLabel: false, // Correct way to hide labels
         tabBarBackground: () => <View style={styles.tabBarBackground} />,
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: ({ color, size }) => <MaterialIcons name="home-filled" size={size} color={color} /> }} />
-      <Tabs.Screen name="calendar" options={{ title: 'Calendar', tabBarIcon: ({ color, size }) => <MaterialIcons name="calendar-today" size={size} color={color} /> }} />
-      <Tabs.Screen name="history" options={{ title: 'History', tabBarIcon: ({ color, size }) => <MaterialIcons name="history" size={size} color={color} /> }} />
-      <Tabs.Screen name="profile" options={{ title: 'Profile', tabBarIcon: ({ color, size }) => <MaterialIcons name="person" size={size} color={color} /> }} />
-      <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarIcon: ({ color, size }) => <MaterialIcons name="settings" size={size} color={color} /> }} />
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Home',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
+              <MaterialIcons name="home-filled" size={24} color={focused ? '#ffffff' : color} />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="calendar"
+        options={{
+          title: 'Calendar',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
+              <MaterialIcons name="calendar-today" size={24} color={focused ? '#ffffff' : color} />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen name="history" options={{ href: null }} />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          title: 'Notifications',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
+              <MaterialIcons name="notifications" size={24} color={focused ? '#ffffff' : color} />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
+              <MaterialIcons name="person" size={24} color={focused ? '#ffffff' : color} />
+            </View>
+          ),
+        }}
+      />
       <Tabs.Screen name="attendance" options={{ href: null }} />
     </Tabs>
   );
@@ -36,35 +78,37 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     position: 'absolute',
-    height: 84,
+    height: 82,
     borderTopWidth: 0,
     elevation: 0,
-    borderRadius: 24,
-    marginHorizontal: 14,
-    marginBottom: Platform.OS === 'ios' ? 24 : 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.9)',
-    overflow: 'hidden',
+    backgroundColor: 'rgba(251, 249, 248, 1)',
+    paddingBottom: Platform.OS === 'ios' ? 20 : 10,
+    paddingTop: 10,
     ...Platform.select({
       ios: {
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.1,
-        shadowRadius: 20,
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
       },
       android: {
-        elevation: 10,
+        elevation: 8,
       }
     })
   },
   tabBarBackground: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backgroundColor: 'rgba(251, 249, 248, 1)',
   },
-  label: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 11,
-    marginBottom: 6,
+  iconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  iconContainerActive: {
+    backgroundColor: Tokens.colors.primary,
   },
 });

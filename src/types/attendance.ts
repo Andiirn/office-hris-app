@@ -16,6 +16,13 @@ export interface CheckinRequest {
   checkin_photo_url?: string | null;
 }
 
+export interface CheckoutRequest {
+  qr_token?: string;
+  gps_lat: number;
+  gps_long: number;
+  checkout_photo_url?: string | null;
+}
+
 export interface AttendanceActionResponse {
   id?: string;
   message?: string;
@@ -34,6 +41,13 @@ export interface AttendanceItem {
   checkin_at?: string | null;
   checkout_at?: string | null;
   attendance_status?: string;
+  branch_name?: string | null;
+  branch?: {
+    id?: string;
+    name?: string;
+    code?: string;
+    timezone?: string;
+  } | null;
 }
 
 export interface AttendanceListQuery {
@@ -43,3 +57,50 @@ export interface AttendanceListQuery {
   page?: number;
   limit?: number;
 }
+
+export interface VisitRequest {
+  gps_lat: number;
+  gps_long: number;
+  visit_date: string;
+  visit_time: string;
+  reason: string;
+  location_name: string;
+  visit_photo_url?: string | null;
+}
+
+export interface VisitItem {
+  id: string;
+  employee_id: string;
+  visit_date: string;
+  visit_time: string;
+  gps_lat: number;
+  gps_long: number;
+  location_name: string;
+  reason: string;
+  visit_photo_url?: string | null;
+  status: string;
+  approved_by?: string | null;
+  approved_at?: string | null;
+  employee?: {
+    id?: string;
+    name?: string | null;
+    full_name?: string | null;
+    nik?: string | null;
+  } | null;
+  approver?: {
+    id?: string;
+    name?: string | null;
+    full_name?: string | null;
+    nik?: string | null;
+  } | null;
+}
+
+export interface VisitListQuery {
+  employee_id?: string;
+  status?: string;
+  date_from?: string;
+  date_to?: string;
+  page?: number;
+  limit?: number;
+}
+

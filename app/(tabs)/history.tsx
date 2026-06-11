@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, RefreshControl, Pressable } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useQuery } from '@tanstack/react-query';
-import { Tokens } from '../../src/core/theme/tokens';
-import { useAuthStore } from '../../src/stores/auth.store';
-import { attendanceService } from '../../src/services/attendance.service';
+import React, { useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { GlassCard } from '../../src/components/ui/GlassCard';
 import { SkeletonCard } from '../../src/components/ui/Skeleton';
 import { StatusBadge } from '../../src/components/ui/StatusBadge';
+import { Tokens } from '../../src/core/theme/tokens';
+import { attendanceService } from '../../src/services/attendance.service';
+import { useAuthStore } from '../../src/stores/auth.store';
 
 const MONTH_NAMES = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -48,19 +48,28 @@ function getPeriodDates(offset = 0) {
   };
 }
 
+function toDateString(date: Date) {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 export default function AttendanceHistoryScreen() {
   const { user } = useAuthStore();
   const [periodOffset, setPeriodOffset] = useState(0);
 
   const period = React.useMemo(() => getPeriodDates(periodOffset), [periodOffset]);
+  const queryEndDate = React.useMemo(() => {
+    const today = new Date();
+    return period.endDate > today ? toDateString(today) : period.dateTo;
+  }, [period]);
 
   // 1. Fetch History
   const { data: history = [], isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['attendance-history-full', user?.id, period.dateFrom, period.dateTo],
-    queryFn: () => attendanceService.getAttendanceHistory({ 
-      employee_id: user?.id, 
+    queryKey: ['attendance-history-full', user?.id, period.dateFrom, queryEndDate],
+    queryFn: () => attendanceService.getAttendanceHistory({
+      employee_id: user?.id,
       date_from: period.dateFrom,
-      date_to: period.dateTo,
+      date_to: queryEndDate,
       limit: 100,
     }),
     enabled: !!user?.id,
@@ -78,12 +87,25 @@ export default function AttendanceHistoryScreen() {
 
   const getStatusType = (status?: string) => {
     switch (status) {
-      case 'PRESENT': return 'secondary';
-      case 'LATE': return 'error';
-      case 'ABSENT': return 'error';
+      case 'HADIR': return 'secondary';
+      case 'TERLAMBAT': return 'error';
+      case 'TIDAK HADIR': return 'error';
       default: return 'secondary';
     }
   };
+
+  const getAttendanceDate = (item: any) => item.attendance_date || item.date || '-';
+  const getCheckinTime = (item: any) => item.checkin_at || item.checkin_time;
+  const getCheckoutTime = (item: any) => item.checkout_at || item.checkout_time;
+  const getAttendanceStatus = (item: any) => {
+    const status = item.attendance_status || item.status || 'PRESENT';
+    const s = status.toUpperCase();
+    if (s === 'PRESENT') return 'HADIR';
+    if (s === 'LATE') return 'TERLAMBAT';
+    if (s === 'ABSENT') return 'TIDAK HADIR';
+    return status;
+  };
+  const getBranchName = (item: any) => item.branch_name || item.branch?.name || item.branch?.code || '';
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -97,13 +119,13 @@ export default function AttendanceHistoryScreen() {
       </View>
 
       <View className="px-5 pb-4 flex-row justify-between items-center z-10">
-        <Pressable 
+        <Pressable
           onPress={() => setPeriodOffset(prev => prev - 1)}
           className="w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm active:opacity-60"
         >
           <MaterialIcons name="chevron-left" size={24} color={Tokens.colors.primary} />
         </Pressable>
-        
+
         <View className="bg-white/80 border border-white/90 px-4 py-2 rounded-2xl items-center justify-center flex-1 mx-3 shadow-sm">
           <Text className="font-inter-bold text-[13px] text-primary">
             {formatDateLabel(period.startDate)} - {formatDateLabel(period.endDate)}
@@ -113,22 +135,21 @@ export default function AttendanceHistoryScreen() {
           </Text>
         </View>
 
-        <Pressable 
+        <Pressable
           onPress={() => {
             if (periodOffset < 0) {
               setPeriodOffset(prev => prev + 1);
             }
           }}
           disabled={periodOffset >= 0}
-          className={`w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm ${
-            periodOffset >= 0 ? 'opacity-30' : 'active:opacity-60'
-          }`}
+          className={`w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm ${periodOffset >= 0 ? 'opacity-30' : 'active:opacity-60'
+            }`}
         >
           <MaterialIcons name="chevron-right" size={24} color={Tokens.colors.primary} />
         </Pressable>
       </View>
 
-      <ScrollView 
+      <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
@@ -157,29 +178,29 @@ export default function AttendanceHistoryScreen() {
                 <View className="flex-row justify-between items-center mb-4">
                   <View className="flex-row items-center gap-2">
                     <MaterialIcons name="calendar-today" size={16} color={Tokens.colors.primary} />
-                    <Text className="font-inter-bold text-base text-black">{item.date}</Text>
+                    <Text className="font-inter-bold text-base text-black">{getAttendanceDate(item)}</Text>
                   </View>
-                  <StatusBadge label={item.status || 'PRESENT'} type={getStatusType(item.status) as any} />
+                  <StatusBadge label={getAttendanceStatus(item)} type={getStatusType(getAttendanceStatus(item)) as any} />
                 </View>
 
                 <View className="flex-row justify-between bg-black/5 p-3 rounded-xl">
                   <View className="items-center flex-1">
                     <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-1">Check In</Text>
-                    <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(item.checkin_time)}</Text>
+                    <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(getCheckinTime(item))}</Text>
                   </View>
                   <View className="w-[1px] bg-black/10 mx-2" />
                   <View className="items-center flex-1">
                     <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-1">Check Out</Text>
-                    <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(item.checkout_time)}</Text>
+                    <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(getCheckoutTime(item))}</Text>
                   </View>
                 </View>
-                
-                {(item as any).branch_name && (
+
+                {getBranchName(item) ? (
                   <View className="flex-row items-center mt-3 gap-1.5 ml-1">
                     <MaterialIcons name="location-on" size={12} color={Tokens.colors.textMuted} />
-                    <Text className="font-inter-medium text-xs text-text-muted">{(item as any).branch_name}</Text>
+                    <Text className="font-inter-medium text-xs text-text-muted">{getBranchName(item)}</Text>
                   </View>
-                )}
+                ) : null}
               </GlassCard>
             ))}
           </View>
