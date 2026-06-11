@@ -4,16 +4,21 @@ import { NotificationItem, NotificationQuery } from '../types/notification';
 
 export const notificationService = {
   async getNotifications(query?: NotificationQuery): Promise<NotificationItem[]> {
-    const response = await api.get('/notifications/', {
-      params: query,
-    });
-    const data = unwrapData<any>(response.data);
-    
-    if (Array.isArray(data)) return data;
-    if (data && Array.isArray(data.items)) return data.items;
-    if (data && Array.isArray(data.data)) return data.data;
-    
-    return [];
+    try {
+      const response = await api.get('/notifications/', {
+        params: query,
+      });
+      const data = unwrapData<any>(response.data);
+      
+      if (Array.isArray(data)) return data;
+      if (data && Array.isArray(data.items)) return data.items;
+      if (data && Array.isArray(data.data)) return data.data;
+      
+      return [];
+    } catch (error) {
+      console.error('[NotificationService] Error fetching notifications:', error);
+      return [];
+    }
   },
 
   async markAsRead(notificationId: string): Promise<void> {

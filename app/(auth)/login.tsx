@@ -5,8 +5,10 @@ import React from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
+  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -85,61 +87,81 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
       >
-        <View style={styles.header}>
-          <Text className='font-manrope-bold text-3xl text-black mb-2'>Welcome Back</Text>
-          <Text className='font-inter-regular text-sm text-text-muted'>Sign in to your account to continue</Text>
-        </View>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.backdropTop} />
+          <View style={styles.backdropBottom} />
 
-        <View style={styles.form}>
-          <Controller
-            control={control}
-            name="nik"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <Input
-                label="NIK"
-                placeholder="Enter your NIK"
-                onBlur={onBlur}
-                onChangeText={onChange}
-                value={value}
-                error={errors.nik?.message}
-                autoCapitalize="none"
-              />
-            )}
-          />
+          <View style={styles.shell}>
+            <View style={styles.heroCard}>
+              <View style={styles.hero}>
+                <Image
+                  source={require('../../assets/images/screen/login.png')}
+                  style={styles.illustration}
+                />
+              </View>
+              <View style={styles.header}>
+                <Text style={styles.title}>Selamat Datang</Text>
+                <Text style={styles.subtitle}>
+                  Masuk dengan akun Anda untuk melanjutkan
+                </Text>
+              </View>
+            </View>
 
-          <Controller
-            control={control}
-            name="password"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <Input
-                label="Password"
-                placeholder="Enter your password"
-                onBlur={onBlur}
-                onChangeText={onChange}
-                value={value}
-                error={errors.password?.message}
-                secureTextEntry
-              />
-            )}
-          />
+            <View style={styles.formCard}>
+              <View style={styles.form}>
+                <Controller
+                  control={control}
+                  name="nik"
+                  render={({ field: { onChange, onBlur, value } }) => (
+                    <Input
+                      label="Nomor Induk Karyawan"
+                      placeholder="Masukkan NIK Anda"
+                      onBlur={onBlur}
+                      onChangeText={onChange}
+                      value={value}
+                      error={errors.nik?.message}
+                      autoCapitalize="none"
+                    />
+                  )}
+                />
 
-          <Button
-            title="Sign In"
-            onPress={handleSubmit(onSubmit)}
-            loading={mutation.isPending}
-            style={styles.button}
-          />
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+                <Controller
+                  control={control}
+                  name="password"
+                  render={({ field: { onChange, onBlur, value } }) => (
+                    <Input
+                      label="Password"
+                      placeholder="Masukkan Password Anda"
+                      onBlur={onBlur}
+                      onChangeText={onChange}
+                      value={value}
+                      error={errors.password?.message}
+                      secureTextEntry
+                    />
+                  )}
+                />
+
+                <Button
+                  title="Sign In"
+                  onPress={handleSubmit(onSubmit)}
+                  loading={mutation.isPending}
+                  style={styles.button}
+                />
+              </View>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
@@ -150,27 +172,115 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    padding: Tokens.spacing.page,
+    paddingHorizontal: Tokens.spacing.page,
+    paddingVertical: 18,
     justifyContent: 'center',
+    position: 'relative',
+  },
+  backdropTop: {
+    position: 'absolute',
+    top: -40,
+    right: -120,
+    width: 240,
+    height: 240,
+    borderRadius: 240,
+    backgroundColor: 'rgba(0, 6, 102, 0.08)',
+  },
+  backdropBottom: {
+    position: 'absolute',
+    left: -90,
+    bottom: 20,
+    width: 180,
+    height: 180,
+    borderRadius: 180,
+    backgroundColor: 'rgba(26, 35, 126, 0.08)',
+  },
+  shell: {
+    width: '100%',
+    gap: 16,
+  },
+  heroCard: {
+    backgroundColor: Tokens.colors.surfaceContainerLowest,
+    borderRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.06,
+        shadowRadius: 24,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
+  },
+  heroBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: Tokens.colors.secondaryContainer,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 9999,
+    marginBottom: 12,
+  },
+  heroBadgeText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 11,
+    color: Tokens.colors.onSecondaryContainer,
+    letterSpacing: 0.4,
+  },
+  hero: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  illustration: {
+    width: '100%',
+    maxWidth: 360,
+    height: undefined,
+    aspectRatio: 1.08,
+    resizeMode: 'contain',
   },
   header: {
-    marginBottom: 40,
+    alignItems: 'center',
   },
   title: {
     fontFamily: 'Manrope_800ExtraBold',
-    fontSize: 32,
+    fontSize: 28,
+    lineHeight: 34,
     color: Tokens.colors.text,
-    marginBottom: 8,
+    textAlign: 'center',
+    marginBottom: 6,
   },
   subtitle: {
     fontFamily: 'Inter_400Regular',
-    fontSize: 16,
-    color: Tokens.colors.outline,
+    fontSize: 14,
+    lineHeight: 20,
+    color: Tokens.colors.textMuted,
+    textAlign: 'center',
+  },
+  formCard: {
+    backgroundColor: Tokens.colors.surfaceContainerLowest,
+    borderRadius: 28,
+    padding: 20,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.05,
+        shadowRadius: 22,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
   },
   form: {
     width: '100%',
   },
   button: {
-    marginTop: 8,
+    marginTop: 4,
   },
 });

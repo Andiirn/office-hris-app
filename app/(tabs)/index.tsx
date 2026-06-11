@@ -6,11 +6,14 @@ import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, useWind
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Tokens } from '../../src/core/theme/tokens';
 import { attendanceService } from '../../src/services/attendance.service';
+import { approvalService } from '../../src/services/approval.service';
 import { leaveService } from '../../src/services/leave.service';
 import { overtimeService } from '../../src/services/overtime.service';
 import { resignService } from '../../src/services/resign.service';
 import { buildHomeMenuItems } from '../../src/features/home/home-menu';
 import { useAuthStore } from '../../src/stores/auth.store';
+import { DigitalClock } from '../../src/features/home/components/DigitalClock';
+import { Skeleton } from '../../src/components/ui/Skeleton';
 
 type FeedType =
   | 'attendance.checkin'
@@ -59,28 +62,9 @@ export default function HomeScreen() {
   const { user, isLoggedIn } = useAuthStore();
   const { width: windowWidth } = useWindowDimensions();
   const name = user?.full_name || 'Employee';
-  const [now, setNow] = React.useState(new Date());
   const [expandedFeedId, setExpandedFeedId] = React.useState<string | null>(null);
 
-  // Debugging logs to see when user object is available
-  React.useEffect(() => {
-    console.log('[HomeScreen] Auth State:', {
-      isLoggedIn,
-      hasUser: !!user,
-      userId: user?.id,
-      userName: user?.full_name
-    });
-  }, [isLoggedIn, user]);
-
-  React.useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const timeText = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  const dateText = now.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-
-  // 1. Fetch Leave Balance
+  // 1. Fetch Data locally
   const dateRange = React.useMemo(() => {
     const dateTo = new Date();
     const dateFrom = new Date();
@@ -92,8 +76,8 @@ export default function HomeScreen() {
   }, []);
 
   const { data: attendanceFeed = [], isLoading: isLoadingAttendanceFeed, refetch: refetchAttendanceFeed, isFetching: isFetchingAttendanceFeed } = useQuery({
-    queryKey: ['home-attendance-feed', user?.id, dateRange.dateFrom, dateRange.dateTo],
-    queryFn: async () => {
+    queryKey: ['attendance-history', user?.id, dateRange.dateFrom, dateRange.dateTo],
+    queryFn: () => {
       if (!user?.id) return [];
       return attendanceService.getAttendanceHistory({
         employee_id: user.id,
@@ -107,8 +91,8 @@ export default function HomeScreen() {
   });
 
   const { data: leaveRequests = [], isLoading: isLoadingLeaveFeed, refetch: refetchLeaveFeed, isFetching: isFetchingLeaveFeed } = useQuery({
-    queryKey: ['home-leave-feed', user?.id],
-    queryFn: async () => {
+    queryKey: ['leave-requests', user?.id],
+    queryFn: () => {
       if (!user?.id) return [];
       return leaveService.getRequests({ employee_id: user.id, limit: 10 });
     },
@@ -116,8 +100,8 @@ export default function HomeScreen() {
   });
 
   const { data: overtimeRecords = [], isLoading: isLoadingOvertimeFeed, refetch: refetchOvertimeFeed, isFetching: isFetchingOvertimeFeed } = useQuery({
-    queryKey: ['home-overtime-feed', user?.id],
-    queryFn: async () => {
+    queryKey: ['overtime-records', user?.id],
+    queryFn: () => {
       if (!user?.id) return [];
       return overtimeService.getRecords({ employee_id: user.id, limit: 10 });
     },
@@ -125,12 +109,22 @@ export default function HomeScreen() {
   });
 
   const { data: resignRequests = [], isLoading: isLoadingResignFeed, refetch: refetchResignFeed, isFetching: isFetchingResignFeed } = useQuery({
-    queryKey: ['home-resign-feed', user?.id],
-    queryFn: async () => {
+    queryKey: ['resign-requests', user?.id],
+    queryFn: () => {
       if (!user?.id) return [];
       return resignService.getMyRequests({ limit: 10 });
     },
     enabled: !!user?.id,
+  });
+
+  const { data: pendingApprovals = [] } = useQuery({
+    queryKey: ['home-approvals', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      return approvalService.getPending({ limit: 50 });
+    },
+    enabled: !!user?.id && !!user?.role && user.role !== 'employee',
+    staleTime: 30 * 1000,
   });
 
   const formatTime = (time?: string | null) => {
@@ -328,7 +322,7 @@ export default function HomeScreen() {
   const latestAttendance = attendanceFeed[0];
   const isClockedIn = !!(latestAttendance?.checkin_time || latestAttendance?.checkin_at) && !(latestAttendance?.checkout_time || latestAttendance?.checkout_at) && (latestAttendance?.attendance_date || latestAttendance?.date) === new Date().toISOString().slice(0, 10);
 
-  const menuItems = React.useMemo<MenuItem[]>(() => buildHomeMenuItems(user?.role), [user?.role]);
+  const menuItems = React.useMemo<MenuItem[]>(() => buildHomeMenuItems(user?.role, pendingApprovals.length), [user?.role, pendingApprovals.length]);
   const menuColumns = React.useMemo(() => {
     const paddedItems: MenuSlot[] = [...menuItems];
     if (paddedItems.length % 2 !== 0) {
@@ -368,9 +362,8 @@ export default function HomeScreen() {
       </View>
 
       <View className="flex-1" style={{ paddingHorizontal: 20, paddingTop: 8 }}>
-        <View className="items-center pt-2">
-          <Text className="font-manrope-extrabold text-5xl text-primary leading-[52px]">{timeText}</Text>
-          <Text className="font-inter-medium text-base text-text-muted mt-1 mb-3.5">{dateText}</Text>
+        <DigitalClock />
+        <View className="items-center">
           <Pressable
             className="w-[148px] h-[148px] rounded-full bg-primary-container items-center justify-center gap-1.5 shadow-lg shadow-black/10 elevation-6"
             onPress={() => router.push('/attendance-scan')}
@@ -397,11 +390,18 @@ export default function HomeScreen() {
                     item ? (
                     <Pressable
                       key={item.title}
-                      className="rounded-2xl bg-white/80 border border-white/80 px-2.5 py-2.5 mb-3 shadow-sm"
+                      className="relative rounded-2xl bg-white/80 border border-white/80 px-2.5 py-2.5 mb-3 shadow-sm"
                       style={{ width: menuColumnWidth }}
                       onPress={item.onPress}
                     >
                       <View className="items-center justify-center gap-1">
+                        {item.badgeCount ? (
+                          <View className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-error items-center justify-center px-1.5 z-20">
+                            <Text className="font-inter-bold text-[10px] text-white leading-[18px]">
+                              {item.badgeCount > 9 ? '9+' : item.badgeCount}
+                            </Text>
+                          </View>
+                        ) : null}
                         <View className="w-9 h-9 rounded-2xl bg-primary/10 items-center justify-center">
                           <MaterialIcons name={item.icon as any} size={20} color={Tokens.colors.primary} />
                         </View>
@@ -452,7 +452,17 @@ export default function HomeScreen() {
             }
           >
               {isLoadingAttendanceFeed || isLoadingLeaveFeed || isLoadingOvertimeFeed || isLoadingResignFeed ? (
-                <ActivityIndicator size="small" color={Tokens.colors.primary} className="mt-5" />
+                <View className="gap-2">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <View key={i} className="bg-white/80 rounded-xl px-3 py-2.5 border border-white/90 shadow-sm flex-row items-center gap-3">
+                      <Skeleton className="w-10 h-10 rounded-2xl" />
+                      <View className="flex-1 gap-2">
+                        <Skeleton className="w-1/2 h-3 rounded" />
+                        <Skeleton className="w-3/4 h-2 rounded" />
+                      </View>
+                    </View>
+                  ))}
+                </View>
               ) : feedItems.length === 0 ? (
                 <View className="items-center py-5">
                   <Text className="font-inter text-[13px] text-text-muted">No recent activities</Text>

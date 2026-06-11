@@ -119,10 +119,12 @@ export default function OvertimeScreen() {
     mutationFn: (payload: CreateOvertimeRequest) => overtimeService.createRecord(payload),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['overtime-history'] }),
-        queryClient.invalidateQueries({ queryKey: ['overtime-summary'] }),
+        queryClient.invalidateQueries({ queryKey: ['overtime-history', user?.id] }),
+        queryClient.invalidateQueries({ queryKey: ['overtime-summary', user?.id] }),
         queryClient.invalidateQueries({ queryKey: ['home-overtime-feed'] }),
         queryClient.invalidateQueries({ queryKey: ['activity-overtime-feed'] }),
+        queryClient.refetchQueries({ queryKey: ['overtime-history', user?.id], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: ['overtime-summary', user?.id], type: 'active' }),
       ]);
       setModalVisible(false);
       setAttendancePickerVisible(false);

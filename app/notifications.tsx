@@ -32,7 +32,7 @@ export default function NotificationsScreen() {
   const [selectedNotification, setSelectedNotification] = React.useState<NotificationItem | null>(null);
 
   const { data: notifications = [], isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['notifications', user?.id],
+    queryKey: ['notifications'],
     queryFn: () => notificationService.getNotifications({ limit: 50 }),
     enabled: !!user?.id,
   });

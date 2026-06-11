@@ -1,10 +1,12 @@
 // app/_layout.tsx
 import './../src/core/theme/global.css';
 import { Stack } from 'expo-router';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { focusManager, QueryClientProvider } from '@tanstack/react-query';
+import { ErrorBoundaryProps, useRouter, useSegments } from 'expo-router';
+import { Alert, Text, View, Pressable, AppState, AppStateStatus, Platform } from 'react-native';
+import { queryClient } from '../src/core/api/query-client';
 import React, { useEffect } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { 
   useFonts, 
   Manrope_800ExtraBold, 
@@ -16,10 +18,6 @@ import {
 } from '@expo-google-fonts/inter';
 import { sessionManager } from '../src/core/auth/session-manager';
 import { useAuthStore } from '../src/stores/auth.store';
-import { AppState, AppStateStatus, Platform } from 'react-native';
-import { focusManager } from '@tanstack/react-query';
-import { ErrorBoundaryProps } from 'expo-router';
-import { Alert, Text, View, Pressable } from 'react-native';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -46,18 +44,10 @@ function onAppStateChange(status: AppStateStatus) {
   }
 }
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 2,
-      staleTime: 1000 * 60 * 5,
-      refetchOnWindowFocus: true,
-    },
-  },
-});
-
 export default function RootLayout() {
   const { isInitialized, isLoggedIn } = useAuthStore();
+  const segments = useSegments();
+  const router = useRouter();
   
   useEffect(() => {
     const subscription = AppState.addEventListener('change', onAppStateChange);
@@ -72,21 +62,26 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    console.log('[RootLayout] Status:', { isInitialized, isLoggedIn, fontsLoaded: loaded });
-  }, [isInitialized, isLoggedIn, loaded]);
-
-  useEffect(() => {
     sessionManager.initialize();
   }, []);
 
   useEffect(() => {
+    if (isInitialized) {
+      const inAuthGroup = segments[0] === '(auth)';
+
+      if (!isLoggedIn && !inAuthGroup) {
+        // Redirect to login if not logged in and not in auth group
+        router.replace('/(auth)/login');
+      } else if (isLoggedIn && inAuthGroup) {
+        // Redirect to tabs if logged in and in auth group
+        router.replace('/(tabs)');
+      }
+    }
+  }, [isInitialized, isLoggedIn, segments]);
+
+  useEffect(() => {
     if ((loaded || error) && isInitialized) {
-      // Small delay before hiding splash to allow layout to settle
-      const timer = setTimeout(() => {
-        console.log('[RootLayout] Hiding Splash Screen');
-        SplashScreen.hideAsync().catch(() => {});
-      }, 500);
-      return () => clearTimeout(timer);
+      SplashScreen.hideAsync().catch(() => {});
     }
   }, [loaded, error, isInitialized]);
 

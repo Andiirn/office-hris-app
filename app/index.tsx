@@ -9,16 +9,11 @@ export default function RootIndex() {
 
   useEffect(() => {
     if (isInitialized) {
-      console.log('[RootIndex] Initialized. isLoggedIn:', isLoggedIn);
-      // Small delay to prevent race conditions during Fabric initial commit
-      const timer = setTimeout(() => {
-        if (isLoggedIn) {
-          router.replace('/(tabs)');
-        } else {
-          router.replace('/(auth)/login');
-        }
-      }, 500);
-      return () => clearTimeout(timer);
+      if (isLoggedIn) {
+        router.replace('/(tabs)');
+      } else {
+        router.replace('/(auth)/login');
+      }
     }
   }, [isInitialized, isLoggedIn]);
 

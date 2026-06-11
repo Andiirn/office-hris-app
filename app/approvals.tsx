@@ -33,13 +33,13 @@ export default function ApprovalsScreen() {
     data: approvals = [],
     isLoading,
     isFetching,
-    refetch
+    refetch,
   } = useQuery({
     queryKey: ['approvals', tab, user?.id],
     queryFn: async () => {
       try {
-        return tab === 'pending' 
-          ? await approvalService.getPending() 
+        return tab === 'pending'
+          ? await approvalService.getPending()
           : await approvalService.getHistory();
       } catch (err: any) {
         console.error(`[ApprovalsScreen] Fetch error:`, err?.message || err);
@@ -47,18 +47,29 @@ export default function ApprovalsScreen() {
       }
     },
     enabled: !!user?.id,
+    staleTime: 30 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    placeholderData: (previous) => previous,
   });
 
   // 2. Process Approval/Rejection Mutation
   const processMutation = useMutation({
     mutationFn: ({ id, action }: { id: string; action: 'APPROVE' | 'REJECT' }) =>
       approvalService.processAction(id, action),
-    onSuccess: (_, variables) => {
+    onSuccess: async (_, variables) => {
       Alert.alert(
         'Sukses',
         variables.action === 'APPROVE' ? 'Permintaan berhasil disetujui' : 'Permintaan berhasil ditolak'
       );
-      queryClient.invalidateQueries({ queryKey: ['approvals'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['approvals', tab, user?.id] }),
+        queryClient.invalidateQueries({ queryKey: ['approvals', 'pending', user?.id] }),
+        queryClient.invalidateQueries({ queryKey: ['home-approvals', user?.id] }),
+        queryClient.refetchQueries({ queryKey: ['approvals', tab, user?.id], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: ['approvals', 'pending', user?.id], type: 'active' }),
+      ]);
     },
     onError: (error: any) => {
       Alert.alert('Gagal', error.response?.data?.message || 'Gagal memproses persetujuan');
@@ -107,7 +118,7 @@ export default function ApprovalsScreen() {
 
   const filteredApprovals = useMemo(() => {
     const list = approvals;
-    
+
     const byModule = selectedModule === 'all'
       ? list
       : list.filter((item) => String(item.module_name || '').toUpperCase() === selectedModule);
@@ -136,7 +147,7 @@ export default function ApprovalsScreen() {
     try {
       const d = new Date(dateStr);
       if (isNaN(d.getTime())) return dateStr;
-      
+
       const day = d.getDate();
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
       return `${day} ${months[d.getMonth()]} ${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -223,9 +234,8 @@ export default function ApprovalsScreen() {
       <View className="px-5 mb-4 flex-row" style={{ gap: 8 }}>
         <Pressable
           onPress={() => setTab('pending')}
-          className={`flex-1 py-3 rounded-2xl border items-center justify-center ${
-            tab === 'pending' ? 'bg-primary border-primary' : 'bg-white border-black/5'
-          }`}
+          className={`flex-1 py-3 rounded-2xl border items-center justify-center ${tab === 'pending' ? 'bg-primary border-primary' : 'bg-white border-black/5'
+            }`}
         >
           <Text className={`font-inter-bold text-xs ${tab === 'pending' ? 'text-white' : 'text-text-muted'}`}>
             Menunggu Persetujuan
@@ -233,9 +243,8 @@ export default function ApprovalsScreen() {
         </Pressable>
         <Pressable
           onPress={() => setTab('history')}
-          className={`flex-1 py-3 rounded-2xl border items-center justify-center ${
-            tab === 'history' ? 'bg-primary border-primary' : 'bg-white border-black/5'
-          }`}
+          className={`flex-1 py-3 rounded-2xl border items-center justify-center ${tab === 'history' ? 'bg-primary border-primary' : 'bg-white border-black/5'
+            }`}
         >
           <Text className={`font-inter-bold text-xs ${tab === 'history' ? 'text-white' : 'text-text-muted'}`}>
             Riwayat Proses
@@ -276,9 +285,8 @@ export default function ApprovalsScreen() {
               <Pressable
                 key={mod.key}
                 onPress={() => setSelectedModule(mod.key)}
-                className={`px-4 py-2.5 rounded-full border ${
-                  isSelected ? 'bg-primary border-primary' : 'bg-white border-black/5'
-                }`}
+                className={`px-4 py-2.5 rounded-full border ${isSelected ? 'bg-primary border-primary' : 'bg-white border-black/5'
+                  }`}
               >
                 <Text className={`font-inter-semibold text-xs ${isSelected ? 'text-white' : 'text-text-muted'}`}>
                   {mod.label}
@@ -319,7 +327,7 @@ export default function ApprovalsScreen() {
             {filteredApprovals.map((item) => {
               const status = item.status || 'PENDING';
               const isPending = tab === 'pending' && (status === 'PENDING' || status === 'IN_PROGRESS');
-              
+
               return (
                 <GlassCard key={item.id} style={{ padding: 16, backgroundColor: 'rgba(255, 255, 255, 0.95)' }}>
                   <View className="flex-row justify-between items-start mb-2">
@@ -360,8 +368,8 @@ export default function ApprovalsScreen() {
                         className="flex-1 h-10 border border-error rounded-xl flex-row items-center justify-center"
                       >
                         {processMutation.isPending &&
-                        processMutation.variables?.id === item.id &&
-                        processMutation.variables?.action === 'REJECT' ? (
+                          processMutation.variables?.id === item.id &&
+                          processMutation.variables?.action === 'REJECT' ? (
                           <ActivityIndicator size="small" color={Tokens.colors.error} />
                         ) : (
                           <>
@@ -376,8 +384,8 @@ export default function ApprovalsScreen() {
                         className="flex-1 h-10 bg-primary rounded-xl flex-row items-center justify-center"
                       >
                         {processMutation.isPending &&
-                        processMutation.variables?.id === item.id &&
-                        processMutation.variables?.action === 'APPROVE' ? (
+                          processMutation.variables?.id === item.id &&
+                          processMutation.variables?.action === 'APPROVE' ? (
                           <ActivityIndicator size="small" color="#fff" />
                         ) : (
                           <>

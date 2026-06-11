@@ -12,7 +12,7 @@ import { useAuthStore } from '../../src/stores/auth.store';
 export default function ProfileScreen() {
   const { user, logout } = useAuthStore();
   const { data: profile, isLoading, refetch } = useQuery({
-    queryKey: ['profile', user?.id],
+    queryKey: ['profile'],
     queryFn: () => authService.getProfile(),
     enabled: !!user?.id,
     staleTime: 1000 * 60 * 5,

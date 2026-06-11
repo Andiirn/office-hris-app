@@ -136,8 +136,8 @@ export default function CalendarScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background">
       <View className="px-5 pt-2 pb-5">
-        <Text className="font-manrope-extrabold text-3xl text-primary">Calendar</Text>
-        <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Company holidays and approved leave</Text>
+        <Text className="font-manrope-extrabold text-3xl text-primary">Kalender</Text>
+        <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Kalender hari libur dan agenda anda</Text>
       </View>
 
       <ScrollView

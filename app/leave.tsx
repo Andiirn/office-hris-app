@@ -123,8 +123,11 @@ export default function LeaveScreen() {
 
       // Invalidate and refetch to ensure UI updates immediately
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['leave-history'] }),
-        queryClient.invalidateQueries({ queryKey: ['calendar-leaves'] })
+        queryClient.invalidateQueries({ queryKey: ['leave-history', user?.id] }),
+        queryClient.invalidateQueries({ queryKey: ['leave-balances', user?.id, new Date().getFullYear()] }),
+        queryClient.invalidateQueries({ queryKey: ['calendar-leaves'] }),
+        queryClient.refetchQueries({ queryKey: ['leave-history', user?.id], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: ['leave-balances', user?.id, new Date().getFullYear()], type: 'active' }),
       ]);
 
       setModalVisible(false);
@@ -163,8 +166,11 @@ export default function LeaveScreen() {
     mutationFn: (id: string) => leaveService.cancelRequest(id),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['leave-history'] }),
-        queryClient.invalidateQueries({ queryKey: ['calendar-leaves'] })
+        queryClient.invalidateQueries({ queryKey: ['leave-history', user?.id] }),
+        queryClient.invalidateQueries({ queryKey: ['leave-balances', user?.id, new Date().getFullYear()] }),
+        queryClient.invalidateQueries({ queryKey: ['calendar-leaves'] }),
+        queryClient.refetchQueries({ queryKey: ['leave-history', user?.id], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: ['leave-balances', user?.id, new Date().getFullYear()], type: 'active' }),
       ]);
       Alert.alert('Success', 'Leave request cancelled');
     },

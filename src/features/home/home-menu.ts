@@ -5,9 +5,10 @@ export type HomeMenuItem = {
   icon: string;
   title: string;
   onPress: () => void;
+  badgeCount?: number;
 };
 
-export function buildHomeMenuItems(role?: string | null): HomeMenuItem[] {
+export function buildHomeMenuItems(role?: string | null, approvalCount?: number): HomeMenuItem[] {
   const items: HomeMenuItem[] = [
     { icon: 'event-available', title: 'Izin & Cuti', onPress: () => router.push('/leave') },
     { icon: 'work-history', title: 'Lembur', onPress: () => router.push('/overtime') },
@@ -19,7 +20,12 @@ export function buildHomeMenuItems(role?: string | null): HomeMenuItem[] {
   ];
 
   if (canApprove(role)) {
-    items.push({ icon: 'assignment-turned-in', title: 'Persetujuan', onPress: () => router.push('/approvals') });
+    items.push({
+      icon: 'assignment-turned-in',
+      title: 'Persetujuan',
+      onPress: () => router.push('/approvals'),
+      badgeCount: approvalCount && approvalCount > 0 ? approvalCount : undefined,
+    });
   }
 
   return items;

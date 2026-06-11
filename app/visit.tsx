@@ -1,30 +1,30 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  ScrollView, 
-  Pressable, 
-  Modal, 
-  RefreshControl, 
-  Alert, 
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import * as DocumentPicker from 'expo-document-picker';
+import * as Location from 'expo-location';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import {
   ActivityIndicator,
+  Alert,
+  Image,
   Linking,
-  Image
+  Modal,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import * as Location from 'expo-location';
-import * as DocumentPicker from 'expo-document-picker';
-import { useRouter } from 'expo-router';
-import { Tokens } from '../src/core/theme/tokens';
-import { useAuthStore } from '../src/stores/auth.store';
-import { attendanceService } from '../src/services/attendance.service';
-import { GlassCard } from '../src/components/ui/GlassCard';
 import { Button } from '../src/components/ui/Button';
+import { GlassCard } from '../src/components/ui/GlassCard';
 import { Input } from '../src/components/ui/Input';
 import { SkeletonCard } from '../src/components/ui/Skeleton';
 import { StatusBadge } from '../src/components/ui/StatusBadge';
+import { Tokens } from '../src/core/theme/tokens';
+import { attendanceService } from '../src/services/attendance.service';
+import { useAuthStore } from '../src/stores/auth.store';
 import { VisitRequest } from '../src/types/attendance';
 
 export default function VisitScreen() {
@@ -36,7 +36,7 @@ export default function VisitScreen() {
   const [locationName, setLocationName] = useState('');
   const [reason, setReason] = useState('');
   const [photoFile, setPhotoFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
-  
+
   // GPS State
   const [coords, setCoords] = useState<{ lat: number; long: number } | null>(null);
   const [gpsError, setGpsError] = useState<string | null>(null);
@@ -106,7 +106,10 @@ export default function VisitScreen() {
   const submitMutation = useMutation({
     mutationFn: (payload: VisitRequest) => attendanceService.requestVisit(payload),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['visit-history'] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['visit-history', user?.id] }),
+        queryClient.refetchQueries({ queryKey: ['visit-history', user?.id], type: 'active' }),
+      ]);
       setModalVisible(false);
       setLocationName('');
       setReason('');
@@ -139,25 +142,24 @@ export default function VisitScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      {/* Background Decor */}
-      <View className="absolute -top-10 -right-10 w-64 h-64 rounded-full bg-primary/5" />
-      <View className="absolute bottom-10 -left-20 w-72 h-72 rounded-full bg-secondary-container/10" />
+      <View className="absolute top-16 -right-20 w-72 h-72 rounded-full bg-primary/5" />
+      <View className="absolute bottom-10 -left-24 w-80 h-80 rounded-full bg-secondary-container/10" />
 
-      {/* Header */}
-      <View className="flex-row items-center px-5 pt-2 pb-5 z-10">
-        <Pressable
-          onPress={() => router.back()}
-          className="w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm mr-4 active:opacity-60"
-        >
-          <MaterialIcons name="arrow-back" size={24} color={Tokens.colors.primary} />
-        </Pressable>
+
+      <View className="flex-row justify-between items-center px-5 pt-2 pb-5 z-10">
         <View>
-          <Text className="font-manrope-extrabold text-3xl text-primary">Dinas Luar</Text>
+          <Text className="font-manrope-extrabold text-3xl text-primary">Visit</Text>
           <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Daftar & laporan kunjungan</Text>
         </View>
+        <Pressable
+          className="w-12 h-12 rounded-2xl bg-primary items-center justify-center shadow-lg shadow-primary/30 elevation-8"
+          onPress={() => setModalVisible(true)}
+        >
+          <MaterialIcons name="add" size={24} color="#fff" />
+        </Pressable>
       </View>
 
-      <ScrollView 
+      <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
@@ -180,12 +182,16 @@ export default function VisitScreen() {
             <SkeletonCard />
           </View>
         ) : history.length === 0 ? (
-          <View className="items-center py-16">
+          <GlassCard style={{ alignItems: 'center', padding: 40, marginTop: 8 }}>
             <MaterialIcons name="location-off" size={64} color={Tokens.colors.outline} />
-            <Text className="font-inter-medium text-sm text-text-muted mt-4 text-center">
+            <Text className="font-manrope-bold text-lg text-primary mt-4 text-center">
+              Belum Ada Visit
+            </Text>
+            <Text className="font-inter-medium text-sm text-text-muted mt-2 text-center">
               Belum ada riwayat kunjungan dinas (visit).
             </Text>
-          </View>
+            <Button title="Laporkan Visit Baru" onPress={() => setModalVisible(true)} style={{ marginTop: 16 }} />
+          </GlassCard>
         ) : (
           <View className="gap-4">
             {history.map((item) => (
@@ -229,14 +235,6 @@ export default function VisitScreen() {
         )}
       </ScrollView>
 
-      {/* FAB */}
-      <Pressable
-        className="absolute bottom-6 right-6 w-14 h-14 rounded-full bg-primary items-center justify-center shadow-lg elevation-5 z-20"
-        onPress={() => setModalVisible(true)}
-      >
-        <MaterialIcons name="add" size={30} color="#ffffff" />
-      </Pressable>
-
       {/* Submit Visit Modal */}
       <Modal
         animationType="slide"
@@ -251,8 +249,8 @@ export default function VisitScreen() {
                 <Text className="font-manrope-extrabold text-2xl text-primary">Laporkan Visit</Text>
                 <Text className="font-inter-medium text-xs text-text-muted mt-0.5">Isi data kunjungan Anda</Text>
               </View>
-              <Pressable 
-                className="w-9 h-9 rounded-full bg-black/5 items-center justify-center" 
+              <Pressable
+                className="w-9 h-9 rounded-full bg-black/5 items-center justify-center"
                 onPress={() => setModalVisible(false)}
               >
                 <MaterialIcons name="close" size={20} color={Tokens.colors.text} />
@@ -260,14 +258,14 @@ export default function VisitScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              <Input 
+              <Input
                 label="Nama Lokasi"
                 value={locationName}
                 onChangeText={setLocationName}
                 placeholder="Misal: Kantor PT Maju Jaya, Jaksel"
               />
 
-              <Input 
+              <Input
                 label="Keterangan / Alasan Kunjungan"
                 value={reason}
                 onChangeText={setReason}
@@ -282,10 +280,10 @@ export default function VisitScreen() {
                 <Text className="font-inter-bold text-[12px] text-text mb-2 ml-1">Kunci Lokasi GPS</Text>
                 <View className="bg-black/5 rounded-2xl p-4 flex-row items-center justify-between border border-black/5">
                   <View className="flex-row items-center gap-3 flex-1 mr-2">
-                    <MaterialIcons 
-                      name={coords ? "location-on" : "location-searching"} 
-                      size={22} 
-                      color={coords ? Tokens.colors.primary : Tokens.colors.textMuted} 
+                    <MaterialIcons
+                      name={coords ? "location-on" : "location-searching"}
+                      size={22}
+                      color={coords ? Tokens.colors.primary : Tokens.colors.textMuted}
                     />
                     {gpsLoading ? (
                       <Text className="font-inter-medium text-sm text-text-muted">Mencari lokasi GPS...</Text>
@@ -311,7 +309,7 @@ export default function VisitScreen() {
                   </View>
 
                   {!gpsLoading && (
-                    <Pressable 
+                    <Pressable
                       onPress={fetchGps}
                       className="w-9 h-9 rounded-full bg-white items-center justify-center border border-black/5 shadow-sm active:opacity-60"
                     >
@@ -327,7 +325,7 @@ export default function VisitScreen() {
               {/* Photo Upload Section */}
               <View className="mb-6">
                 <Text className="font-inter-bold text-[12px] text-text mb-2 ml-1">Foto Kunjungan (Opsional)</Text>
-                
+
                 {photoFile ? (
                   <View className="rounded-2xl overflow-hidden border border-black/10 relative">
                     <Image source={{ uri: photoFile.uri }} style={{ width: '100%', height: 160 }} />
@@ -349,13 +347,13 @@ export default function VisitScreen() {
                 )}
               </View>
 
-              <Button 
-                title="Kirim Laporan Visit" 
+              <Button
+                title="Kirim Laporan Visit"
                 onPress={() => {
                   if (!isFormValid) {
                     return;
                   }
-                  
+
                   const today = new Date().toISOString().slice(0, 10);
                   const currentTime = new Date().toTimeString().slice(0, 8);
 
