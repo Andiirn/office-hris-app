@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "46349978346",
+    "project_id": "hris-mobile-jsf",
+    "storage_bucket": "hris-mobile-jsf.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:46349978346:android:db00c8a3c76424fc0ca593",
+        "android_client_info": {
+          "package_name": "com.hris.employee.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAE-qD7uwysHF7bKR2O1GGARmP3RpBvQOo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

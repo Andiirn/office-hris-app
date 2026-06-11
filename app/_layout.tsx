@@ -18,6 +18,7 @@ import {
 } from '@expo-google-fonts/inter';
 import { sessionManager } from '../src/core/auth/session-manager';
 import { useAuthStore } from '../src/stores/auth.store';
+import { NotificationManager } from '../src/core/notifications/notification-manager';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -45,7 +46,7 @@ function onAppStateChange(status: AppStateStatus) {
 }
 
 export default function RootLayout() {
-  const { isInitialized, isLoggedIn } = useAuthStore();
+  const { isInitialized, isLoggedIn, bootstrapError, setBootstrapError } = useAuthStore();
   const segments = useSegments();
   const router = useRouter();
   
@@ -65,6 +66,11 @@ export default function RootLayout() {
     sessionManager.initialize();
   }, []);
 
+  const handleRetryBootstrap = React.useCallback(() => {
+    setBootstrapError(null);
+    sessionManager.initialize();
+  }, [setBootstrapError]);
+
   useEffect(() => {
     if (isInitialized) {
       const inAuthGroup = segments[0] === '(auth)';
@@ -80,6 +86,35 @@ export default function RootLayout() {
   }, [isInitialized, isLoggedIn, segments]);
 
   useEffect(() => {
+    if (isLoggedIn) {
+      // Register for push notifications and retrieve token
+      NotificationManager.registerForPushNotificationsAsync().then((token) => {
+        if (token) {
+          console.log('[RootLayout] Device Push Token:', token);
+        }
+      });
+
+      // Set up foreground & background/click listeners
+      const cleanup = NotificationManager.setupNotificationListeners(
+        (notification) => {
+          // Invalidate queries to auto-refresh state (e.g. badge count or approvals list)
+          queryClient.invalidateQueries({ queryKey: ['notifications'] });
+          queryClient.invalidateQueries({ queryKey: ['approvals'] });
+        },
+        (response) => {
+          // Route user to a specific screen if payload contains screen name
+          const data = response.notification.request.content.data;
+          if (data && data.screen) {
+            router.push(data.screen as any);
+          }
+        }
+      );
+
+      return () => cleanup();
+    }
+  }, [isLoggedIn]);
+
+  useEffect(() => {
     if ((loaded || error) && isInitialized) {
       SplashScreen.hideAsync().catch(() => {});
     }
@@ -87,6 +122,20 @@ export default function RootLayout() {
 
   if ((!loaded && !error) || !isInitialized) {
     return null;
+  }
+
+  if (!isLoggedIn && bootstrapError) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#fbf9f8', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+        <Text style={{ fontSize: 22, fontWeight: '800', color: '#000666', marginBottom: 8 }}>Tidak bisa memuat sesi</Text>
+        <Text style={{ fontSize: 14, color: '#454652', textAlign: 'center', marginBottom: 20 }}>
+          {bootstrapError}
+        </Text>
+        <Pressable onPress={handleRetryBootstrap} style={{ backgroundColor: '#000666', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 12 }}>
+          <Text style={{ color: '#fff', fontWeight: '700' }}>Coba Lagi</Text>
+        </Pressable>
+      </View>
+    );
   }
 
   return (

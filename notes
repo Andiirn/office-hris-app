@@ -1,137 +1,96 @@
-Sudah pasti masuk app employee
+Agar project siap di-build dan bisa langsung ditest via Firebase Console, ada 3 hal krusial yang harus
+  dipastikan:
 
-  - Auth: /auth/login, /auth/refresh, /auth/logout
-  - Profile: /profile, /profile/password, /profile/avatar
-  - Dashboard: /dashboard/stats
-  - Attendance:
-      - POST /attendance/checkin
-      - POST /attendance/checkout
-      - GET /attendance/
-      - GET /attendance/{id}
-      - POST /attendance/corrections
-      - POST /attendance/visit
-      - GET /attendance/qr/{branch_id}
+  1. File Konfigurasi Firebase (MANDATORY)
+  Pastikan Anda sudah meletakkan file berikut di root folder project
+  (/Users/test/Documents/Project/HRIS/hris-app/):
+   - google-services.json (untuk Android)
+   - GoogleService-Info.plist (untuk iOS)
 
-  - Leave:
-      - GET /leave/balances/{employee_id}
-      - GET /leave/requests
-      - POST /leave/requests
-      - GET /leave/requests/{id}
-      - POST /leave/requests/{id}/upload-document
-      - POST /leave/requests/{id}/cancel
-      - GET /leave/calendar
+  Catatan: Saya melihat file ini belum ada di daftar file project Anda. Tanpa ini, build akan gagal atau push
+  notif tidak akan jalan.
 
-  - Overtime:
-      - GET /overtime/summary/{employee_id}
-      - GET /overtime/records
-      - GET /overtime/records/{record_id}
-      - POST /overtime/records
+  2. Update Kode Log Token
+  Saya sudah mengupdate file src/core/notifications/notification-manager.ts agar nantinya saat aplikasi
+  dijalankan, ia akan memunculkan NATIVE FCM TOKEN. Token inilah yang Anda masukkan ke Firebase Console untuk
+  testing.
 
-  - Payroll:
-      - GET /payroll/preview/{employee_id}
-      - GET /payroll/preview/{employee_id}/pdf
+  3. Checklist Sebelum Menjalankan Build
+  Sebelum mengetik perintah build, pastikan:
+   - [x] eas.json sudah memiliki profil development (Sudah OK).
+   - [x] app.json sudah memiliki package name com.hris.employee.app (Sudah OK).
+   - [x] Dependensi expo-dev-client sudah ada (Sudah OK).
 
-  - Notifications:
-      - GET /notifications/
-      - POST /notifications/{id}/read
-      - POST /notifications/read-all
+  ---
 
-  - Resign:
-      - POST /resign/requests
-      - GET /resign/requests/my
-      - GET /resign/requests/{id}
-      - DELETE /resign/requests/{id}
+  Perintah Build Sekarang:
+  Jika file Firebase (poin 1) sudah siap, silakan jalankan perintah ini di terminal Anda:
 
-  Yang menurut saya paling masuk akal untuk ditambahkan next
+   1 # Untuk Android (menghasilkan .apk)
+   2 eas build --profile development --platform android
 
-  1. Attendance Correction
+  Apa yang dilakukan setelah Build selesai?
+   1. Download dan Install APK hasil build ke HP Anda.
+   2. Jalankan server lokal: npx expo start --dev-client.
+   3. Buka aplikasi di HP (bukan Expo Go).
+   4. Lihat terminal, copy nilai NATIVE FCM TOKEN.
+   5. Pergi ke Firebase Console -> Cloud Messaging.
+   6. Kirim Test Message menggunakan token tersebut dengan Custom Data:
+      - Key: screen
+      - Value: approvals
 
-  - Ini memang sudah ada kontraknya.
-  - Cocok jadi screen tersendiri dari history atau detail attendance.
-  - Flow yang logis:
-      - user buka attendance history
-      - tap salah satu attendance
-      - kalau ada masalah, ajukan koreksi
+  Apakah file google-services.json sudah Anda siapkan di folder project? Jika sudah, Anda bisa langsung gas
+  build!
+                                                                                                             
+ > coba check lgi semua file udah saya tambahkan, what is next step?                                         
+                                                                                                             
 
-  - Endpoint yang dipakai:
-      - GET /attendance/corrections
-      - POST /attendance/corrections
-      - GET /attendance/{id}
+  Verifying Configuration and Build Setup: 
+  Verifying firebase configuration files and guiding the user through the development build process.
 
-  2. Notification Center
+  ✓  ReadFolder  . → Found 32 item(s). (4 ignored)
 
-  - Ini wajib kalau mau semua notif muncul di satu tempat.
-  - Endpoint yang sudah pas:
-      - GET /notifications/ dengan query is_read, page, limit
-      - POST /notifications/{id}/read
-      - POST /notifications/read-all
+✦ Mantap! File google-services.json dan GoogleService-Info.plist sudah terdeteksi di root folder. 
 
-  - Yang cocok di UI:
-      - tab list semua notif
-      - filter unread/read
-      - badge unread count
-      - mark all read
+  Next Step adalah melakukan build dan pengujian. Ikuti urutan ini agar tidak ada yang terlewat:
 
-  3. Attendance Detail
+  Langkah 1: Jalankan EAS Build (Development)
+  Buka terminal dan jalankan perintah build untuk platform yang ingin Anda gunakan. Build ini akan
+  menghasilkan aplikasi "Custom Development Client" Anda sendiri.
 
-  - Ini berguna banget untuk detail per hari.
-  - Endpoint ada:
-      - GET /attendance/{id}
+   1 # Untuk Android (disarankan untuk testing awal)
+   2 eas build --profile development --platform android
+   3
+   4 # ATAU Untuk iOS (membutuhkan akun Apple Developer)
+   5 eas build --profile development --platform ios
+  Tunggu proses build di cloud selesai (biasanya 5-10 menit).
 
-  - Cocok untuk:
-      - lihat raw check-in/check-out
-      - lihat overtime minutes/hours
-      - lihat validation flags
-      - lihat apakah hari itu weekend/holiday
+  Langkah 2: Instal Aplikasi di HP
+  Setelah build selesai, Anda akan mendapatkan link download atau QR Code:
+   1. Scan QR Code atau download file APK/IPA tersebut.
+   2. Instal di HP fisik Anda.
+   3. PENTING: Hapus aplikasi Expo Go jika perlu, atau pastikan Anda TIDAK membuka lewat Expo Go. Buka
+      aplikasi yang baru saja Anda instal (ikon HRIS - Mobile).
 
-  4. Visit Attendance
+  Langkah 3: Jalankan Server Lokal
+  Di terminal komputer Anda, jalankan perintah ini untuk menghubungkan kode di komputer ke aplikasi di HP:
 
-  - Ada di OpenAPI, jadi memang kemungkinan fitur employee.
-  - Endpoint:
-      - POST /attendance/visit
+   1 npx expo start --dev-client
 
-  - Cocok kalau app employee perlu absensi kunjungan ke lokasi lain.
-  - Biasanya UI-nya mirip attendance request + GPS + reason + lokasi.
+  Langkah 4: Ambil Token & Test via Firebase Console
+   1. Buka aplikasi HRIS di HP Anda dan pastikan Anda sudah Login.
+   2. Lihat di Terminal komputer Anda. Cari log seperti ini:
 
-  5. Leave Calendar
+   1    [NotificationManager] Registration Successful
+   2    NATIVE FCM TOKEN: dXFz... (copy token panjang ini)
+   3. Buka Firebase Console (https://console.firebase.google.com/) -> Messaging.
+   4. Klik "Create your first campaign" -> "Firebase Device Preview messages".
+   5. Di bagian "Notification data": Masukkan Title & Body.
+   6. Klik "Send test message" -> Masukkan NATIVE FCM TOKEN tadi -> Klik Test.
+   7. Di bagian "Additional options" (Custom Data), masukkan:
+      - Key: screen | Value: approvals
 
-  - Endpoint ini ada dan relevan:
-      - GET /leave/calendar
+  Saran: Jika Anda ingin mengetes alur "Klik Notifikasi langsung ke halaman Approval", pastikan aplikasi
+  dalam kondisi background (tidak sedang terbuka di layar) saat mengirim test message.
 
-  - Cocok untuk kalender gabungan cuti/absensi/libur.
-  - Ini bisa bantu calendar screen jadi lebih kaya, bukan cuma attendance plain.
-
-  Yang ada di backend tapi saya tidak sarankan langsung dipakai employee app tanpa alasan kuat
-
-  - GET /resign/requests dan POST /resign/requests/{id}/approve
-      - ini admin/HR only, harus tetap di luar scope employee
-
-  - overtime/settings/{company_id}
-      - ini setting company, bukan layar employee
-
-  - endpoint approval untuk correction/visit/leave/resign
-      - semua approval flow adalah HR/admin
-
-  Soal pertanyaan kamu tentang weekend hadir
-  Dari kontrak yang ada, yang paling masuk akal adalah:
-
-  - kalau Sabtu/Minggu ada attendance, tetap tampil sebagai attendance
-  - kalau backend mengisi overtime_minutes/overtime_hours, baru UI boleh kasih label lembur
-  - jangan UI yang memutuskan sendiri semua weekend hadir = overtime, karena itu policy backend
-
-  Saran prioritas implementasi
-
-  1. Notifications center
-  2. Attendance correction
-  3. Attendance detail
-  4. Leave calendar
-  5. Visit attendance
-
-  Kalau kamu mau, next saya bisa bikin mapping yang lebih operasional:
-
-  - screen apa saja yang perlu ditambah
-  - endpoint mana dipakai per screen
-  - field request/response pentingnya
-  - mana yang sudah ada di app sekarang, mana yang belum
-
-  Atau saya bisa langsung lanjut bikin “daftar fitur employee app final” berdasarkan OpenAPI ini.
+  Silakan dimulai build-nya! Ada kendala saat menjalankan eas build?
