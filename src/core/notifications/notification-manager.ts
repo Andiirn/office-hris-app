@@ -63,20 +63,23 @@ export const NotificationManager = {
         console.warn('[NotificationManager] Project ID not found in Constants. Make sure EAS/projectId is configured in app.json.');
       }
 
-      // 4. Retrieve the Expo Push Token
-      const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
-      const token = tokenData.data;
+      // 4. Retrieve the Expo Push Token (Optional, keep for Expo infra)
+      const expoTokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+      const expoToken = expoTokenData.data;
 
-      // 5. Retrieve the Native Device Token (FCM Token) for direct Firebase Console testing
-      const nativeToken = (await Notifications.getDevicePushTokenAsync()).data;
+      // 5. Retrieve the Native Device Token (FCM Token for Android, APNs for iOS)
+      // This is the token usually required by direct backend integrations
+      const nativeTokenData = await Notifications.getDevicePushTokenAsync();
+      const nativeToken = nativeTokenData.data;
 
       console.log('======================================================');
       console.log('[NotificationManager] Registration Successful');
-      console.log('EXPO TOKEN:', token);
-      console.log('NATIVE FCM TOKEN:', nativeToken);
+      console.log('EXPO TOKEN:', expoToken);
+      console.log('NATIVE DEVICE TOKEN:', nativeToken);
       console.log('======================================================');
 
-      return token;
+      // Return the native token as it's more standard for direct FCM backends
+      return nativeToken;
     } catch (error) {
       console.error('[NotificationManager] Error during token registration:', error);
       return null;

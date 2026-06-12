@@ -1,5 +1,7 @@
+import * as FileSystem from 'expo-file-system/legacy';
 import { api } from '../core/api/client';
 import { unwrapData } from '../core/api/envelope';
+import { tokenStore } from '../core/auth/token-store';
 import { PayrollPreview, PayrollPreviewQuery } from '../types/payroll';
 
 export const payrollService = {
@@ -31,14 +33,25 @@ export const payrollService = {
   },
 
   async downloadPdf(employeeId: string, query: PayrollPreviewQuery): Promise<string> {
-    await api.get(`/payroll/preview/${employeeId}/pdf`, {
-      params: query,
-      responseType: 'blob',
+    const token = await tokenStore.getAccessToken();
+    const params = new URLSearchParams({
+      month: String(query.month),
+      year: String(query.year),
+    });
+    const url = `${api.defaults.baseURL}/payroll/preview/${employeeId}/pdf?${params.toString()}`;
+    
+    const formattedMonth = String(query.month).padStart(2, '0');
+    const filename = `slip-${query.year}-${formattedMonth}-${employeeId}.pdf`;
+    const localUri = `${FileSystem.cacheDirectory}${filename}`;
+    
+    console.log(`[PayrollService] Downloading PDF from ${url} to ${localUri}`);
+    
+    const result = await FileSystem.downloadAsync(url, localUri, {
+      headers: {
+        Authorization: token ? `Bearer ${token}` : '',
+      },
     });
     
-    // In a real browser this would trigger download, 
-    // in Expo we might need expo-file-system and expo-sharing
-    // Returning the URL for now
-    return `${api.defaults.baseURL}/payroll/preview/${employeeId}/pdf?month=${query.month}&year=${query.year}`;
+    return result.uri;
   },
 };

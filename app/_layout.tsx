@@ -19,6 +19,7 @@ import {
 import { sessionManager } from '../src/core/auth/session-manager';
 import { useAuthStore } from '../src/stores/auth.store';
 import { NotificationManager } from '../src/core/notifications/notification-manager';
+import { notificationService } from '../src/services/notification.service';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -91,6 +92,8 @@ export default function RootLayout() {
       NotificationManager.registerForPushNotificationsAsync().then((token) => {
         if (token) {
           console.log('[RootLayout] Device Push Token:', token);
+          // Sync token with backend
+          notificationService.saveDeviceToken(token);
         }
       });
 

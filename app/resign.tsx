@@ -1,5 +1,6 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, Modal, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +15,7 @@ import { useAuthStore } from '../src/stores/auth.store';
 import { CreateResignRequest } from '../src/types/resign';
 
 export default function ResignScreen() {
+  const router = useRouter();
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const [modalVisible, setModalVisible] = useState(false);
@@ -75,9 +77,19 @@ export default function ResignScreen() {
       <View className="absolute bottom-10 -left-24 w-80 h-80 rounded-full bg-primary/5" />
 
       <View className="flex-row justify-between items-center px-5 pt-2 pb-5 z-10">
-        <View>
-          <Text className="font-manrope-extrabold text-3xl text-primary">Resign</Text>
-          <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Daftar pengajuan pengunduran diri</Text>
+        <View className="flex-row items-center gap-3 flex-1">
+          <Pressable
+            onPress={() => router.back()}
+            className="w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm active:opacity-60"
+            accessibilityRole="button"
+            accessibilityLabel="Kembali"
+          >
+            <MaterialIcons name="arrow-back" size={22} color={Tokens.colors.primary} />
+          </Pressable>
+          <View className="flex-1">
+            <Text className="font-manrope-extrabold text-3xl text-primary">Resign</Text>
+            <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Daftar pengajuan pengunduran diri</Text>
+          </View>
         </View>
         <Pressable
           className="w-12 h-12 rounded-2xl bg-error items-center justify-center shadow-lg shadow-error/30 elevation-8"
