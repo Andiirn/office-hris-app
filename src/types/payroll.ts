@@ -57,4 +57,5 @@ export interface PayrollPreview {
 export interface PayrollPreviewQuery {
   month: number;
   year: number;
+  company_id?: string | null;
 }

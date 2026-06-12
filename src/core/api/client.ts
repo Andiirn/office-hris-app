@@ -59,12 +59,11 @@ api.interceptors.response.use(
         const refreshToken = await tokenStore.getRefreshToken();
         if (!refreshToken) {
           console.log('[API Client] No refresh token found, logging out...');
-          Alert.alert(
-            'Sesi Berakhir',
-            'Sesi Anda telah berakhir. Silakan login kembali.',
-            [{ text: 'OK' }]
-          );
-          await tokenStore.clearTokens();
+        Alert.alert(
+          'Sesi Berakhir',
+          'Sesi Anda telah berakhir. Silakan login kembali.',
+          [{ text: 'OK' }]
+        );
           await useAuthStore.getState().logout();
           return Promise.reject(err);
         }
@@ -95,7 +94,6 @@ api.interceptors.response.use(
           [{ text: 'OK' }]
         );
         
-        await tokenStore.clearTokens();
         await useAuthStore.getState().logout();
         
         return Promise.reject(refreshError);

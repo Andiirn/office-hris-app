@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import React from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Tokens } from '../src/core/theme/tokens';
 import { attendanceService } from '../src/services/attendance.service';
 import { leaveService } from '../src/services/leave.service';
@@ -41,6 +42,7 @@ type FeedItem = {
 };
 
 export default function ActivityScreen() {
+  const router = useRouter();
   const { user } = useAuthStore();
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
 
@@ -242,8 +244,20 @@ export default function ActivityScreen() {
   return (
     <SafeAreaView className="flex-1 bg-background">
       <View className="px-5 pt-2 pb-4">
-        <Text className="font-manrope-extrabold text-3xl text-primary">Aktivitas</Text>
-        <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Semua aktivitas terbaru dalam satu layar</Text>
+        <View className="flex-row items-center gap-3">
+          <Pressable
+            onPress={() => router.back()}
+            className="w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm active:opacity-60"
+            accessibilityRole="button"
+            accessibilityLabel="Kembali"
+          >
+            <MaterialIcons name="arrow-back" size={22} color={Tokens.colors.primary} />
+          </Pressable>
+          <View className="flex-1">
+            <Text className="font-manrope-extrabold text-3xl text-primary">Aktivitas</Text>
+            <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Semua aktivitas terbaru dalam satu layar</Text>
+          </View>
+        </View>
       </View>
 
       <ScrollView

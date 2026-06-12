@@ -6,10 +6,14 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ActivityIndicator, Linking, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Device from 'expo-device';
 import { Button } from '../src/components/ui/Button';
 import { Skeleton, SkeletonCard } from '../src/components/ui/Skeleton';
 import { Tokens } from '../src/core/theme/tokens';
+import { getStableDeviceFingerprint } from '../src/core/auth/device-fingerprint';
+import { qk } from '../src/core/query/query-keys';
 import { attendanceService } from '../src/services/attendance.service';
+import { useAuthStore } from '../src/stores/auth.store';
 
 type LocationStatus = 'loading' | 'granted' | 'denied';
 type CameraStatus = 'loading' | 'granted' | 'denied';
@@ -17,6 +21,7 @@ type CameraStatus = 'loading' | 'granted' | 'denied';
 export default function AttendanceScanScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
   const [status, setStatus] = useState<LocationStatus>('loading');
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>('loading');
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
@@ -27,7 +32,6 @@ export default function AttendanceScanScreen() {
   const [coords, setCoords] = useState<{ lat: number; long: number } | null>(null);
   const [isMocked, setIsMocked] = useState(false);
   const [todayRecord, setTodayRecord] = useState<any | null>(null);
-  const [lastQrPayload, setLastQrPayload] = useState<{ qrToken: string; branchId: string } | null>(null);
   const { width, height } = useWindowDimensions();
 
   const parseQrPayload = useCallback((raw: string) => {
@@ -118,16 +122,16 @@ export default function AttendanceScanScreen() {
 
       const { qrToken, branchId } = parseQrPayload(rawQrData);
       if (!hasCheckin) {
-        setLastQrPayload({ qrToken, branchId });
+        const deviceFingerprint = await getStableDeviceFingerprint();
         const payload = {
           qr_token: qrToken,
           branch_id: branchId,
           gps_lat: coords.lat,
           gps_long: coords.long,
-          device_fingerprint: 'local-dev-id',
-          user_agent: 'expo-hris-mobile',
-          device_os: 'android',
-          device_model: 'expo-device',
+          device_fingerprint: deviceFingerprint,
+          user_agent: `HRIS/${Device.modelName || 'device'}`,
+          device_os: Device.osName || 'unknown',
+          device_model: Device.modelName || Device.deviceName || 'unknown',
           is_mock_location: isMocked,
           is_rooted: false,
           battery_level: null,
@@ -151,18 +155,17 @@ export default function AttendanceScanScreen() {
       const latest = await attendanceService.getTodayRecord();
       setTodayRecord(latest ?? null);
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['attendance-history'] }),
-        queryClient.invalidateQueries({ queryKey: ['attendance-history-full'] }),
-        queryClient.invalidateQueries({ queryKey: ['home-approvals'] }),
-        queryClient.invalidateQueries({ queryKey: ['home-approvals', 'pending'] }),
-        queryClient.invalidateQueries({ queryKey: ['activity-attendance-feed'] }),
+        queryClient.invalidateQueries({ queryKey: qk.attendanceHistory(user?.id) }),
+        queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryFull(user?.id) }),
+        queryClient.invalidateQueries({ queryKey: qk.homeApprovals(user?.id) }),
+        queryClient.invalidateQueries({ queryKey: qk.activityAttendanceFeed(user?.id, null, null) }),
       ]);
     } catch (error: any) {
       setErrorMessage(error?.response?.data?.message ?? error?.message ?? 'Gagal memproses absensi');
     } finally {
       setSubmitting(false);
     }
-  }, [coords, isMocked, height, lastQrPayload, parseQrPayload, todayRecord, width]);
+  }, [coords, height, isMocked, parseQrPayload, queryClient, todayRecord, user?.id, width]);
 
   const handleRetryScanner = () => {
     setScanned(false);

@@ -1,5 +1,6 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useQuery } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -35,6 +36,8 @@ function getAttendanceStatus(item: any) {
   const s = status.toUpperCase();
   if (s === 'PRESENT') return 'HADIR';
   if (s === 'LATE') return 'TERLAMBAT';
+  if (s === 'SICK') return 'SAKIT';
+  if (s === 'PERMISSION' || s === 'IZIN') return 'IZIN';
   if (s === 'ABSENT') return 'TIDAK HADIR';
   return status;
 }
@@ -49,6 +52,23 @@ function getCheckOut(item: any) {
 
 function getAttendanceKey(item: any) {
   return item.attendance_date || item.date || null;
+}
+
+function isApprovedAbsence(item: any) {
+  const status = String(item?.attendance_status || item?.status || '').toUpperCase();
+  const decision = String(item?.validation_decision || item?.validation_status || item?.approval_status || '').toUpperCase();
+  if (status !== 'SICK' && status !== 'PERMISSION' && status !== 'IZIN') return false;
+  return ['APPROVED', 'VALID', 'ACCEPTED', 'CONFIRMED'].includes(decision);
+}
+
+function getAttendanceBucket(item: any) {
+  const status = String(item?.attendance_status || item?.status || 'PRESENT').toUpperCase();
+  if (status === 'PRESENT') return 'HADIR';
+  if (status === 'LATE') return 'TERLAMBAT';
+  if (status === 'SICK') return isApprovedAbsence(item) ? 'SAKIT' : 'SAKIT (PENDING)';
+  if (status === 'PERMISSION' || status === 'IZIN') return isApprovedAbsence(item) ? 'IZIN' : 'IZIN (PENDING)';
+  if (status === 'ABSENT') return 'TIDAK HADIR';
+  return status;
 }
 
 
@@ -71,6 +91,7 @@ function getPeriodDates(offset = 0) {
 
 
 export default function AttendanceScreen() {
+  const router = useRouter();
   const { user } = useAuthStore();
   const [periodOffset, setPeriodOffset] = useState(0);
 
@@ -91,10 +112,27 @@ export default function AttendanceScreen() {
     const uniqueDates = new Set<string>();
     history.forEach((item: any) => {
       const key = getAttendanceKey(item);
+      const status = String(item?.attendance_status || item?.status || '').toUpperCase();
       const hasAttendance = !!(getCheckIn(item) || getCheckOut(item));
-      if (key && hasAttendance) uniqueDates.add(key);
+      const countsAsAttendance = status === 'PRESENT' || status === 'LATE' || isApprovedAbsence(item);
+      if (key && (hasAttendance || countsAsAttendance)) uniqueDates.add(key);
     });
     return uniqueDates.size;
+  }, [history]);
+
+  const attendanceSummary = useMemo(() => {
+    return history.reduce(
+      (acc: { present: number; late: number; sick: number; permission: number; absent: number }, item: any) => {
+        const bucket = getAttendanceBucket(item);
+        if (bucket === 'HADIR') acc.present += 1;
+        else if (bucket === 'TERLAMBAT') acc.late += 1;
+        else if (bucket.startsWith('SAKIT')) acc.sick += 1;
+        else if (bucket.startsWith('IZIN')) acc.permission += 1;
+        else if (bucket === 'TIDAK HADIR') acc.absent += 1;
+        return acc;
+      },
+      { present: 0, late: 0, sick: 0, permission: 0, absent: 0 },
+    );
   }, [history]);
 
   const onRefresh = () => {
@@ -105,6 +143,8 @@ export default function AttendanceScreen() {
     switch (status) {
       case 'HADIR': return 'secondary';
       case 'TERLAMBAT': return 'error';
+      case 'SAKIT': return 'warning';
+      case 'IZIN': return 'secondary';
       case 'TIDAK HADIR': return 'error';
       default: return 'secondary';
     }
@@ -116,8 +156,23 @@ export default function AttendanceScreen() {
       <View className="absolute bottom-10 -left-20 w-72 h-72 rounded-full bg-secondary-container/15" />
 
       <View className="px-5 pt-2 pb-4 z-10">
-        <Text className="font-manrope-extrabold text-3xl text-primary">Absensi</Text>
-        <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Detail riwayat kehadiran anda</Text>
+        <View className="flex-row items-center gap-3">
+          <Pressable
+            onPress={() => router.back()}
+            className="w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm active:opacity-60"
+            accessibilityRole="button"
+            accessibilityLabel="Kembali"
+          >
+            <MaterialIcons name="arrow-back" size={22} color={Tokens.colors.primary} />
+          </Pressable>
+          <View className="flex-1">
+            <Text className="font-manrope-extrabold text-3xl text-primary">Absensi</Text>
+            <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Ringkasan periode {period.dateFrom} - {period.dateTo}</Text>
+          </View>
+        </View>
+        <Text className="font-inter text-xs text-text-muted mt-2">
+          Angka utama menghitung hari yang tercatat hadir, terlambat, atau sakit/izin yang sudah disahkan.
+        </Text>
       </View>
 
       <View className="px-5 pb-4">
@@ -125,17 +180,31 @@ export default function AttendanceScreen() {
           <View className="flex-row items-start justify-between">
             <View className="flex-1 pr-3">
               <Text className="font-inter-bold text-xs text-text-muted uppercase tracking-wider mb-1">
-                Kehadiran Periode Ini
+                Hari Tercatat
               </Text>
               <Text className="font-manrope-extrabold text-3xl text-primary leading-9">
                 {attendanceCount}
               </Text>
               <Text className="font-inter text-sm text-on-surface leading-6 mt-2">
-                Hanya tanggal yang punya check-in atau check-out yang dihitung.
+                Hadir, terlambat, dan sakit/izin yang sudah disetujui dihitung sebagai hari tercatat.
               </Text>
             </View>
             <View className="w-14 h-14 rounded-2xl bg-primary/10 items-center justify-center">
               <MaterialIcons name="event-available" size={28} color={Tokens.colors.primary} />
+            </View>
+          </View>
+          <View className="flex-row flex-wrap gap-2 mt-4">
+            <View className="px-3 py-1.5 rounded-full bg-secondary-container/60">
+              <Text className="font-inter-bold text-[11px] text-secondary">Hadir {attendanceSummary.present}</Text>
+            </View>
+            <View className="px-3 py-1.5 rounded-full bg-error/10">
+              <Text className="font-inter-bold text-[11px] text-error">Terlambat {attendanceSummary.late}</Text>
+            </View>
+            <View className="px-3 py-1.5 rounded-full bg-primary/10">
+              <Text className="font-inter-bold text-[11px] text-primary">Sakit {attendanceSummary.sick}</Text>
+            </View>
+            <View className="px-3 py-1.5 rounded-full bg-black/5">
+              <Text className="font-inter-bold text-[11px] text-text-muted">Izin {attendanceSummary.permission}</Text>
             </View>
           </View>
         </GlassCard>
@@ -209,7 +278,7 @@ export default function AttendanceScreen() {
                       <Text className="font-inter-bold text-base text-black">{getAttendanceDate(item)}</Text>
                     </View>
                   </View>
-                  <StatusBadge label={getAttendanceStatus(item)} type={getStatusType(getAttendanceStatus(item)) as any} />
+                  <StatusBadge label={getAttendanceBucket(item)} type={getStatusType(getAttendanceBucket(item)) as any} />
                 </View>
 
                 <View className="flex-row justify-between bg-black/5 p-3 rounded-xl">

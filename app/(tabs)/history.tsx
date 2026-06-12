@@ -1,11 +1,12 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import React, { useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GlassCard } from '../../src/components/ui/GlassCard';
 import { SkeletonCard } from '../../src/components/ui/Skeleton';
 import { StatusBadge } from '../../src/components/ui/StatusBadge';
+import { qk } from '../../src/core/query/query-keys';
 import { Tokens } from '../../src/core/theme/tokens';
 import { attendanceService } from '../../src/services/attendance.service';
 import { useAuthStore } from '../../src/stores/auth.store';
@@ -48,35 +49,53 @@ function getPeriodDates(offset = 0) {
   };
 }
 
-function toDateString(date: Date) {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
 export default function AttendanceHistoryScreen() {
   const { user } = useAuthStore();
   const [periodOffset, setPeriodOffset] = useState(0);
+  const [isNearBottom, setIsNearBottom] = useState(false);
 
   const period = React.useMemo(() => getPeriodDates(periodOffset), [periodOffset]);
-  const queryEndDate = React.useMemo(() => {
-    const today = new Date();
-    return period.endDate > today ? toDateString(today) : period.dateTo;
-  }, [period]);
 
-  // 1. Fetch History
-  const { data: history = [], isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['attendance-history-full', user?.id, period.dateFrom, queryEndDate],
-    queryFn: () => attendanceService.getAttendanceHistory({
-      employee_id: user?.id,
-      date_from: period.dateFrom,
-      date_to: queryEndDate,
-      limit: 100,
-    }),
+  const pageSize = 20;
+
+  const {
+    data,
+    isLoading,
+    refetch,
+    isFetching,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: qk.attendanceHistoryInfinite(user?.id, period.dateFrom, period.dateTo),
+    queryFn: async ({ pageParam = 1 }) => {
+      return attendanceService.getAttendanceHistory({
+        employee_id: user?.id,
+        date_from: period.dateFrom,
+        date_to: period.dateTo,
+        limit: pageSize,
+        page: pageParam,
+      });
+    },
     enabled: !!user?.id,
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) => (lastPage.length < pageSize ? undefined : Number(lastPageParam) + 1),
   });
+
+  const history = React.useMemo(() => data?.pages.flat() ?? [], [data]);
 
   const onRefresh = () => {
     refetch();
+  };
+
+  const handleScroll = (event: any) => {
+    const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+    const distanceFromBottom = contentSize.height - (layoutMeasurement.height + contentOffset.y);
+    const threshold = contentSize.height * 0.2;
+
+    if (distanceFromBottom <= threshold && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
   };
 
   const formatTime = (time?: string | null) => {
@@ -156,6 +175,8 @@ export default function AttendanceHistoryScreen() {
         refreshControl={
           <RefreshControl refreshing={isFetching} onRefresh={onRefresh} tintColor={Tokens.colors.primary} />
         }
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       >
         {isLoading ? (
           <View className="mt-2">
@@ -203,6 +224,11 @@ export default function AttendanceHistoryScreen() {
                 ) : null}
               </GlassCard>
             ))}
+            {isFetchingNextPage ? (
+              <View className="py-4">
+                <SkeletonCard />
+              </View>
+            ) : null}
           </View>
         )}
       </ScrollView>

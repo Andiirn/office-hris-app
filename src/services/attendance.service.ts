@@ -4,6 +4,18 @@ import { unwrapData } from '../core/api/envelope';
 import { AttendanceActionResponse, AttendanceItem, AttendanceListQuery, CheckinRequest, CheckoutRequest, VisitItem, VisitListQuery, VisitRequest } from '../types/attendance';
 import { AttendanceCorrection, CorrectionListQuery, CorrectionRequest } from '../types/correction';
 
+const devLog = (...args: unknown[]) => {
+  if (__DEV__) {
+    console.log(...args);
+  }
+};
+
+const devError = (...args: unknown[]) => {
+  if (__DEV__) {
+    console.error(...args);
+  }
+};
+
 export const attendanceService = {
   async checkin(payload: CheckinRequest): Promise<AttendanceActionResponse> {
     const response = await api.post('/attendance/checkin', {
@@ -28,17 +40,17 @@ export const attendanceService = {
   },
   async getAttendanceHistory(query?: AttendanceListQuery): Promise<AttendanceItem[]> {
     try {
-      console.log('[AttendanceService] Fetching history with query:', JSON.stringify(query));
+      devLog('[AttendanceService] Fetching history with query:', JSON.stringify(query));
       const response = await api.get('/attendance/', {
         params: query,
       });
       
       const baseURL = response.config?.baseURL || '';
       const requestUrl = response.config?.url || '';
-      console.log('[AttendanceService] Full URL:', `${baseURL}${requestUrl}`);
+      devLog('[AttendanceService] Full URL:', `${baseURL}${requestUrl}`);
       
       const data: any = unwrapData(response.data);
-      console.log('[AttendanceService] Unwrapped data sample:', JSON.stringify(Array.isArray(data) ? data.slice(0, 1) : data));
+      devLog('[AttendanceService] Unwrapped data sample:', JSON.stringify(Array.isArray(data) ? data.slice(0, 1) : data));
 
       // Handle different possible backend pagination shapes
       let result: AttendanceItem[] = [];
@@ -54,17 +66,17 @@ export const attendanceService = {
         if (arrays.length > 0) result = arrays[0] as AttendanceItem[];
       }
 
-      console.log('[AttendanceService] Returning', result.length, 'items');
+      devLog('[AttendanceService] Returning', result.length, 'items');
       return result;
     } catch (error: any) {
-      console.error('[AttendanceService] getAttendanceHistory error:', error?.message);
+      devError('[AttendanceService] getAttendanceHistory error:', error?.message);
       return [];
     }
   },
 
   async listVisits(query?: VisitListQuery): Promise<VisitItem[]> {
     try {
-      console.log('[AttendanceService] Fetching visits with query:', JSON.stringify(query));
+      devLog('[AttendanceService] Fetching visits with query:', JSON.stringify(query));
       const response = await api.get('/attendance/visit', {
         params: query,
       });
@@ -76,7 +88,7 @@ export const attendanceService = {
       
       return [];
     } catch (error: any) {
-      console.error('[AttendanceService] listVisits error:', error?.message);
+      devError('[AttendanceService] listVisits error:', error?.message);
       return [];
     }
   },
@@ -88,7 +100,7 @@ export const attendanceService = {
 
   async listCorrections(query?: CorrectionListQuery): Promise<AttendanceCorrection[]> {
     try {
-      console.log('[AttendanceService] Fetching corrections with query:', JSON.stringify(query));
+      devLog('[AttendanceService] Fetching corrections with query:', JSON.stringify(query));
       const response = await api.get('/attendance/corrections', {
         params: query,
       });
@@ -103,7 +115,7 @@ export const attendanceService = {
       
       return [];
     } catch (error: any) {
-      console.error('[AttendanceService] listCorrections error:', error?.message);
+      devError('[AttendanceService] listCorrections error:', error?.message);
       return [];
     }
   },
@@ -113,4 +125,3 @@ export const attendanceService = {
     return unwrapData<AttendanceCorrection>(response.data);
   },
 };
-

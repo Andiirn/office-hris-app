@@ -1,6 +1,7 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
+import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
   Alert,
@@ -48,6 +49,7 @@ function isAnnualLeaveType(type?: { code?: string | null; name?: string | null; 
 }
 
 export default function LeaveScreen() {
+  const router = useRouter();
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const [modalVisible, setModalVisible] = useState(false);
@@ -378,8 +380,19 @@ export default function LeaveScreen() {
       <View className="absolute top-64 -left-24 w-72 h-72 rounded-full bg-error-container/10" />
       <View className="absolute -bottom-12 -right-4 w-44 h-44 rounded-full bg-secondary-container/20" />
 
-      <View className="flex-row justify-between items-center px-5 pt-2 pb-5 z-10">
-        <Text className="font-manrope-extrabold text-3xl text-primary">Pengajuan izin & cuti</Text>
+      <View className="flex-row items-center px-5 pt-2 pb-5 z-10">
+        <Pressable
+          onPress={() => router.back()}
+          className="w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm active:opacity-60"
+          accessibilityRole="button"
+          accessibilityLabel="Kembali"
+        >
+          <MaterialIcons name="arrow-back" size={22} color={Tokens.colors.primary} />
+        </Pressable>
+        <View className="flex-1 ml-3">
+          <Text className="font-manrope-extrabold text-3xl text-primary">Pengajuan izin & cuti</Text>
+          <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Ajukan dan pantau izin atau cuti</Text>
+        </View>
       </View>
 
       <ScrollView

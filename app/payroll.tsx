@@ -1,11 +1,13 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Linking, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GlassCard } from '../src/components/ui/GlassCard';
 import { Skeleton, SkeletonCard } from '../src/components/ui/Skeleton';
 import { Tokens } from '../src/core/theme/tokens';
+import { authService } from '../src/services/auth.service';
 import { payrollService } from '../src/services/payroll.service';
 import { useAuthStore } from '../src/stores/auth.store';
 
@@ -15,12 +17,25 @@ export default function PayrollScreen() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
-  // 1. Fetch Payroll Preview
-  const { data: payroll, isLoading, refetch, isFetching, isError } = useQuery({
-    queryKey: ['payroll-preview', user?.id, selectedYear, selectedMonth],
-    queryFn: () => payrollService.getPreview(user?.id || '', { month: selectedMonth, year: selectedYear }),
+  const { data: profile } = useQuery({
+    queryKey: ['profile', user?.id],
+    queryFn: () => authService.getProfile(),
     enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
   });
+  const companyId = profile?.company_id || user?.company_id || null;
+  const companyName = profile?.company?.name || profile?.company_id || 'Company tidak tersedia';
+
+  // 1. Fetch Payroll Preview
+  const { data: payroll, isLoading, refetch, isFetching, isError, error } = useQuery({
+    queryKey: ['payroll-preview', user?.id, companyId, selectedYear, selectedMonth],
+    queryFn: () => payrollService.getPreview(user?.id || '', { month: selectedMonth, year: selectedYear, company_id: companyId }),
+    enabled: !!user?.id,
+    retry: 1, // Minimize retries for production if server is down
+  });
+
+  const isServerError = (error as any)?.response?.status === 500;
+  const isNotFound = (error as any)?.response?.status === 404 || (!payroll && !isLoading && !isError);
 
   const readNumber = (value: unknown) =>
     typeof value === 'number' && Number.isFinite(value) ? value : 0;
@@ -77,22 +92,25 @@ export default function PayrollScreen() {
       Alert.alert('Success', 'Payslip generated for this month');
     },
     onError: (error: any) => {
-      Alert.alert('Error', error?.response?.data?.message || 'Failed to generate payslip');
+      const status = error?.response?.status;
+      const message = status === 500
+        ? 'Server sedang bermasalah. Silakan coba lagi nanti.'
+        : (error?.response?.data?.message || 'Gagal membuat slip gaji');
+      Alert.alert('Gagal', message);
     }
   });
 
   const handleDownload = async () => {
     try {
-      const url = await payrollService.downloadPdf(user?.id || '', { month: selectedMonth, year: selectedYear });
-      // In mobile, we typically open the URL in browser or use a file downloader
-      const canOpen = await Linking.canOpenURL(url);
-      if (canOpen) {
-        await Linking.openURL(url);
-      } else {
-        Alert.alert('Error', 'Could not open download link');
-      }
-    } catch (err) {
-      Alert.alert('Error', 'Failed to prepare download link');
+      const localUri = await payrollService.downloadPdf(user?.id || '', { month: selectedMonth, year: selectedYear, company_id: companyId });
+      Alert.alert('Sukses', `Slip gaji berhasil diunduh.\n\nFile tersimpan sementara sebagai: ${localUri.split('/').pop()}`);
+    } catch (err: any) {
+      console.error('[Payroll Download Error]', err);
+      const status = err?.response?.status;
+      const message = status === 500
+        ? 'Server sedang bermasalah. Gagal mengunduh slip gaji.'
+        : 'Gagal mengunduh slip gaji. Silakan coba lagi.';
+      Alert.alert('Gagal', message);
     }
   };
 
@@ -123,9 +141,19 @@ export default function PayrollScreen() {
       <View className="absolute bottom-20 -right-12 w-48 h-48 rounded-full bg-secondary/10" />
 
       <View className="flex-row justify-between items-center px-5 pt-2 pb-5 z-10">
-        <View>
-          <Text className="font-manrope-extrabold text-3xl text-[#000666]">Payroll</Text>
-          <Text className="font-inter-medium text-sm text-[#454652] mt-0.5">Slip Gaji Bulanan</Text>
+        <View className="flex-row items-center gap-3 flex-1">
+          <Pressable
+            onPress={() => router.back()}
+            className="w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm active:opacity-60"
+            accessibilityRole="button"
+            accessibilityLabel="Kembali"
+          >
+            <MaterialIcons name="arrow-back" size={22} color={Tokens.colors.primary} />
+          </Pressable>
+          <View className="flex-1">
+            <Text className="font-manrope-extrabold text-3xl text-[#000666]">Payroll</Text>
+            <Text className="font-inter-medium text-sm text-[#454652] mt-0.5">Slip Gaji Bulanan</Text>
+          </View>
         </View>
         <View className="bg-primary/10 px-4 py-2 rounded-2xl">
           <Text className="font-manrope-bold text-xs text-[#000666]">{selectedYear}</Text>
@@ -144,8 +172,8 @@ export default function PayrollScreen() {
               key={name}
               onPress={() => setSelectedMonth(index + 1)}
               className={`px-5 py-2.5 rounded-xl border ${selectedMonth === index + 1
-                  ? 'bg-[#000666] border-[#000666]'
-                  : 'bg-white/80 border-white/90'
+                ? 'bg-[#000666] border-[#000666]'
+                : 'bg-white/80 border-white/90'
                 }`}
             >
               <Text className={`font-inter-bold text-xs ${selectedMonth === index + 1 ? 'text-white' : 'text-[#454652]'
@@ -183,6 +211,22 @@ export default function PayrollScreen() {
               Silakan login kembali atau hubungi HR.
             </Text>
           </GlassCard>
+        ) : isServerError ? (
+          <GlassCard style={{ alignItems: 'center', padding: 40, marginTop: 10 }}>
+            <View className="w-20 h-20 rounded-full bg-error/5 items-center justify-center mb-6">
+              <MaterialIcons name="dns" size={40} color={Tokens.colors.error} />
+            </View>
+            <Text className="font-manrope-bold text-lg text-[#000666]">Server Bermasalah</Text>
+            <Text className="font-inter text-sm text-[#454652] text-center mt-2 mb-8 px-4">
+              Maaf, saat ini server sedang mengalami gangguan. Silakan coba beberapa saat lagi.
+            </Text>
+            <Pressable
+              onPress={() => refetch()}
+              className="bg-[#000666] px-8 py-3 rounded-2xl shadow-sm active:opacity-70"
+            >
+              <Text className="font-inter-bold text-white text-sm">Coba Lagi</Text>
+            </Pressable>
+          </GlassCard>
         ) : isError || !payroll ? (
           <GlassCard style={{ alignItems: 'center', padding: 40, marginTop: 10 }}>
             <View className="w-20 h-20 rounded-full bg-primary/5 items-center justify-center mb-6">
@@ -199,15 +243,16 @@ export default function PayrollScreen() {
             <GlassCard style={{ padding: 0, overflow: 'hidden', backgroundColor: 'rgba(255, 255, 255, 0.95)' }}>
               {/* Brand Header */}
               <View className="bg-[#000666] px-5 py-6 flex-row justify-between items-center">
-                <View>
-                  <Text className="font-manrope-extrabold text-lg text-white">PT Java Super Food</Text>
-                  <Text className="font-inter text-xs text-white/80">SLIP GAJI KARYAWAN</Text>
-                </View>
-                <View className="bg-white/20 px-3 py-1 rounded-full flex-row items-center border border-white/30">
-                  <View className={`h-2 w-2 rounded-full mr-1.5 ${payroll.status === 'finalized' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-                  <Text className="font-inter-bold text-[10px] text-white uppercase tracking-wider">
-                    {payroll.status === 'finalized' ? 'FINALIZED' : 'DRAFT'}
-                  </Text>
+                <View className="flex-1 pr-3">
+                  <View className="flex-row items-center gap-3 flex-wrap">
+                    <Text className="font-manrope-extrabold text-lg text-white">{companyName}</Text>
+                    <View className="px-2.5 py-1 rounded-full bg-white/15 border border-white/15">
+                      <Text className="font-inter-bold text-sm text-white uppercase tracking-wider">
+                        {monthNames[payroll.period_month - 1]} {payroll.period_year}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text className="font-inter text-xs text-white/80 mt-1.5">SLIP GAJI KARYAWAN</Text>
                 </View>
               </View>
 
@@ -225,14 +270,7 @@ export default function PayrollScreen() {
                 </View>
 
                 <View className="flex-row justify-between">
-                  <View>
-                    <Text className="font-inter-semibold text-[10px] text-[#454652] uppercase tracking-wider mb-1">PERIODE GAJI</Text>
-                    <Text className="font-manrope-bold text-sm text-[#1b1c1c]">{monthNames[payroll.period_month - 1]} {payroll.period_year}</Text>
-                  </View>
-                  <View className="items-end">
-                    <Text className="font-inter-semibold text-[10px] text-[#454652] uppercase tracking-wider mb-1">ID DOKUMEN</Text>
-                    <Text className="font-manrope-bold text-xs text-[#454652]">{payroll.id.substring(0, 8).toUpperCase()}...</Text>
-                  </View>
+
                 </View>
               </View>
             </GlassCard>
@@ -424,4 +462,3 @@ export default function PayrollScreen() {
     </SafeAreaView>
   );
 }
-

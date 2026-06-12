@@ -269,8 +269,7 @@ export default function HomeScreen() {
         summary: `${item.overtime_date || item.attendance_date || '-'} · ${item.overtime_hours ?? item.overtime_minutes ?? '-'} jam`,
         details: [
           `Tanggal: ${item.overtime_date || item.attendance_date || '-'}`,
-          `Durasi: ${item.overtime_hours ?? item.overtime_minutes ?? '-'} jam`,
-          `Alasan: ${item.reason || '-'}`,
+          `Durasi: ${item.overtime_hours ?? item.overtime_minutes ?? '-'} jam`
         ],
         timestamp: item.created_at || item.overtime_date || item.attendance_date || '',
         sortTime: toSortTime(item.created_at) || toSortTime(item.approved_at) || toSortTime(item.end_time) || toSortTime(item.start_time) || toSortTime(item.overtime_date) || toSortTime(item.attendance_date),
