@@ -378,9 +378,6 @@ export default function HomeScreen() {
           <View className="max-w-[118px] px-0 py-0">
             <View className="flex-row items-center gap-1.5 mb-1">
               <View className={`w-2 h-2 rounded-full ${isClockedIn ? 'bg-secondary' : isClockedOut ? 'bg-primary' : 'bg-error'}`} />
-              <Text className={`font-inter-bold text-[9px] uppercase tracking-wider ${attendanceChipTextClass}`}>
-                Status
-              </Text>
             </View>
             <Text
               className={`font-inter-bold text-[10px] leading-4 ${attendanceChipTextClass}`}

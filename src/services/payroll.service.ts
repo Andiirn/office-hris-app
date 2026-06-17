@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
 import { api } from '../core/api/client';
 import { unwrapData } from '../core/api/envelope';
@@ -32,7 +33,7 @@ export const payrollService = {
     });
   },
 
-  async downloadPdf(employeeId: string, query: PayrollPreviewQuery): Promise<string> {
+  async downloadPdf(employeeId: string, query: PayrollPreviewQuery): Promise<{ localUri: string; filename: string }> {
     const token = await tokenStore.getAccessToken();
     const params = new URLSearchParams({
       month: String(query.month),
@@ -46,12 +47,62 @@ export const payrollService = {
     
     console.log(`[PayrollService] Downloading PDF from ${url} to ${localUri}`);
     
-    const result = await FileSystem.downloadAsync(url, localUri, {
+    const response = await api.get(url, {
+      responseType: 'blob',
       headers: {
         Authorization: token ? `Bearer ${token}` : '',
       },
     });
-    
-    return result.uri;
+
+    const blob = response.data as Blob;
+    const reader = new FileReader();
+    const base64 = await new Promise<string>((resolve, reject) => {
+      reader.onloadend = () => {
+        const result = reader.result;
+        if (typeof result === 'string') {
+          const commaIndex = result.indexOf(',');
+          resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
+          return;
+        }
+        reject(new Error('Gagal membaca file PDF'));
+      };
+      reader.onerror = () => reject(new Error('Gagal membaca file PDF'));
+      reader.readAsDataURL(blob);
+    });
+
+    await FileSystem.writeAsStringAsync(localUri, base64, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+
+    return { localUri, filename };
+  },
+
+  async savePdfToDownloads(localUri: string, filename: string): Promise<string> {
+    if (Platform.OS !== 'android') {
+      throw new Error('Save to Downloads hanya didukung di Android');
+    }
+
+    const { StorageAccessFramework } = FileSystem;
+    const permission = await StorageAccessFramework.requestDirectoryPermissionsAsync();
+
+    if (!permission.granted) {
+      throw new Error('Izin folder tidak diberikan');
+    }
+
+    const pdfBase64 = await FileSystem.readAsStringAsync(localUri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+
+    const targetUri = await StorageAccessFramework.createFileAsync(
+      permission.directoryUri,
+      filename,
+      'application/pdf',
+    );
+
+    await FileSystem.writeAsStringAsync(targetUri, pdfBase64, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+
+    return targetUri;
   },
 };

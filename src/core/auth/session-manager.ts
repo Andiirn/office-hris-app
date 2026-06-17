@@ -3,8 +3,8 @@ import { useAuthStore } from '../../stores/auth.store';
 import { authService } from '../../services/auth.service';
 import { queryClient } from '../api/query-client';
 import { qk } from '../query/query-keys';
-import { Alert } from 'react-native';
 import axios from 'axios';
+import { setSuppressAuthErrorAlerts } from '../api/client';
 
 export const sessionManager = {
   async initialize() {
@@ -19,6 +19,7 @@ export const sessionManager = {
     try {
       console.log('[SessionManager] Fetching profile...');
       useAuthStore.getState().setBootstrapError(null);
+      setSuppressAuthErrorAlerts(true);
       
       // Fetch profile and store in cache
       const profile = await queryClient.fetchQuery({
@@ -48,20 +49,20 @@ export const sessionManager = {
       console.log('[SessionManager] Session initialized for:', user.full_name);
     } catch (error) {
       console.error('[SessionManager] Failed to initialize session:', error);
-      
+
       if (axios.isAxiosError(error) && error.response?.status === 401) {
+        await tokenStore.clearTokens();
+        useAuthStore.getState().setUser(null);
+        useAuthStore.getState().setInitialized(true);
         useAuthStore.getState().setBootstrapError(null);
-        Alert.alert(
-          'Sesi Berakhir',
-          'Sesi Anda telah habis atau tidak valid. Silakan login kembali.',
-          [{ text: 'OK', onPress: () => this.logout() }]
-        );
-      } else {
-        useAuthStore.getState().setBootstrapError(
-          'Gagal memuat profil. Cek koneksi lalu coba lagi.',
-        );
+        return;
       }
+
+      useAuthStore.getState().setBootstrapError(
+        'Gagal memuat profil. Cek koneksi lalu coba lagi.',
+      );
     } finally {
+      setSuppressAuthErrorAlerts(false);
       // Ensure app is always initialized
       useAuthStore.getState().setInitialized(true);
     }

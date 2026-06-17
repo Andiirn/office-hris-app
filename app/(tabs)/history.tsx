@@ -79,6 +79,7 @@ export default function AttendanceHistoryScreen() {
     },
     enabled: !!user?.id,
     initialPageParam: 1,
+    staleTime: 60_000,
     getNextPageParam: (lastPage, _allPages, lastPageParam) => (lastPage.length < pageSize ? undefined : Number(lastPageParam) + 1),
   });
 

@@ -1,17 +1,20 @@
 import { Platform } from 'react-native';
+import * as Device from 'expo-device';
 import { api } from '../core/api/client';
 import { unwrapData } from '../core/api/envelope';
 import { LoginResponse } from '../types/auth';
 import { ProfileData } from '../types/profile';
 import { normalizeRole } from '../core/auth/rbac';
+import { getStableDeviceFingerprint } from '../core/auth/device-fingerprint';
 
 export const authService = {
   async login(nik: string, password: string): Promise<LoginResponse> {
+    const deviceFingerprint = await getStableDeviceFingerprint();
     const payload = {
       nik,
       password,
-      device_fingerprint: 'local-dev-id',
-      device_name: 'Expo App Local',
+      device_fingerprint: deviceFingerprint,
+      device_name: Device.modelName || Device.deviceName || 'unknown',
       device_os: Platform.OS,
     };
 

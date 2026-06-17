@@ -6,6 +6,7 @@ import { Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GlassCard } from '../src/components/ui/GlassCard';
 import { Skeleton, SkeletonCard } from '../src/components/ui/Skeleton';
+import { qk } from '../src/core/query/query-keys';
 import { Tokens } from '../src/core/theme/tokens';
 import { authService } from '../src/services/auth.service';
 import { payrollService } from '../src/services/payroll.service';
@@ -18,7 +19,7 @@ export default function PayrollScreen() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   const { data: profile } = useQuery({
-    queryKey: ['profile', user?.id],
+    queryKey: qk.profile(),
     queryFn: () => authService.getProfile(),
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000,
@@ -28,9 +29,10 @@ export default function PayrollScreen() {
 
   // 1. Fetch Payroll Preview
   const { data: payroll, isLoading, refetch, isFetching, isError, error } = useQuery({
-    queryKey: ['payroll-preview', user?.id, companyId, selectedYear, selectedMonth],
+    queryKey: qk.payrollPreview(user?.id, companyId, selectedYear, selectedMonth),
     queryFn: () => payrollService.getPreview(user?.id || '', { month: selectedMonth, year: selectedYear, company_id: companyId }),
     enabled: !!user?.id,
+    staleTime: 5 * 60_000,
     retry: 1, // Minimize retries for production if server is down
   });
 
@@ -88,7 +90,7 @@ export default function PayrollScreen() {
   const generateMutation = useMutation({
     mutationFn: () => payrollService.generatePreview(user?.id || '', { month: selectedMonth, year: selectedYear }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['payroll-preview'] });
+      queryClient.invalidateQueries({ queryKey: qk.payrollPreview(user?.id, companyId, selectedYear, selectedMonth) });
       Alert.alert('Success', 'Payslip generated for this month');
     },
     onError: (error: any) => {
@@ -102,8 +104,9 @@ export default function PayrollScreen() {
 
   const handleDownload = async () => {
     try {
-      const localUri = await payrollService.downloadPdf(user?.id || '', { month: selectedMonth, year: selectedYear, company_id: companyId });
-      Alert.alert('Sukses', `Slip gaji berhasil diunduh.\n\nFile tersimpan sementara sebagai: ${localUri.split('/').pop()}`);
+      const { localUri, filename } = await payrollService.downloadPdf(user?.id || '', { month: selectedMonth, year: selectedYear, company_id: companyId });
+      const savedUri = await payrollService.savePdfToDownloads(localUri, filename);
+      Alert.alert('Sukses', `Slip gaji tersimpan ke folder pilihan.\n\nFile: ${savedUri.split('/').pop() || filename}`);
     } catch (err: any) {
       console.error('[Payroll Download Error]', err);
       const status = err?.response?.status;

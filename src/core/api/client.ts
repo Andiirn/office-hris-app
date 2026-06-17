@@ -22,6 +22,11 @@ api.interceptors.request.use(async (config) => {
 
 let isRefreshing = false;
 let failedQueue: any[] = [];
+let suppressAuthErrorAlerts = false;
+
+export const setSuppressAuthErrorAlerts = (value: boolean) => {
+  suppressAuthErrorAlerts = value;
+};
 
 const processQueue = (error: any, token: string | null = null) => {
   failedQueue.forEach((prom) => {
@@ -59,11 +64,13 @@ api.interceptors.response.use(
         const refreshToken = await tokenStore.getRefreshToken();
         if (!refreshToken) {
           console.log('[API Client] No refresh token found, logging out...');
-        Alert.alert(
-          'Sesi Berakhir',
-          'Sesi Anda telah berakhir. Silakan login kembali.',
-          [{ text: 'OK' }]
-        );
+        if (!suppressAuthErrorAlerts) {
+          Alert.alert(
+            'Sesi Berakhir',
+            'Sesi Anda telah berakhir. Silakan login kembali.',
+            [{ text: 'OK' }]
+          );
+        }
           await useAuthStore.getState().logout();
           return Promise.reject(err);
         }
@@ -87,12 +94,14 @@ api.interceptors.response.use(
       } catch (refreshError: any) {
         console.error('[API Client] Token refresh failed:', refreshError.response?.data || refreshError.message);
         processQueue(refreshError, null);
-        
-        Alert.alert(
-          'Sesi Berakhir',
-          'Sesi Anda telah habis atau tidak valid. Silakan login kembali.',
-          [{ text: 'OK' }]
-        );
+
+        if (!suppressAuthErrorAlerts) {
+          Alert.alert(
+            'Sesi Berakhir',
+            'Sesi Anda telah habis atau tidak valid. Silakan login kembali.',
+            [{ text: 'OK' }]
+          );
+        }
         
         await useAuthStore.getState().logout();
         
