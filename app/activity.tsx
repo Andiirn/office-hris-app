@@ -10,6 +10,7 @@ import { leaveService } from '../src/services/leave.service';
 import { overtimeService } from '../src/services/overtime.service';
 import { resignService } from '../src/services/resign.service';
 import { useAuthStore } from '../src/stores/auth.store';
+import { getAttendanceBadgeProps } from '../src/utils/status';
 
 type FeedType =
   | 'attendance.checkin'
@@ -141,9 +142,8 @@ export default function ActivityScreen() {
       const attendanceDate = item.attendance_date || item.date || '-';
       const checkinTime = item.checkin_at || item.checkin_time;
       const checkoutTime = item.checkout_at || item.checkout_time;
-      const rawStatus = item.attendance_status || item.status || 'PRESENT';
-      const statusUpper = rawStatus.toUpperCase();
-      const status = statusUpper === 'PRESENT' ? 'HADIR' : statusUpper === 'LATE' ? 'TERLAMBAT' : statusUpper === 'ABSENT' ? 'TIDAK HADIR' : rawStatus;
+      const badgeProps = getAttendanceBadgeProps(item.attendance_status || item.status);
+      const status = badgeProps.label;
 
       if (checkinTime) {
         items.push({

@@ -26,8 +26,8 @@ export interface PayrollPreview {
   overtime_hours: number;
   slip_pdf_url: string | null;
   generated_at: string;
-  
   // New matching properties from backend
+  salary_original?: number;
   work_days?: number;
   bruto_salary?: number;
   employee_custom_earning?: number;

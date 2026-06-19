@@ -42,7 +42,7 @@ export default function PayrollScreen() {
   const readNumber = (value: unknown) =>
     typeof value === 'number' && Number.isFinite(value) ? value : 0;
 
-  const baseSalary = readNumber(payroll?.base_salary);
+  const baseSalary = readNumber(payroll?.salary_original ?? payroll?.base_salary);
   const totalAllowanceVal = readNumber(payroll?.total_allowance);
   const totalOvertimeVal = readNumber(payroll?.total_overtime);
   const customEarningVal = readNumber(payroll?.employee_custom_earning);
@@ -53,9 +53,6 @@ export default function PayrollScreen() {
   const lateDeductionVal = readNumber(payroll?.late_deduction);
   const leaveDeductionVal = readNumber(payroll?.leave_deduction);
   const customDeductionVal = readNumber(payroll?.employee_custom_deduction);
-
-  const bpjsKesCompanyVal = readNumber(payroll?.bpjs_kes_company);
-  const bpjsTkCompanyVal = readNumber(payroll?.bpjs_tk_company);
 
   // Custom component lines from API
   const rawComponents = React.useMemo(() => [
@@ -71,13 +68,23 @@ export default function PayrollScreen() {
     .map((c: any) => ({ name: c.name as string, amount: readNumber(c.amount), keterangan: c.keterangan })), [rawComponents]);
 
   const customDeductions = React.useMemo(() => rawComponents
-    .filter((c: any) => normalizeComponentType(c.component_type || c.type) === "deduction")
+    .filter((c: any) => normalizeComponentType(c.component_type || c.type) === "deduction" && c.source !== 'bpjs')
     .map((c: any) => ({ name: c.name as string, amount: readNumber(c.amount), keterangan: c.keterangan })), [rawComponents]);
 
-  const totalAllowance = totalAllowanceVal || allowances.reduce((sum: number, item: any) => sum + item.amount, 0);
-  const totalDeduction = payroll?.total_deductions || (taxAmountVal + bpjsKesEmployeeVal + bpjsTkEmployeeVal + lateDeductionVal + leaveDeductionVal + customDeductionVal + customDeductions.reduce((sum: number, item: any) => sum + item.amount, 0));
+  const sumCustomDeductions = customDeductions.reduce((sum: number, item: any) => sum + item.amount, 0);
+  const displayCustomDeductionVal = customDeductionVal > 0 ? customDeductionVal : sumCustomDeductions;
 
-  const grossIncome = payroll?.bruto_salary || (baseSalary + totalAllowance + totalOvertimeVal + customEarningVal);
+  // Calculate Absent Deduction if salary_original is used as baseSalary
+  const originalSalary = readNumber(payroll?.salary_original);
+  const actualBaseSalary = readNumber(payroll?.base_salary);
+  const absentDeduction = originalSalary > actualBaseSalary ? originalSalary - actualBaseSalary : 0;
+
+  const totalAllowance = totalAllowanceVal || allowances.reduce((sum: number, item: any) => sum + item.amount, 0);
+
+  // Recalculate Gross and Total Deductions manually to balance the inflated Base Salary
+  const grossIncome = baseSalary + totalAllowance + totalOvertimeVal + customEarningVal;
+  const totalDeduction = taxAmountVal + bpjsKesEmployeeVal + bpjsTkEmployeeVal + lateDeductionVal + leaveDeductionVal + displayCustomDeductionVal + absentDeduction;
+
   const netSalary = payroll?.take_home_pay || (grossIncome - totalDeduction);
 
   React.useEffect(() => {
@@ -136,6 +143,15 @@ export default function PayrollScreen() {
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
+
+  const formatDurationHuman = (hoursDecimal: number | undefined | null) => {
+    if (!hoursDecimal) return '0j';
+    const hrs = Math.floor(hoursDecimal);
+    const mins = Math.round((hoursDecimal - hrs) * 60);
+    if (hrs === 0) return `${mins}m`;
+    if (mins === 0) return `${hrs}j`;
+    return `${hrs}j ${mins}m`;
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-[#fbf9f8]">
@@ -304,7 +320,7 @@ export default function PayrollScreen() {
                   </View>
                   <View className="bg-amber-50 rounded-2xl p-3 items-center justify-center border border-amber-100" style={{ width: '30%' }}>
                     <Text className="font-inter-bold text-[10px] text-amber-700 uppercase">Lembur</Text>
-                    <Text className="font-manrope-bold text-base text-amber-700 mt-1">{payroll.overtime_hours ?? 0}j</Text>
+                    <Text className="font-manrope-bold text-base text-amber-700 mt-1">{formatDurationHuman(payroll.overtime_hours)}</Text>
                   </View>
                   <View className="bg-amber-50 rounded-2xl p-2 items-center justify-center border border-amber-100" style={{ width: '30%' }}>
                     <Text className="font-inter-bold text-[9px] text-amber-700 uppercase">Terlambat</Text>
@@ -327,10 +343,10 @@ export default function PayrollScreen() {
                     <Text className="font-inter text-sm text-[#454652]">Gaji Pokok</Text>
                     <Text className="font-inter-semibold text-sm text-[#1b1c1c]">{formatCurrency(baseSalary)}</Text>
                   </View>
-                  <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
+                  {/* <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
                     <Text className="font-inter text-sm text-[#454652]">Total Tunjangan</Text>
                     <Text className="font-inter-semibold text-sm text-[#1b1c1c]">{formatCurrency(totalAllowanceVal)}</Text>
-                  </View>
+                  </View> */}
                   <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
                     <Text className="font-inter text-sm text-[#454652]">Total Lembur</Text>
                     <Text className="font-inter-semibold text-sm text-[#1b1c1c]">{formatCurrency(totalOvertimeVal)}</Text>
@@ -389,9 +405,15 @@ export default function PayrollScreen() {
                     <Text className="font-inter text-sm text-[#454652]">Potongan Cuti</Text>
                     <Text className="font-inter-semibold text-sm text-error">-{formatCurrency(leaveDeductionVal)}</Text>
                   </View>
+                  {absentDeduction > 0 && (
+                    <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
+                      <Text className="font-inter text-sm text-[#454652]">Potongan Tidak Hadir ({payroll?.absent_days ?? 0} Hari)</Text>
+                      <Text className="font-inter-semibold text-sm text-error">-{formatCurrency(absentDeduction)}</Text>
+                    </View>
+                  )}
                   <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
                     <Text className="font-inter text-sm text-[#454652]">Potongan Lain-lain</Text>
-                    <Text className="font-inter-semibold text-sm text-error">-{formatCurrency(customDeductionVal)}</Text>
+                    <Text className="font-inter-semibold text-sm text-error">-{formatCurrency(displayCustomDeductionVal)}</Text>
                   </View>
 
                   {/* Component Lines (Deductions) */}
@@ -410,26 +432,6 @@ export default function PayrollScreen() {
                   <View className="mt-2 pt-3 flex-row justify-between items-center">
                     <Text className="font-manrope-bold text-sm text-error">Total Potongan</Text>
                     <Text className="font-manrope-extrabold text-sm text-error">-{formatCurrency(totalDeduction)}</Text>
-                  </View>
-                </View>
-              </GlassCard>
-            </View>
-
-            {/* BPJS Ditanggung Perusahaan */}
-            <View>
-              <View className="flex-row items-center mb-3 ml-1 gap-2">
-                <MaterialIcons name="info" size={18} color="#1a237e" />
-                <Text className="font-manrope-bold text-base text-primaryContainer">BPJS (Ditanggung Perusahaan)</Text>
-              </View>
-              <GlassCard style={{ padding: 18, backgroundColor: 'rgba(255, 255, 255, 0.95)' }}>
-                <View className="gap-3">
-                  <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
-                    <Text className="font-inter text-sm text-[#454652]">BPJS Kesehatan (Perusahaan)</Text>
-                    <Text className="font-inter-semibold text-sm text-[#1b1c1c]">{formatCurrency(bpjsKesCompanyVal)}</Text>
-                  </View>
-                  <View className="flex-row justify-between items-center">
-                    <Text className="font-inter text-sm text-[#454652]">BPJS Ketenagakerjaan (Perusahaan)</Text>
-                    <Text className="font-inter-semibold text-sm text-[#1b1c1c]">{formatCurrency(bpjsTkCompanyVal)}</Text>
                   </View>
                 </View>
               </GlassCard>

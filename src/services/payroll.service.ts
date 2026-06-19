@@ -22,7 +22,7 @@ export const payrollService = {
       return data as PayrollPreview;
     } catch (error: any) {
       if (error.response?.status === 404) return null;
-      console.error('[PayrollService] Error fetching preview:', error.response?.status, error.message);
+      console.log('[PayrollService] Error fetching preview:', error.response?.status, error.message);
       throw error;
     }
   },

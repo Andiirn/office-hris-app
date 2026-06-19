@@ -10,6 +10,7 @@ import { StatusBadge } from '../../src/components/ui/StatusBadge';
 import { Tokens } from '../../src/core/theme/tokens';
 import { attendanceService } from '../../src/services/attendance.service';
 import { useAuthStore } from '../../src/stores/auth.store';
+import { getAttendanceBadgeProps } from '../../src/utils/status';
 
 function formatTime(time?: string | null) {
   if (!time) return '--:--';
@@ -54,24 +55,11 @@ function getAttendanceKey(item: any) {
   return item.attendance_date || item.date || null;
 }
 
-function isApprovedAbsence(item: any) {
+function countsAsAttendance(item: any) {
   const status = String(item?.attendance_status || item?.status || '').toUpperCase();
-  const decision = String(item?.validation_decision || item?.validation_status || item?.approval_status || '').toUpperCase();
-  if (status !== 'SICK' && status !== 'PERMISSION' && status !== 'IZIN') return false;
-  return ['APPROVED', 'VALID', 'ACCEPTED', 'CONFIRMED'].includes(decision);
+  // Any status other than ABSENT or HOLIDAY implies they had an attendance intent (either present, leave, or sick).
+  return !['ABSENT', 'HOLIDAY'].includes(status);
 }
-
-function getAttendanceBucket(item: any) {
-  const status = String(item?.attendance_status || item?.status || 'PRESENT').toUpperCase();
-  if (status === 'PRESENT') return 'HADIR';
-  if (status === 'LATE') return 'TERLAMBAT';
-  if (status === 'SICK') return isApprovedAbsence(item) ? 'SAKIT' : 'SAKIT (PENDING)';
-  if (status === 'PERMISSION' || status === 'IZIN') return isApprovedAbsence(item) ? 'IZIN' : 'IZIN (PENDING)';
-  if (status === 'ABSENT') return 'TIDAK HADIR';
-  return status;
-}
-
-
 
 function getPeriodDates(offset = 0) {
   const today = new Date();
@@ -112,10 +100,8 @@ export default function AttendanceScreen() {
     const uniqueDates = new Set<string>();
     history.forEach((item: any) => {
       const key = getAttendanceKey(item);
-      const status = String(item?.attendance_status || item?.status || '').toUpperCase();
       const hasAttendance = !!(getCheckIn(item) || getCheckOut(item));
-      const countsAsAttendance = status === 'PRESENT' || status === 'LATE' || isApprovedAbsence(item);
-      if (key && (hasAttendance || countsAsAttendance)) uniqueDates.add(key);
+      if (key && (hasAttendance || countsAsAttendance(item))) uniqueDates.add(key);
     });
     return uniqueDates.size;
   }, [history]);
@@ -123,12 +109,12 @@ export default function AttendanceScreen() {
   const attendanceSummary = useMemo(() => {
     return history.reduce(
       (acc: { present: number; late: number; sick: number; permission: number; absent: number }, item: any) => {
-        const bucket = getAttendanceBucket(item);
-        if (bucket === 'HADIR') acc.present += 1;
-        else if (bucket === 'TERLAMBAT') acc.late += 1;
-        else if (bucket.startsWith('SAKIT')) acc.sick += 1;
-        else if (bucket.startsWith('IZIN')) acc.permission += 1;
-        else if (bucket === 'TIDAK HADIR') acc.absent += 1;
+        const status = String(item?.attendance_status || item?.status || '').toUpperCase();
+        if (['PRESENT', 'EARLY_CHECKOUT'].includes(status)) acc.present += 1;
+        else if (status === 'LATE') acc.late += 1;
+        else if (['SICK', 'SICK_WITH_DOC', 'SICK_NO_DOC'].includes(status)) acc.sick += 1;
+        else if (['PERMISSION', 'LEAVE', 'SPECIAL_LEAVE'].includes(status)) acc.permission += 1;
+        else if (status === 'ABSENT') acc.absent += 1;
         return acc;
       },
       { present: 0, late: 0, sick: 0, permission: 0, absent: 0 },
@@ -137,17 +123,6 @@ export default function AttendanceScreen() {
 
   const onRefresh = () => {
     refetch();
-  };
-
-  const getStatusType = (status?: string) => {
-    switch (status) {
-      case 'HADIR': return 'secondary';
-      case 'TERLAMBAT': return 'error';
-      case 'SAKIT': return 'warning';
-      case 'IZIN': return 'secondary';
-      case 'TIDAK HADIR': return 'error';
-      default: return 'secondary';
-    }
   };
 
   return (
@@ -170,9 +145,6 @@ export default function AttendanceScreen() {
             <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Ringkasan periode {period.dateFrom} - {period.dateTo}</Text>
           </View>
         </View>
-        <Text className="font-inter text-xs text-text-muted mt-2">
-          Angka utama menghitung hari yang tercatat hadir, terlambat, atau sakit/izin yang sudah disahkan.
-        </Text>
       </View>
 
       <View className="px-5 pb-4">
@@ -278,20 +250,25 @@ export default function AttendanceScreen() {
                       <Text className="font-inter-bold text-base text-black">{getAttendanceDate(item)}</Text>
                     </View>
                   </View>
-                  <StatusBadge label={getAttendanceBucket(item)} type={getStatusType(getAttendanceBucket(item)) as any} />
+                  <StatusBadge
+                    label={getAttendanceBadgeProps(item.attendance_status || item.status).label}
+                    type={getAttendanceBadgeProps(item.attendance_status || item.status).type}
+                  />
                 </View>
 
-                <View className="flex-row justify-between bg-black/5 p-3 rounded-xl">
-                  <View className="items-center flex-1">
-                    <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-1">Check In</Text>
-                    <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(getCheckIn(item))}</Text>
+                {(getCheckIn(item) || getCheckOut(item) || ['PRESENT', 'LATE', 'EARLY_CHECKOUT'].includes(String(item.attendance_status || item.status || 'PRESENT').toUpperCase())) && (
+                  <View className="flex-row justify-between bg-black/5 p-3 rounded-xl mt-1">
+                    <View className="items-center flex-1">
+                      <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-1">Check In</Text>
+                      <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(getCheckIn(item))}</Text>
+                    </View>
+                    <View className="w-[1px] bg-black/10 mx-2" />
+                    <View className="items-center flex-1">
+                      <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-1">Check Out</Text>
+                      <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(getCheckOut(item))}</Text>
+                    </View>
                   </View>
-                  <View className="w-[1px] bg-black/10 mx-2" />
-                  <View className="items-center flex-1">
-                    <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-1">Check Out</Text>
-                    <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(getCheckOut(item))}</Text>
-                  </View>
-                </View>
+                )}
               </GlassCard>
             ))}
           </View>

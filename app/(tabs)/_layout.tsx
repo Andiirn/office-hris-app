@@ -1,7 +1,7 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { Redirect, Tabs } from 'expo-router';
+import { Redirect, router, Tabs } from 'expo-router';
 import React from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Tokens } from '../../src/core/theme/tokens';
 import { useAuthStore } from '../../src/stores/auth.store';
 
@@ -43,6 +43,25 @@ export default function TabLayout() {
           tabBarIcon: ({ color, focused }) => (
             <View style={[styles.iconContainer, focused && styles.iconContainerActive]}>
               <MaterialIcons name="calendar-today" size={24} color={focused ? '#ffffff' : color} />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="scanner"
+        options={{
+          title: 'Scan',
+          tabBarIcon: () => null,
+          tabBarButton: (props) => (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-start' }}>
+              <Pressable
+                onPress={() => router.push('/attendance-scan')}
+                style={styles.fabButton}
+              >
+                <View style={styles.fabInner}>
+                  <MaterialIcons name="qr-code-scanner" size={28} color="#fff" />
+                </View>
+              </Pressable>
             </View>
           ),
         }}
@@ -110,5 +129,35 @@ const styles = StyleSheet.create({
   },
   iconContainerActive: {
     backgroundColor: Tokens.colors.primary,
+  },
+  fabButton: {
+    top: -24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Tokens.colors.surface,
+    padding: 6,
+    ...Platform.select({
+      ios: {
+        shadowColor: Tokens.colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 6,
+      }
+    }),
+  },
+  fabInner: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    borderRadius: 28,
+    backgroundColor: Tokens.colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

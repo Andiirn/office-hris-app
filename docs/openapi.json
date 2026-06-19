@@ -1502,6 +1502,151 @@
         }
       }
     },
+    "/api/v1/approvals/feedbacks": {
+      "get": {
+        "tags": [
+          "Approvals"
+        ],
+        "summary": "List Feedbacks",
+        "operationId": "list_feedbacks_api_v1_approvals_feedbacks_get",
+        "parameters": [
+          {
+            "name": "reference_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Reference Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_list_FeedbackResponse__"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Bad request — business rule violation",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Resource not found",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Conflict — resource already exists",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Validation error",
+                  "errors": [
+                    {
+                      "field": "nik",
+                      "message": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Not authenticated — missing or invalid token",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Access denied — insufficient permissions",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
     "/api/v1/approvals/{request_id}/action": {
       "post": {
         "tags": [
@@ -2132,6 +2277,23 @@
             }
           },
           {
+            "name": "branch_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Branch Id"
+            }
+          },
+          {
             "name": "contract_type",
             "in": "query",
             "required": false,
@@ -2458,6 +2620,40 @@
         "summary": "Get Hierarchy",
         "operationId": "get_hierarchy_api_v1_employees_structure_hierarchy_get",
         "parameters": [
+          {
+            "name": "company_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Company Id"
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Branch Id"
+            }
+          },
           {
             "name": "authorization",
             "in": "header",
@@ -10414,6 +10610,461 @@
             "description": "Forbidden"
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "Shifts"
+        ],
+        "summary": "Unassign Shift Employees",
+        "operationId": "unassign_shift_employees_api_v1_shifts__shift_id__employees_delete",
+        "parameters": [
+          {
+            "name": "shift_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Shift Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnassignEmployeesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Unassign Shift Employees Api V1 Shifts  Shift Id  Employees Delete"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Bad request — business rule violation",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Resource not found",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Conflict — resource already exists",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Validation error",
+                  "errors": [
+                    {
+                      "field": "nik",
+                      "message": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Not authenticated — missing or invalid token",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Access denied — insufficient permissions",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/shifts/{shift_id}/divisions": {
+      "get": {
+        "tags": [
+          "Shifts"
+        ],
+        "summary": "Get Shift Divisions",
+        "operationId": "get_shift_divisions_api_v1_shifts__shift_id__divisions_get",
+        "parameters": [
+          {
+            "name": "shift_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Shift Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_ShiftDivisionsResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Bad request — business rule violation",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Resource not found",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Conflict — resource already exists",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Validation error",
+                  "errors": [
+                    {
+                      "field": "nik",
+                      "message": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Not authenticated — missing or invalid token",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Access denied — insufficient permissions",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Shifts"
+        ],
+        "summary": "Unassign Shift Divisions",
+        "operationId": "unassign_shift_divisions_api_v1_shifts__shift_id__divisions_delete",
+        "parameters": [
+          {
+            "name": "shift_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Shift Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnassignDivisionsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Unassign Shift Divisions Api V1 Shifts  Shift Id  Divisions Delete"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Bad request — business rule violation",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Resource not found",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Conflict — resource already exists",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Validation error",
+                  "errors": [
+                    {
+                      "field": "nik",
+                      "message": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Not authenticated — missing or invalid token",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Access denied — insufficient permissions",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        }
       }
     },
     "/api/v1/shifts/assign/division": {
@@ -12413,6 +13064,23 @@
             }
           },
           {
+            "name": "company_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Company Id"
+            }
+          },
+          {
             "name": "branch_id",
             "in": "query",
             "required": false,
@@ -12781,6 +13449,23 @@
                 }
               ],
               "title": "Employee Id"
+            }
+          },
+          {
+            "name": "attendance_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Attendance Id"
             }
           },
           {
@@ -13161,6 +13846,161 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_CorrectionResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Bad request — business rule violation",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Resource not found",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Conflict — resource already exists",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Validation error",
+                  "errors": [
+                    {
+                      "field": "nik",
+                      "message": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Not authenticated — missing or invalid token",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Access denied — insufficient permissions",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/attendance/corrections/{correction_id}/action": {
+      "post": {
+        "tags": [
+          "Attendance"
+        ],
+        "summary": "Process Correction Action",
+        "operationId": "process_correction_action_api_v1_attendance_corrections__correction_id__action_post",
+        "parameters": [
+          {
+            "name": "correction_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Correction Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CorrectionApprovalAction"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -14270,6 +15110,161 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/RejectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_VisitResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Bad request — business rule violation",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Resource not found",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Conflict — resource already exists",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Validation error",
+                  "errors": [
+                    {
+                      "field": "nik",
+                      "message": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Not authenticated — missing or invalid token",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Access denied — insufficient permissions",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/attendance/visit/{visit_id}/action": {
+      "post": {
+        "tags": [
+          "Attendance"
+        ],
+        "summary": "Process Visit Action",
+        "operationId": "process_visit_action_api_v1_attendance_visit__visit_id__action_post",
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Visit Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VisitApprovalAction"
               }
             }
           }
@@ -18120,6 +19115,892 @@
         }
       }
     },
+    "/api/v1/overtime/break-overrides/divisions/{division_id}": {
+      "put": {
+        "tags": [
+          "Overtime"
+        ],
+        "summary": "Upsert Division Break Override",
+        "operationId": "upsert_division_break_override_api_v1_overtime_break_overrides_divisions__division_id__put",
+        "parameters": [
+          {
+            "name": "division_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Division Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OvertimeBreakOverrideUpsert"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_DivisionOvertimeBreakOverrideResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Bad request — business rule violation",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Resource not found",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Conflict — resource already exists",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Validation error",
+                  "errors": [
+                    {
+                      "field": "nik",
+                      "message": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Not authenticated — missing or invalid token",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Access denied — insufficient permissions",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Overtime"
+        ],
+        "summary": "Delete Division Break Override",
+        "operationId": "delete_division_break_override_api_v1_overtime_break_overrides_divisions__division_id__delete",
+        "parameters": [
+          {
+            "name": "division_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Division Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Bad request — business rule violation",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Resource not found",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Conflict — resource already exists",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Validation error",
+                  "errors": [
+                    {
+                      "field": "nik",
+                      "message": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Not authenticated — missing or invalid token",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Access denied — insufficient permissions",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/overtime/break-overrides/divisions": {
+      "get": {
+        "tags": [
+          "Overtime"
+        ],
+        "summary": "List Division Break Overrides",
+        "operationId": "list_division_break_overrides_api_v1_overtime_break_overrides_divisions_get",
+        "parameters": [
+          {
+            "name": "company_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Company Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_list_DivisionOvertimeBreakOverrideResponse__"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Bad request — business rule violation",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Resource not found",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Conflict — resource already exists",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Validation error",
+                  "errors": [
+                    {
+                      "field": "nik",
+                      "message": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Not authenticated — missing or invalid token",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Access denied — insufficient permissions",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/overtime/break-overrides/employees/{employee_id}": {
+      "put": {
+        "tags": [
+          "Overtime"
+        ],
+        "summary": "Upsert Employee Break Override",
+        "operationId": "upsert_employee_break_override_api_v1_overtime_break_overrides_employees__employee_id__put",
+        "parameters": [
+          {
+            "name": "employee_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Employee Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OvertimeBreakOverrideUpsert"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_EmployeeOvertimeBreakOverrideResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Bad request — business rule violation",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Resource not found",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Conflict — resource already exists",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Validation error",
+                  "errors": [
+                    {
+                      "field": "nik",
+                      "message": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Not authenticated — missing or invalid token",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Access denied — insufficient permissions",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Overtime"
+        ],
+        "summary": "Delete Employee Break Override",
+        "operationId": "delete_employee_break_override_api_v1_overtime_break_overrides_employees__employee_id__delete",
+        "parameters": [
+          {
+            "name": "employee_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Employee Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Bad request — business rule violation",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Resource not found",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Conflict — resource already exists",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Validation error",
+                  "errors": [
+                    {
+                      "field": "nik",
+                      "message": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Not authenticated — missing or invalid token",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Access denied — insufficient permissions",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/overtime/break-overrides/employees": {
+      "get": {
+        "tags": [
+          "Overtime"
+        ],
+        "summary": "List Employee Break Overrides",
+        "operationId": "list_employee_break_overrides_api_v1_overtime_break_overrides_employees_get",
+        "parameters": [
+          {
+            "name": "company_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Company Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_list_EmployeeOvertimeBreakOverrideResponse__"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Bad request — business rule violation",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Resource not found",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Conflict — resource already exists",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Validation error",
+                  "errors": [
+                    {
+                      "field": "nik",
+                      "message": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Not authenticated — missing or invalid token",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Access denied — insufficient permissions",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
     "/api/v1/overtime/settings/{company_id}": {
       "get": {
         "tags": [
@@ -18587,6 +20468,40 @@
             }
           },
           {
+            "name": "company_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Company Id"
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Branch Id"
+            }
+          },
+          {
             "name": "month",
             "in": "query",
             "required": false,
@@ -18635,6 +20550,25 @@
                 }
               ],
               "title": "Is Approved"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ApprovalStatusEnum"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
             }
           },
           {
@@ -19572,6 +21506,151 @@
         }
       }
     },
+    "/api/v1/overtime/import": {
+      "post": {
+        "tags": [
+          "Overtime"
+        ],
+        "summary": "Import Overtime",
+        "operationId": "import_overtime_api_v1_overtime_import_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_overtime_api_v1_overtime_import_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_OvertimeImportResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Bad request — business rule violation",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Resource not found",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Conflict — resource already exists",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Validation error",
+                  "errors": [
+                    {
+                      "field": "nik",
+                      "message": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Not authenticated — missing or invalid token",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Access denied — insufficient permissions",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
     "/api/v1/payroll/preview/{employee_id}": {
       "post": {
         "tags": [
@@ -19930,6 +22009,40 @@
             }
           },
           {
+            "name": "company_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Company Id"
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Branch Id"
+            }
+          },
+          {
             "name": "year",
             "in": "query",
             "required": true,
@@ -20129,6 +22242,40 @@
               "maximum": 12,
               "minimum": 1,
               "title": "Month"
+            }
+          },
+          {
+            "name": "company_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Company Id"
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Branch Id"
             }
           },
           {
@@ -20959,6 +23106,582 @@
         }
       }
     },
+    "/api/v1/payroll/bpjs-configs": {
+      "get": {
+        "tags": [
+          "Payroll"
+        ],
+        "summary": "List Bpjs Configs",
+        "operationId": "list_bpjs_configs_api_v1_payroll_bpjs_configs_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_list_BPJSConfigResponse__"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Bad request — business rule violation",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Resource not found",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Conflict — resource already exists",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Validation error",
+                  "errors": [
+                    {
+                      "field": "nik",
+                      "message": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Not authenticated — missing or invalid token",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Access denied — insufficient permissions",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Payroll"
+        ],
+        "summary": "Create Bpjs Config",
+        "operationId": "create_bpjs_config_api_v1_payroll_bpjs_configs_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BPJSConfigCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_BPJSConfigResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Bad request — business rule violation",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Resource not found",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Conflict — resource already exists",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Validation error",
+                  "errors": [
+                    {
+                      "field": "nik",
+                      "message": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Not authenticated — missing or invalid token",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Access denied — insufficient permissions",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/payroll/bpjs-configs/{config_id}": {
+      "patch": {
+        "tags": [
+          "Payroll"
+        ],
+        "summary": "Update Bpjs Config",
+        "operationId": "update_bpjs_config_api_v1_payroll_bpjs_configs__config_id__patch",
+        "parameters": [
+          {
+            "name": "config_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Config Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BPJSConfigUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_BPJSConfigResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Bad request — business rule violation",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Resource not found",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Conflict — resource already exists",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Validation error",
+                  "errors": [
+                    {
+                      "field": "nik",
+                      "message": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Not authenticated — missing or invalid token",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Access denied — insufficient permissions",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Payroll"
+        ],
+        "summary": "Delete Bpjs Config",
+        "operationId": "delete_bpjs_config_api_v1_payroll_bpjs_configs__config_id__delete",
+        "parameters": [
+          {
+            "name": "config_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Config Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_dict_"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Bad request — business rule violation",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Resource not found",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Conflict — resource already exists",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Validation error",
+                  "errors": [
+                    {
+                      "field": "nik",
+                      "message": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Not authenticated — missing or invalid token",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Access denied — insufficient permissions",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
     "/api/v1/payroll/preview/{employee_id}/pdf": {
       "get": {
         "tags": [
@@ -21152,6 +23875,40 @@
               "maximum": 12,
               "minimum": 1,
               "title": "Month"
+            }
+          },
+          {
+            "name": "company_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Company Id"
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Branch Id"
             }
           },
           {
@@ -22755,6 +25512,40 @@
         "summary": "Get Stats",
         "operationId": "get_stats_api_v1_dashboard_stats_get",
         "parameters": [
+          {
+            "name": "company_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Company Id"
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Branch Id"
+            }
+          },
           {
             "name": "authorization",
             "in": "header",
@@ -28727,6 +31518,22 @@
             }
           },
           {
+            "name": "name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Name"
+            }
+          },
+          {
             "name": "authorization",
             "in": "header",
             "required": false,
@@ -30061,6 +32868,72 @@
             "type": "boolean",
             "title": "Is Corrected"
           },
+          "timemark_checkin_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timemark Checkin Code"
+          },
+          "timemark_checkout_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timemark Checkout Code"
+          },
+          "timemark_checkin_data": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timemark Checkin Data"
+          },
+          "timemark_checkout_data": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timemark Checkout Data"
+          },
+          "timemark_checkin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TimemarkInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "timemark_checkout": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TimemarkInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "employee": {
             "anyOf": [
               {
@@ -30337,6 +33210,157 @@
         ],
         "title": "AuditLogResponse"
       },
+      "BPJSConfigCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "bpjs_type": {
+            "type": "string",
+            "title": "Bpjs Type"
+          },
+          "employee_rate": {
+            "type": "number",
+            "title": "Employee Rate"
+          },
+          "company_rate": {
+            "type": "number",
+            "title": "Company Rate"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "bpjs_type",
+          "employee_rate",
+          "company_rate"
+        ],
+        "title": "BPJSConfigCreate"
+      },
+      "BPJSConfigResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "bpjs_type": {
+            "type": "string",
+            "title": "Bpjs Type"
+          },
+          "employee_rate": {
+            "type": "number",
+            "title": "Employee Rate"
+          },
+          "company_rate": {
+            "type": "number",
+            "title": "Company Rate"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "company_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Company Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "bpjs_type",
+          "employee_rate",
+          "company_rate",
+          "id",
+          "company_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "BPJSConfigResponse"
+      },
+      "BPJSConfigUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "bpjs_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bpjs Type"
+          },
+          "employee_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employee Rate"
+          },
+          "company_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company Rate"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "title": "BPJSConfigUpdate"
+      },
       "BankAccountCreate": {
         "properties": {
           "bank_name": {
@@ -30496,6 +33520,11 @@
             "type": "string",
             "title": "Branch Id"
           },
+          "send_credentials": {
+            "type": "boolean",
+            "title": "Send Credentials",
+            "default": false
+          },
           "file": {
             "type": "string",
             "format": "binary",
@@ -30523,6 +33552,38 @@
           "file"
         ],
         "title": "Body_import_leave_balances_api_v1_leave_balances_import_post"
+      },
+      "Body_import_overtime_api_v1_overtime_import_post": {
+        "properties": {
+          "company_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Company Id"
+          },
+          "branch_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch Id"
+          },
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "company_id",
+          "file"
+        ],
+        "title": "Body_import_overtime_api_v1_overtime_import_post"
       },
       "Body_import_ter_categories_api_v1_payroll_ter_categories_import_post": {
         "properties": {
@@ -30975,6 +34036,30 @@
           "month": {
             "type": "integer",
             "title": "Month"
+          },
+          "company_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company Id"
+          },
+          "branch_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch Id"
           },
           "employee_ids": {
             "anyOf": [
@@ -31553,6 +34638,29 @@
         ],
         "title": "ContractTypeEnum"
       },
+      "CorrectionApprovalAction": {
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/ApprovalActionEnum"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "CorrectionApprovalAction"
+      },
       "CorrectionRequest": {
         "properties": {
           "attendance_id": {
@@ -32001,16 +35109,36 @@
             "default": 0
           },
           "bpjs_kes": {
-            "type": "number",
-            "minimum": 0.0,
+            "type": "boolean",
             "title": "Bpjs Kes",
-            "default": 0
+            "default": false
           },
           "bpjs_tk": {
-            "type": "number",
-            "minimum": 0.0,
+            "type": "boolean",
             "title": "Bpjs Tk",
-            "default": 0
+            "default": false
+          },
+          "bpjs_kes_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bpjs Kes Number"
+          },
+          "bpjs_tk_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bpjs Tk Number"
           },
           "tax_status": {
             "anyOf": [
@@ -32059,6 +35187,10 @@
             "type": "integer",
             "title": "Late Today"
           },
+          "on_leave_today": {
+            "type": "integer",
+            "title": "On Leave Today"
+          },
           "pending_leave_requests": {
             "type": "integer",
             "title": "Pending Leave Requests"
@@ -32075,6 +35207,7 @@
           "present_today",
           "absent_today",
           "late_today",
+          "on_leave_today",
           "pending_leave_requests",
           "monthly_overtime_hours"
         ],
@@ -32171,6 +35304,36 @@
         ],
         "title": "DeviceSessionResponse"
       },
+      "DivisionAssignedItem": {
+        "properties": {
+          "division_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Division Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "effective_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Effective Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "division_id",
+          "name",
+          "code",
+          "effective_date"
+        ],
+        "title": "DivisionAssignedItem"
+      },
       "DivisionCreate": {
         "properties": {
           "company_id": {
@@ -32222,6 +35385,41 @@
           "code"
         ],
         "title": "DivisionNested"
+      },
+      "DivisionOvertimeBreakOverrideResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "division_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Division Id"
+          },
+          "auto_break_threshold_hour": {
+            "type": "integer",
+            "title": "Auto Break Threshold Hour"
+          },
+          "auto_break_duration_minutes": {
+            "type": "integer",
+            "title": "Auto Break Duration Minutes"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "division_id",
+          "auto_break_threshold_hour",
+          "auto_break_duration_minutes",
+          "is_active"
+        ],
+        "title": "DivisionOvertimeBreakOverrideResponse"
       },
       "DivisionResponse": {
         "properties": {
@@ -32287,6 +35485,11 @@
             "type": "string",
             "format": "date",
             "title": "Effective Date"
+          },
+          "force": {
+            "type": "boolean",
+            "title": "Force",
+            "default": false
           }
         },
         "type": "object",
@@ -32686,6 +35889,41 @@
           "nik"
         ],
         "title": "EmployeeNested"
+      },
+      "EmployeeOvertimeBreakOverrideResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "employee_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Employee Id"
+          },
+          "auto_break_threshold_hour": {
+            "type": "integer",
+            "title": "Auto Break Threshold Hour"
+          },
+          "auto_break_duration_minutes": {
+            "type": "integer",
+            "title": "Auto Break Duration Minutes"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "employee_id",
+          "auto_break_threshold_hour",
+          "auto_break_duration_minutes",
+          "is_active"
+        ],
+        "title": "EmployeeOvertimeBreakOverrideResponse"
       },
       "EmployeePayrollComponentCreate": {
         "properties": {
@@ -33181,7 +36419,7 @@
           "bpjs_kes": {
             "anyOf": [
               {
-                "type": "number"
+                "type": "boolean"
               },
               {
                 "type": "null"
@@ -33192,13 +36430,35 @@
           "bpjs_tk": {
             "anyOf": [
               {
-                "type": "number"
+                "type": "boolean"
               },
               {
                 "type": "null"
               }
             ],
             "title": "Bpjs Tk"
+          },
+          "bpjs_kes_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bpjs Kes Number"
+          },
+          "bpjs_tk_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bpjs Tk Number"
           },
           "tax_status": {
             "anyOf": [
@@ -33473,6 +36733,59 @@
           "message": "Validation error",
           "success": false
         }
+      },
+      "FeedbackResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "action": {
+            "$ref": "#/components/schemas/ApprovalActionEnum"
+          },
+          "feedback": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feedback"
+          },
+          "hr_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Hr Id"
+          },
+          "hr_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hr Name"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "action",
+          "feedback",
+          "hr_id",
+          "created_at"
+        ],
+        "title": "FeedbackResponse"
       },
       "ForgotPasswordRequestResponse": {
         "properties": {
@@ -35004,6 +38317,33 @@
         ],
         "title": "OvertimeApprovalAction"
       },
+      "OvertimeBreakOverrideUpsert": {
+        "properties": {
+          "auto_break_threshold_hour": {
+            "type": "integer",
+            "maximum": 23.0,
+            "minimum": 18.0,
+            "title": "Auto Break Threshold Hour"
+          },
+          "auto_break_duration_minutes": {
+            "type": "integer",
+            "maximum": 120.0,
+            "minimum": 30.0,
+            "title": "Auto Break Duration Minutes",
+            "default": 60
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "auto_break_threshold_hour"
+        ],
+        "title": "OvertimeBreakOverrideUpsert"
+      },
       "OvertimeCreateRequest": {
         "properties": {
           "attendance_id": {
@@ -35088,6 +38428,33 @@
         ],
         "title": "OvertimeDashboardResponse"
       },
+      "OvertimeImportResponse": {
+        "properties": {
+          "success_count": {
+            "type": "integer",
+            "title": "Success Count"
+          },
+          "failed_count": {
+            "type": "integer",
+            "title": "Failed Count"
+          },
+          "errors": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success_count",
+          "failed_count",
+          "errors"
+        ],
+        "title": "OvertimeImportResponse"
+      },
       "OvertimeRecordResponse": {
         "properties": {
           "id": {
@@ -35158,6 +38525,9 @@
             "type": "boolean",
             "title": "Is Approved"
           },
+          "status": {
+            "$ref": "#/components/schemas/ApprovalStatusEnum"
+          },
           "approved_by": {
             "anyOf": [
               {
@@ -35222,6 +38592,7 @@
           "start_time",
           "end_time",
           "is_approved",
+          "status",
           "approved_by",
           "approved_at",
           "created_at"
@@ -36561,6 +39932,10 @@
             "type": "number",
             "title": "Base Salary"
           },
+          "salary_original": {
+            "type": "number",
+            "title": "Salary Original"
+          },
           "total_allowance": {
             "type": "number",
             "title": "Total Allowance"
@@ -36702,6 +40077,7 @@
           "period_year",
           "period_month",
           "base_salary",
+          "salary_original",
           "total_allowance",
           "total_overtime",
           "total_deductions",
@@ -36734,25 +40110,20 @@
             "type": "integer",
             "title": "Working Days Per Month"
           },
-          "bpjs_kes_employee_rate": {
-            "type": "number",
-            "title": "Bpjs Kes Employee Rate"
-          },
-          "bpjs_kes_company_rate": {
-            "type": "number",
-            "title": "Bpjs Kes Company Rate"
-          },
-          "bpjs_tk_employee_rate": {
-            "type": "number",
-            "title": "Bpjs Tk Employee Rate"
-          },
-          "bpjs_tk_company_rate": {
-            "type": "number",
-            "title": "Bpjs Tk Company Rate"
-          },
           "tax_ptkp_amount": {
             "type": "number",
             "title": "Tax Ptkp Amount"
+          },
+          "umr": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Umr"
           },
           "created_at": {
             "type": "string",
@@ -36780,10 +40151,6 @@
           "id",
           "company_id",
           "working_days_per_month",
-          "bpjs_kes_employee_rate",
-          "bpjs_kes_company_rate",
-          "bpjs_tk_employee_rate",
-          "bpjs_tk_company_rate",
           "tax_ptkp_amount",
           "created_at",
           "updated_at"
@@ -36803,50 +40170,6 @@
             ],
             "title": "Working Days Per Month"
           },
-          "bpjs_kes_employee_rate": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Bpjs Kes Employee Rate"
-          },
-          "bpjs_kes_company_rate": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Bpjs Kes Company Rate"
-          },
-          "bpjs_tk_employee_rate": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Bpjs Tk Employee Rate"
-          },
-          "bpjs_tk_company_rate": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Bpjs Tk Company Rate"
-          },
           "tax_ptkp_amount": {
             "anyOf": [
               {
@@ -36857,6 +40180,17 @@
               }
             ],
             "title": "Tax Ptkp Amount"
+          },
+          "umr": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Umr"
           }
         },
         "type": "object",
@@ -38184,6 +41518,33 @@
         ],
         "title": "ShiftCreate"
       },
+      "ShiftDivisionsResponse": {
+        "properties": {
+          "shift_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Shift Id"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "divisions": {
+            "items": {
+              "$ref": "#/components/schemas/DivisionAssignedItem"
+            },
+            "type": "array",
+            "title": "Divisions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "shift_id",
+          "total",
+          "divisions"
+        ],
+        "title": "ShiftDivisionsResponse"
+      },
       "ShiftNested": {
         "properties": {
           "id": {
@@ -38262,14 +41623,6 @@
                 "type": "null"
               }
             ]
-          },
-          "divisions": {
-            "items": {
-              "$ref": "#/components/schemas/DivisionNested"
-            },
-            "type": "array",
-            "title": "Divisions",
-            "default": []
           }
         },
         "type": "object",
@@ -38438,6 +41791,31 @@
         ],
         "title": "StationRefreshToken"
       },
+      "SuccessResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "title": "SuccessResponse"
+      },
       "SuccessResponse_ApprovalFlowResponse_": {
         "properties": {
           "success": {
@@ -38541,6 +41919,32 @@
         },
         "type": "object",
         "title": "SuccessResponse[AttendanceSettingsResponse]"
+      },
+      "SuccessResponse_BPJSConfigResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BPJSConfigResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "SuccessResponse[BPJSConfigResponse]"
       },
       "SuccessResponse_BankAccountResponse_": {
         "properties": {
@@ -38698,6 +42102,32 @@
         "type": "object",
         "title": "SuccessResponse[DashboardStatsResponse]"
       },
+      "SuccessResponse_DivisionOvertimeBreakOverrideResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DivisionOvertimeBreakOverrideResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "SuccessResponse[DivisionOvertimeBreakOverrideResponse]"
+      },
       "SuccessResponse_DivisionResponse_": {
         "properties": {
           "success": {
@@ -38775,6 +42205,32 @@
         },
         "type": "object",
         "title": "SuccessResponse[EmergencyContactResponse]"
+      },
+      "SuccessResponse_EmployeeOvertimeBreakOverrideResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EmployeeOvertimeBreakOverrideResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "SuccessResponse[EmployeeOvertimeBreakOverrideResponse]"
       },
       "SuccessResponse_EmployeePayrollComponentImportResultResponse_": {
         "properties": {
@@ -39192,6 +42648,32 @@
         "type": "object",
         "title": "SuccessResponse[OvertimeDashboardResponse]"
       },
+      "SuccessResponse_OvertimeImportResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OvertimeImportResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "SuccessResponse[OvertimeImportResponse]"
+      },
       "SuccessResponse_OvertimeRecordResponse_": {
         "properties": {
           "success": {
@@ -39504,6 +42986,32 @@
         "type": "object",
         "title": "SuccessResponse[ResignRequestResponse]"
       },
+      "SuccessResponse_ShiftDivisionsResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShiftDivisionsResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "SuccessResponse[ShiftDivisionsResponse]"
+      },
       "SuccessResponse_ShiftResponse_": {
         "properties": {
           "success": {
@@ -39774,6 +43282,36 @@
         "type": "object",
         "title": "SuccessResponse[list[AttendanceResponse]]"
       },
+      "SuccessResponse_list_BPJSConfigResponse__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BPJSConfigResponse"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "title": "SuccessResponse[list[BPJSConfigResponse]]"
+      },
       "SuccessResponse_list_BankAccountResponse__": {
         "properties": {
           "success": {
@@ -39864,6 +43402,36 @@
         "type": "object",
         "title": "SuccessResponse[list[ContractHistoryResponse]]"
       },
+      "SuccessResponse_list_DivisionOvertimeBreakOverrideResponse__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DivisionOvertimeBreakOverrideResponse"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "title": "SuccessResponse[list[DivisionOvertimeBreakOverrideResponse]]"
+      },
       "SuccessResponse_list_DocumentResponse__": {
         "properties": {
           "success": {
@@ -39924,6 +43492,36 @@
         "type": "object",
         "title": "SuccessResponse[list[EmergencyContactResponse]]"
       },
+      "SuccessResponse_list_EmployeeOvertimeBreakOverrideResponse__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EmployeeOvertimeBreakOverrideResponse"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "title": "SuccessResponse[list[EmployeeOvertimeBreakOverrideResponse]]"
+      },
       "SuccessResponse_list_EmployeePayrollComponentResponse__": {
         "properties": {
           "success": {
@@ -39953,6 +43551,36 @@
         },
         "type": "object",
         "title": "SuccessResponse[list[EmployeePayrollComponentResponse]]"
+      },
+      "SuccessResponse_list_FeedbackResponse__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FeedbackResponse"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "title": "SuccessResponse[list[FeedbackResponse]]"
       },
       "SuccessResponse_list_HRAssignmentResponse__": {
         "properties": {
@@ -40522,6 +44150,35 @@
         ],
         "title": "TimemarkEmployeeGrant"
       },
+      "TimemarkInfo": {
+        "properties": {
+          "photo_code": {
+            "type": "string",
+            "title": "Photo Code"
+          },
+          "address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "link": {
+            "type": "string",
+            "title": "Link",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "photo_code"
+        ],
+        "title": "TimemarkInfo"
+      },
       "TimemarkRequest": {
         "properties": {
           "photoCode": {
@@ -40572,6 +44229,42 @@
           "expires_in"
         ],
         "title": "TokenResponse"
+      },
+      "UnassignDivisionsRequest": {
+        "properties": {
+          "division_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Division Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "division_ids"
+        ],
+        "title": "UnassignDivisionsRequest"
+      },
+      "UnassignEmployeesRequest": {
+        "properties": {
+          "employee_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Employee Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "employee_ids"
+        ],
+        "title": "UnassignEmployeesRequest"
       },
       "UpdateEmployeeRequest": {
         "properties": {
@@ -40844,8 +44537,7 @@
           "bpjs_kes": {
             "anyOf": [
               {
-                "type": "number",
-                "minimum": 0.0
+                "type": "boolean"
               },
               {
                 "type": "null"
@@ -40856,14 +44548,35 @@
           "bpjs_tk": {
             "anyOf": [
               {
-                "type": "number",
-                "minimum": 0.0
+                "type": "boolean"
               },
               {
                 "type": "null"
               }
             ],
             "title": "Bpjs Tk"
+          },
+          "bpjs_kes_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bpjs Kes Number"
+          },
+          "bpjs_tk_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bpjs Tk Number"
           },
           "is_active": {
             "anyOf": [
@@ -40894,16 +44607,14 @@
             "default": 0
           },
           "bpjs_kes": {
-            "type": "number",
-            "minimum": 0.0,
+            "type": "boolean",
             "title": "Bpjs Kes",
-            "default": 0
+            "default": false
           },
           "bpjs_tk": {
-            "type": "number",
-            "minimum": 0.0,
+            "type": "boolean",
             "title": "Bpjs Tk",
-            "default": 0
+            "default": false
           },
           "effective_date": {
             "type": "string",
@@ -40928,6 +44639,29 @@
           "effective_date"
         ],
         "title": "UpdateSalaryRequest"
+      },
+      "VisitApprovalAction": {
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/ApprovalActionEnum"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "VisitApprovalAction"
       },
       "VisitRequest": {
         "properties": {

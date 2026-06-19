@@ -18,6 +18,12 @@ export interface AttendanceCorrection {
   created_at?: string;
   attendance_date?: string;
   notes?: string | null;
+  original_checkin?: string | null;
+  original_checkout?: string | null;
+  attendance?: {
+    attendance_date?: string;
+    date?: string;
+  };
 }
 
 export interface CorrectionListQuery {

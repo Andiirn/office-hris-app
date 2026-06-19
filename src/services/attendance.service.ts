@@ -12,7 +12,7 @@ const devLog = (...args: unknown[]) => {
 
 const devError = (...args: unknown[]) => {
   if (__DEV__) {
-    console.error(...args);
+    console.log(...args);
   }
 };
 

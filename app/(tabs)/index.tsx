@@ -13,6 +13,7 @@ import { leaveService } from '../../src/services/leave.service';
 import { overtimeService } from '../../src/services/overtime.service';
 import { resignService } from '../../src/services/resign.service';
 import { useAuthStore } from '../../src/stores/auth.store';
+import { getAttendanceBadgeProps } from '../../src/utils/status';
 
 type FeedType =
   | 'attendance.checkin'
@@ -184,9 +185,8 @@ export default function HomeScreen() {
       const attendanceDate = item.attendance_date || item.date || '-';
       const checkinTime = item.checkin_at || item.checkin_time;
       const checkoutTime = item.checkout_at || item.checkout_time;
-      const rawStatus = item.attendance_status || item.status || 'PRESENT';
-      const statusUpper = rawStatus.toUpperCase();
-      const status = statusUpper === 'PRESENT' ? 'HADIR' : statusUpper === 'LATE' ? 'TERLAMBAT' : statusUpper === 'ABSENT' ? 'TIDAK HADIR' : rawStatus;
+      const badgeProps = getAttendanceBadgeProps(item.attendance_status || item.status);
+      const status = badgeProps.label;
 
       if (checkinTime) {
         items.push({
@@ -390,22 +390,7 @@ export default function HomeScreen() {
       </View>
 
       <View className="flex-1" style={{ paddingHorizontal: 20, paddingTop: 10 }}>
-        <View className="items-center">
-          <Pressable
-            className="w-[150px] h-[150px] rounded-full bg-primary-container items-center justify-center gap-1.5 shadow-lg shadow-black/10 elevation-6"
-            onPress={() => router.push('/attendance-scan')}
-          >
-            <View className="w-[30px] h-[30px] rounded-full bg-white/15 items-center justify-center">
-              <MaterialIcons name="qr-code-scanner" size={30} color="#fff" />
-            </View>
-            <Text className="font-inter-bold text-[12px] text-white">Scan QR Code</Text>
-          </Pressable>
-          <Text className="font-inter text-[10px] text-text-muted mt-2">
-            Tap untuk mulai absensi
-          </Text>
-        </View>
-
-        <View className="h-[196px] mt-[18px] mb-2">
+        <View className="h-[196px] mt-2 mb-2">
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -461,7 +446,7 @@ export default function HomeScreen() {
           </ScrollView>
         </View>
 
-        <View className="mt-3">
+        <View className="flex-1 mt-3">
           <View className="flex-row justify-between items-center mb-3">
             <Text className="font-manrope-bold text-base text-primary">Aktivitas Terbaru</Text>
             <Pressable onPress={() => router.push('/activity')}>
@@ -469,7 +454,7 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
-          <View className="h-[360px] rounded-2xl bg-white/45 border border-white/70 overflow-hidden">
+          <View className="flex-1 rounded-2xl bg-white/45 border border-white/70 overflow-hidden">
             <ScrollView
               className="flex-1"
               contentContainerStyle={{ padding: 12, paddingBottom: 18 }}

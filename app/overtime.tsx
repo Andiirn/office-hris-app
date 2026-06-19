@@ -18,6 +18,7 @@ import { GlassCard } from '../src/components/ui/GlassCard';
 import { Input } from '../src/components/ui/Input';
 import { StatusBadge } from '../src/components/ui/StatusBadge';
 import { Tokens } from '../src/core/theme/tokens';
+import { getAttendanceBadgeProps } from '../src/utils/status';
 import { attendanceService } from '../src/services/attendance.service';
 import { overtimeService } from '../src/services/overtime.service';
 import { useAuthStore } from '../src/stores/auth.store';
@@ -559,13 +560,16 @@ export default function OvertimeScreen() {
                               <Text className={`font-inter-bold text-sm ${isSelected ? 'text-primary' : 'text-on-surface'}`}>
                                 {att.attendance_date || att.date}
                               </Text>
-                              {att.attendance_status ? (
-                                <View className={`px-1.5 py-0.5 rounded-md ${att.attendance_status === 'PRESENT' ? 'bg-secondary-container' : 'bg-error-container/10'}`}>
-                                  <Text className={`font-inter-bold text-[8px] ${att.attendance_status === 'PRESENT' ? 'text-secondary' : 'text-error'}`}>
-                                    {att.attendance_status === 'PRESENT' ? 'HADIR' : att.attendance_status === 'LATE' ? 'TERLAMBAT' : 'TIDAK HADIR'}
-                                  </Text>
-                                </View>
-                              ) : null}
+                              {att.attendance_status && (() => {
+                                const badgeProps = getAttendanceBadgeProps(att.attendance_status);
+                                return (
+                                  <View className={`px-1.5 py-0.5 rounded-md ${badgeProps.bgClass}`}>
+                                    <Text className={`font-inter-bold text-[8px] ${badgeProps.textClass}`}>
+                                      {badgeProps.label}
+                                    </Text>
+                                  </View>
+                                );
+                              })()}
                             </View>
                             <Text className="font-inter-medium text-[10px] text-text-muted">
                               {formatTime(att.checkin_at || att.checkin_time)} - {formatTime(att.checkout_at || att.checkout_time)}

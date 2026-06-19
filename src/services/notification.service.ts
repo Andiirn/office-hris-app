@@ -18,7 +18,7 @@ export const notificationService = {
       
       return [];
     } catch (error) {
-      console.error('[NotificationService] Error fetching notifications:', error);
+      console.log('[NotificationService] Error fetching notifications:', error);
       return [];
     }
   },
