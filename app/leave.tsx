@@ -2,7 +2,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Modal,
@@ -20,6 +20,8 @@ import { Input } from '../src/components/ui/Input';
 import { SkeletonCard } from '../src/components/ui/Skeleton';
 import { StatusBadge } from '../src/components/ui/StatusBadge';
 import { Tokens } from '../src/core/theme/tokens';
+import { authService } from '../src/services/auth.service';
+import { employeeService } from '../src/services/employee.service';
 import { leaveService } from '../src/services/leave.service';
 import { useAuthStore } from '../src/stores/auth.store';
 import { CreateLeaveRequest } from '../src/types/leave';
@@ -43,6 +45,12 @@ function isHourlyLeaveType(type?: { code?: string | null; name?: string | null; 
   return /hour|jam|per\s*jam|hourly/.test(haystack);
 }
 
+function formatLeaveTypeName(name?: string | null) {
+  if (!name) return '';
+  // Remove "Cuti " or "cuti " prefix, case-insensitive
+  return name.replace(/^Cuti\s+/i, '');
+}
+
 function isAnnualLeaveType(type?: { code?: string | null; name?: string | null; category?: string | null } | null) {
   const haystack = `${type?.code || ''} ${type?.name || ''} ${type?.category || ''}`.toLowerCase();
   return /annual|tahunan|cuti\s*tahunan/.test(haystack);
@@ -53,6 +61,7 @@ export default function LeaveScreen() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const [modalVisible, setModalVisible] = useState(false);
+  const [replacementModalVisible, setReplacementModalVisible] = useState(false);
   const [timePickerVisible, setTimePickerVisible] = useState(false);
   const [timeField, setTimeField] = useState<TimeField>('start_time');
   const [selectedRange, setSelectedRange] = useState<{ start?: string, end?: string }>({});
@@ -65,6 +74,23 @@ export default function LeaveScreen() {
     start_time: '',
     end_time: '',
     reason: '',
+    replacement_id: '',
+  });
+
+  const [colleagueSearch, setColleagueSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(colleagueSearch);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [colleagueSearch]);
+
+  const { data: profile } = useQuery({
+    queryKey: ['profile', user?.id],
+    queryFn: () => authService.getProfile(),
+    enabled: !!user?.id,
   });
 
   // 1. Fetch History
@@ -78,7 +104,6 @@ export default function LeaveScreen() {
   const { data: leaveTypes = [] } = useQuery({
     queryKey: ['leave-types', user?.company_id],
     queryFn: () => leaveService.getTypes(user?.company_id || null),
-    enabled: !!user?.company_id,
   });
 
   const selectedLeaveType = useMemo(
@@ -88,20 +113,13 @@ export default function LeaveScreen() {
   const isHourlyLeave = isHourlyLeaveType(selectedLeaveType);
   const isAnnualLeave = isAnnualLeaveType(selectedLeaveType);
 
-  const { data: balances = [] } = useQuery({
-    queryKey: ['leave-balances', user?.id, new Date().getFullYear()],
-    queryFn: () => leaveService.getBalances(user?.id || '', new Date().getFullYear()),
-    enabled: !!user?.id && !!isAnnualLeave,
+  const { data: colleagues = [], isLoading: isLoadingColleagues } = useQuery({
+    queryKey: ['colleagues', profile?.division_id, debouncedSearch],
+    queryFn: () => employeeService.getColleagues(profile?.division_id, debouncedSearch),
+    enabled: !!profile?.division_id,
   });
 
-  const annualLeaveBalance = useMemo(() => {
-    if (!selectedLeaveType) return null;
-    return balances.find((item) => {
-      const left = `${item.leave_type_name || ''}`.toLowerCase();
-      const right = `${selectedLeaveType.name || ''} ${selectedLeaveType.code || ''} ${selectedLeaveType.category || ''}`.toLowerCase();
-      return left.includes('annual') || left.includes('tahunan') || right.includes(left) || left.includes(right);
-    }) || balances[0] || null;
-  }, [balances, selectedLeaveType]);
+  // Leave balances logic removed per HR request
 
   // 3. Create Request Mutation
   const createMutation = useMutation({
@@ -123,13 +141,10 @@ export default function LeaveScreen() {
     onSuccess: async () => {
       console.log('[Leave] Request submitted successfully, refreshing data...');
 
-      // Invalidate and refetch to ensure UI updates immediately
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['leave-history', user?.id] }),
-        queryClient.invalidateQueries({ queryKey: ['leave-balances', user?.id, new Date().getFullYear()] }),
         queryClient.invalidateQueries({ queryKey: ['calendar-leaves'] }),
         queryClient.refetchQueries({ queryKey: ['leave-history', user?.id], type: 'active' }),
-        queryClient.refetchQueries({ queryKey: ['leave-balances', user?.id, new Date().getFullYear()], type: 'active' }),
       ]);
 
       setModalVisible(false);
@@ -143,8 +158,9 @@ export default function LeaveScreen() {
         start_time: '',
         end_time: '',
         reason: '',
+        replacement_id: '',
       });
-      Alert.alert('Success', 'Leave request submitted successfully');
+      Alert.alert('Berhasil', 'Pengajuan berhasil dikirim');
     },
     onError: (error: any) => {
       const response = error?.response?.data;
@@ -169,10 +185,8 @@ export default function LeaveScreen() {
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['leave-history', user?.id] }),
-        queryClient.invalidateQueries({ queryKey: ['leave-balances', user?.id, new Date().getFullYear()] }),
         queryClient.invalidateQueries({ queryKey: ['calendar-leaves'] }),
         queryClient.refetchQueries({ queryKey: ['leave-history', user?.id], type: 'active' }),
-        queryClient.refetchQueries({ queryKey: ['leave-balances', user?.id, new Date().getFullYear()], type: 'active' }),
       ]);
       Alert.alert('Success', 'Leave request cancelled');
     },
@@ -265,21 +279,23 @@ export default function LeaveScreen() {
         end_date: selectedHourlyDate,
         start_time: form.start_time || null,
         end_time: form.end_time || null,
+        replacement_id: form.replacement_id || null,
       }
       : {
         ...form,
         end_date: form.end_date || null,
         start_time: null,
         end_time: null,
+        replacement_id: form.replacement_id || null,
       };
 
     if (!payload.leave_type_id) {
-      Alert.alert('Error', 'Pilih jenis izin/cuti terlebih dahulu');
+      Alert.alert('Pilih jenis izin/cuti terlebih dahulu');
       return;
     }
 
     if (!payload.reason || payload.reason.trim().length < 5) {
-      Alert.alert('Error', 'Reason minimal 5 karakter');
+      Alert.alert('Mohon masukkan alasan minimal 5 karakter');
       return;
     }
 
@@ -403,15 +419,6 @@ export default function LeaveScreen() {
           <RefreshControl refreshing={isFetchingHistory} onRefresh={onRefresh} tintColor={Tokens.colors.primary} />
         }
       >
-        {isAnnualLeave && annualLeaveBalance ? (
-          <GlassCard style={{ padding: 16, marginBottom: 20, backgroundColor: '#f7f9ff' }}>
-            <Text className="font-inter-bold text-sm text-primary mb-1">Informasi Cuti Tahunan</Text>
-            <Text className="font-inter text-sm text-on-surface leading-5">
-              Berdasarkan data kepegawaian di perusahaan, anda dapat mengajaukan cuti tahunan sebanyak {annualLeaveBalance.remaining_days} hari.
-            </Text>
-          </GlassCard>
-        ) : null}
-
         <GlassCard style={{ padding: 16, marginBottom: 20 }}>
           <View className="flex-row items-center justify-between mb-3">
             <View>
@@ -440,7 +447,7 @@ export default function LeaveScreen() {
                     onPress={() => handleSelectLeaveType(type.id)}
                   >
                     <Text className={`font-inter-bold text-sm ${active ? 'text-white' : 'text-text-muted'}`}>
-                      {type.name}
+                      {formatLeaveTypeName(type.name)}
                     </Text>
                   </Pressable>
                 );
@@ -473,7 +480,7 @@ export default function LeaveScreen() {
             <GlassCard key={item.id} style={{ marginBottom: 12, padding: 16 }}>
               <View className="flex-row justify-between items-start mb-2.5">
                 <View className="flex-1">
-                  <Text className="font-inter-bold text-base text-black">{item.leave_type_name || 'Leave Request'}</Text>
+                  <Text className="font-inter-bold text-base text-black">{formatLeaveTypeName(item.leave_type_name) || 'Leave Request'}</Text>
                   <View className="flex-row items-center mt-1 gap-1.5">
                     <MaterialIcons name="calendar-today" size={12} color={Tokens.colors.textMuted} />
                     <Text className="font-inter-medium text-xs text-text-muted">
@@ -510,13 +517,14 @@ export default function LeaveScreen() {
           setSelectedRange({});
           setTimePickerVisible(false);
           setDocumentFile(null);
+          setColleagueSearch('');
         }}
       >
         <View className="flex-1 bg-primary/40 justify-end">
           <View className="bg-background rounded-t-[32px] p-6 max-h-[85%] shadow-2xl">
             <View className="flex-row justify-between items-start mb-6">
               <View>
-                <Text className="font-manrope-extrabold text-2xl text-primary">Pengajuan {selectedLeaveType?.name || ''}</Text>
+                <Text className="font-manrope-extrabold text-2xl text-primary">Pengajuan {formatLeaveTypeName(selectedLeaveType?.name)}</Text>
               </View>
               <Pressable
                 className="w-9 h-9 rounded-full bg-black/5 items-center justify-center"
@@ -524,6 +532,7 @@ export default function LeaveScreen() {
                   setModalVisible(false);
                   setSelectedRange({});
                   setTimePickerVisible(false);
+                  setColleagueSearch('');
                 }}
               >
                 <MaterialIcons name="close" size={20} color={Tokens.colors.text} />
@@ -637,6 +646,24 @@ export default function LeaveScreen() {
                 style={{ height: 100, textAlignVertical: 'top', paddingTop: 12 }}
               />
 
+              <GlassCard style={{ padding: 14, marginTop: 12 }}>
+                <Text className="font-inter-bold text-sm text-primary mb-2">Pengganti (Opsional)</Text>
+                <Text className="font-inter text-xs text-text-muted mb-3">
+                  Pilih rekan 1 divisi untuk menggantikan Anda selama cuti.
+                </Text>
+                <Pressable
+                  onPress={() => setReplacementModalVisible(true)}
+                  className="flex-row items-center justify-between px-4 py-3 bg-black/5 rounded-xl border border-outline"
+                >
+                  <Text className={`font-inter-medium text-sm ${form.replacement_id ? 'text-black' : 'text-text-muted'}`}>
+                    {form.replacement_id
+                      ? colleagues.find(c => c.id === form.replacement_id)?.full_name || 'Karyawan Terpilih'
+                      : 'Pilih Pengganti'}
+                  </Text>
+                  <MaterialIcons name="chevron-right" size={20} color={Tokens.colors.textMuted} />
+                </Pressable>
+              </GlassCard>
+
               {requiresDocument ? (
                 <GlassCard style={{ padding: 14, marginTop: 12 }}>
                   <Text className="font-inter-bold text-sm text-primary mb-2">Dokumen Pendukung</Text>
@@ -667,12 +694,6 @@ export default function LeaveScreen() {
                     >
                       <Text className="font-inter-bold text-[12px] text-primary">Upload File</Text>
                     </Pressable>
-                    <Pressable
-                      onPress={clearDocument}
-                      className="flex-1 py-3 rounded-xl bg-[#f8f8f8] items-center"
-                    >
-                      <Text className="font-inter-bold text-[12px] text-text-muted">Lewati</Text>
-                    </Pressable>
                   </View>
                 </GlassCard>
               ) : null}
@@ -687,42 +708,90 @@ export default function LeaveScreen() {
             </ScrollView>
           </View>
         </View>
-      </Modal>
 
-      <Modal
-        animationType="fade"
-        transparent
-        visible={timePickerVisible}
-        onRequestClose={() => setTimePickerVisible(false)}
-      >
-        <View className="flex-1 bg-black/40 justify-end">
-          <View className="bg-background rounded-t-[28px] p-5 max-h-[70%]">
-            <View className="flex-row justify-between items-center mb-4">
-              <View>
-                <Text className="font-manrope-bold text-xl text-primary">Pilih Jam</Text>
-                <Text className="font-inter text-xs text-text-muted">Scroll untuk memilih {timeField === 'start_time' ? 'start time' : 'end time'}</Text>
+        {timePickerVisible && (
+          <View className="absolute inset-0 z-50 flex-1 bg-black/40 justify-end">
+            <View className="bg-background rounded-t-[28px] p-5 max-h-[70%]">
+              <View className="flex-row justify-between items-center mb-4">
+                <View>
+                  <Text className="font-manrope-bold text-xl text-primary">Pilih Jam</Text>
+                  <Text className="font-inter text-xs text-text-muted">Scroll untuk memilih {timeField === 'start_time' ? 'start time' : 'end time'}</Text>
+                </View>
+                <Pressable onPress={() => setTimePickerVisible(false)} className="w-9 h-9 rounded-full bg-black/5 items-center justify-center">
+                  <MaterialIcons name="close" size={18} color={Tokens.colors.text} />
+                </Pressable>
               </View>
-              <Pressable onPress={() => setTimePickerVisible(false)} className="w-9 h-9 rounded-full bg-black/5 items-center justify-center">
-                <MaterialIcons name="close" size={18} color={Tokens.colors.text} />
-              </Pressable>
-            </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {TIME_OPTIONS.map((value) => {
-                const active = selectedTimeLabel(timeField) === value;
-                return (
-                  <Pressable
-                    key={value}
-                    onPress={() => handleSelectTime(value)}
-                    className={`px-4 py-3 rounded-xl mb-2 ${active ? 'bg-primary/5 border border-primary' : 'bg-[#f8f8f8]'}`}
-                  >
-                    <Text className={`font-inter-bold text-sm ${active ? 'text-primary' : 'text-on-surface'}`}>{value}</Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {TIME_OPTIONS.map((value) => {
+                  const active = selectedTimeLabel(timeField) === value;
+                  return (
+                    <Pressable
+                      key={value}
+                      onPress={() => handleSelectTime(value)}
+                      className={`px-4 py-3 rounded-xl mb-2 ${active ? 'bg-primary/5 border border-primary' : 'bg-[#f8f8f8]'}`}
+                    >
+                      <Text className={`font-inter-bold text-sm ${active ? 'text-primary' : 'text-on-surface'}`}>{value}</Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
           </View>
-        </View>
+        )}
+
+        {replacementModalVisible && (
+          <View className="absolute inset-0 z-50 flex-1 bg-black/40 justify-end">
+            <View className="bg-background rounded-t-[28px] p-5 h-[80%] shadow-2xl">
+              <View className="flex-row justify-between items-center mb-4">
+                <View>
+                  <Text className="font-manrope-bold text-xl text-primary">Pilih Pengganti</Text>
+                  <Text className="font-inter text-xs text-text-muted">Cari rekan 1 divisi</Text>
+                </View>
+                <Pressable onPress={() => { setReplacementModalVisible(false); setColleagueSearch(''); }} className="w-9 h-9 rounded-full bg-black/5 items-center justify-center">
+                  <MaterialIcons name="close" size={18} color={Tokens.colors.text} />
+                </Pressable>
+              </View>
+
+              <Input
+                placeholder="Cari nama karyawan..."
+                value={colleagueSearch}
+                onChangeText={setColleagueSearch}
+              />
+
+              <ScrollView showsVerticalScrollIndicator={false} className="mt-4">
+                {isLoadingColleagues ? (
+                  <Text className="font-inter text-center text-sm text-text-muted mt-4">Memuat data...</Text>
+                ) : colleagues.filter(c => c.id !== user?.id).length > 0 ? (
+                  colleagues.filter(c => c.id !== user?.id).map((c) => {
+                    const active = form.replacement_id === c.id;
+                    return (
+                      <Pressable
+                        key={c.id}
+                        onPress={() => {
+                          setForm({ ...form, replacement_id: active ? '' : c.id });
+                          setReplacementModalVisible(false);
+                          setColleagueSearch('');
+                        }}
+                        className={`flex-row items-center justify-between p-4 mb-2 rounded-xl border ${active ? 'bg-primary/5 border-primary' : 'bg-white border-outline'}`}
+                      >
+                        <View>
+                          <Text className={`font-inter-bold text-sm ${active ? 'text-primary' : 'text-on-surface'}`}>{c.full_name}</Text>
+                          <Text className="font-inter text-[11px] text-text-muted mt-0.5">{c.nik}</Text>
+                        </View>
+                        {active && <MaterialIcons name="check-circle" size={20} color={Tokens.colors.primary} />}
+                      </Pressable>
+                    );
+                  })
+                ) : debouncedSearch ? (
+                  <Text className="font-inter text-center text-sm text-text-muted mt-4">Tidak ada hasil untuk "{debouncedSearch}"</Text>
+                ) : (
+                  <Text className="font-inter text-center text-sm text-text-muted mt-4">Ketik nama untuk mencari</Text>
+                )}
+              </ScrollView>
+            </View>
+          </View>
+        )}
       </Modal>
     </SafeAreaView>
   )

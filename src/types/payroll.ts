@@ -26,8 +26,8 @@ export interface PayrollPreview {
   overtime_hours: number;
   slip_pdf_url: string | null;
   generated_at: string;
-  
   // New matching properties from backend
+  salary_original?: number;
   work_days?: number;
   bruto_salary?: number;
   employee_custom_earning?: number;
@@ -49,6 +49,17 @@ export interface PayrollPreview {
     amount: number;
     keterangan?: string | null;
   }>;
+  absensi?: {
+    alpha: number;
+    ijin: number;
+    cuti: number;
+    sakit: number;
+  };
+  bank_account?: {
+    bank_name: string;
+    account_number: string;
+    account_holder_name: string;
+  };
   // Fallbacks for compatibility
   components?: PayrollComponent[];
   status?: string;

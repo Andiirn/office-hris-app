@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { router } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Tokens } from '../src/core/theme/tokens';
 import { approvalService } from '../src/services/approval.service';
@@ -223,9 +224,17 @@ export default function ApprovalsScreen() {
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       {/* Header */}
-      <View className="px-5 pt-2 pb-4 flex-row justify-between items-center z-10">
-        <View>
-          <Text className="font-manrope-extrabold text-3xl text-primary">Persetujuan Tim</Text>
+      <View className="px-5 pt-2 pb-4 flex-row items-center gap-3 z-10">
+        <Pressable
+          onPress={() => router.back()}
+          className="w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm active:opacity-60"
+          accessibilityRole="button"
+          accessibilityLabel="Kembali"
+        >
+          <MaterialIcons name="arrow-back" size={22} color={Tokens.colors.primary} />
+        </Pressable>
+        <View className="flex-1">
+          <Text className="font-manrope-extrabold text-2xl text-primary">Persetujuan Tim</Text>
           <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Kelola permintaan persetujuan tim</Text>
         </View>
       </View>

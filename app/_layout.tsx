@@ -18,8 +18,8 @@ import {
 } from '@expo-google-fonts/inter';
 import { sessionManager } from '../src/core/auth/session-manager';
 import { useAuthStore } from '../src/stores/auth.store';
-import { NotificationManager } from '../src/core/notifications/notification-manager';
 import { notificationService } from '../src/services/notification.service';
+import { qk } from '../src/core/query/query-keys';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -88,32 +88,51 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (isLoggedIn) {
-      // Register for push notifications and retrieve token
-      NotificationManager.registerForPushNotificationsAsync().then((token) => {
-        if (token) {
-          console.log('[RootLayout] Device Push Token:', token);
-          // Sync token with backend
-          notificationService.saveDeviceToken(token);
-        }
-      });
+      let cleanup: (() => void) | undefined;
+      let cancelled = false;
 
-      // Set up foreground & background/click listeners
-      const cleanup = NotificationManager.setupNotificationListeners(
-        (notification) => {
-          // Invalidate queries to auto-refresh state (e.g. badge count or approvals list)
-          queryClient.invalidateQueries({ queryKey: ['notifications'] });
-          queryClient.invalidateQueries({ queryKey: ['approvals'] });
-        },
-        (response) => {
-          // Route user to a specific screen if payload contains screen name
-          const data = response.notification.request.content.data;
-          if (data && data.screen) {
-            router.push(data.screen as any);
+      (async () => {
+        let NotificationManager;
+        try {
+          ({ NotificationManager } = await import('../src/core/notifications/notification-manager'));
+        } catch (error) {
+          console.warn('[RootLayout] Notification setup skipped:', error);
+          return;
+        }
+        if (cancelled) {
+          return;
+        }
+
+        // Register for push notifications and retrieve token
+        NotificationManager.registerForPushNotificationsAsync().then((token) => {
+          if (token) {
+            console.log('[RootLayout] Device Push Token:', token);
+            // Sync token with backend
+            notificationService.saveDeviceToken(token);
           }
-        }
-      );
+        });
 
-      return () => cleanup();
+        // Set up foreground & background/click listeners
+        cleanup = NotificationManager.setupNotificationListeners(
+          () => {
+            // Invalidate queries to auto-refresh state (e.g. badge count or approvals list)
+            queryClient.invalidateQueries({ queryKey: qk.notificationsRoot() });
+            queryClient.invalidateQueries({ queryKey: qk.homeApprovalsRoot() });
+          },
+          (response) => {
+            // Route user to a specific screen if payload contains screen name
+            const data = response.notification.request.content.data;
+            if (data && data.screen) {
+              router.push(data.screen as any);
+            }
+          }
+        );
+      })();
+
+      return () => {
+        cancelled = true;
+        cleanup?.();
+      };
     }
   }, [isLoggedIn]);
 

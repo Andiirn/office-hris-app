@@ -1,17 +1,18 @@
-import { tokenStore } from './token-store';
-import { useAuthStore } from '../../stores/auth.store';
+import { CancelledError } from '@tanstack/react-query';
+import axios from 'axios';
 import { authService } from '../../services/auth.service';
+import { useAuthStore } from '../../stores/auth.store';
+import { setSuppressAuthErrorAlerts } from '../api/client';
 import { queryClient } from '../api/query-client';
 import { qk } from '../query/query-keys';
-import { Alert } from 'react-native';
-import axios from 'axios';
+import { tokenStore } from './token-store';
 
 export const sessionManager = {
   async initialize() {
     const accessToken = await tokenStore.getAccessToken();
     if (!accessToken) {
       console.log('[SessionManager] No access token found');
-      useAuthStore.getState().setBootstrapError(null);
+      alert('Sesi berakhir. Silahkan login kembali');
       await useAuthStore.getState().setInitialized(true);
       return;
     }
@@ -19,7 +20,8 @@ export const sessionManager = {
     try {
       console.log('[SessionManager] Fetching profile...');
       useAuthStore.getState().setBootstrapError(null);
-      
+      setSuppressAuthErrorAlerts(true);
+
       // Fetch profile and store in cache
       const profile = await queryClient.fetchQuery({
         queryKey: qk.profile(),
@@ -41,27 +43,32 @@ export const sessionManager = {
       };
 
       const refreshToken = await tokenStore.getRefreshToken();
-      
+
       // Update Auth Store
       await useAuthStore.getState().setAuth(user, accessToken, refreshToken || '');
 
       console.log('[SessionManager] Session initialized for:', user.full_name);
     } catch (error) {
-      console.error('[SessionManager] Failed to initialize session:', error);
-      
-      if (axios.isAxiosError(error) && error.response?.status === 401) {
-        useAuthStore.getState().setBootstrapError(null);
-        Alert.alert(
-          'Sesi Berakhir',
-          'Sesi Anda telah habis atau tidak valid. Silakan login kembali.',
-          [{ text: 'OK', onPress: () => this.logout() }]
-        );
-      } else {
-        useAuthStore.getState().setBootstrapError(
-          'Gagal memuat profil. Cek koneksi lalu coba lagi.',
-        );
+      if (error instanceof CancelledError) {
+        console.log('[SessionManager] Session initialization cancelled');
+        return;
       }
+
+      console.error('[SessionManager] Failed to initialize session:', error);
+
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        await tokenStore.clearTokens();
+        useAuthStore.getState().setUser(null);
+        useAuthStore.getState().setInitialized(true);
+        useAuthStore.getState().setBootstrapError(null);
+        return;
+      }
+
+      useAuthStore.getState().setBootstrapError(
+        'Gagal memuat profil. Cek koneksi lalu coba lagi.',
+      );
     } finally {
+      setSuppressAuthErrorAlerts(false);
       // Ensure app is always initialized
       useAuthStore.getState().setInitialized(true);
     }

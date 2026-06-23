@@ -9,6 +9,7 @@ export interface ProfileData {
   address_domicile?: string | null;
   branch_name?: string | null;
   department_name?: string | null;
+  division_id?: string | null;
   position_name?: string | null;
   photo_url?: string | null;
   gender?: string | null;

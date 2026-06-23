@@ -8,6 +8,7 @@ import { SkeletonCard } from '../../src/components/ui/Skeleton';
 import { StatusBadge } from '../../src/components/ui/StatusBadge';
 import { qk } from '../../src/core/query/query-keys';
 import { Tokens } from '../../src/core/theme/tokens';
+import { getAttendanceBadgeProps } from '../../src/utils/status';
 import { attendanceService } from '../../src/services/attendance.service';
 import { useAuthStore } from '../../src/stores/auth.store';
 
@@ -79,6 +80,7 @@ export default function AttendanceHistoryScreen() {
     },
     enabled: !!user?.id,
     initialPageParam: 1,
+    staleTime: 60_000,
     getNextPageParam: (lastPage, _allPages, lastPageParam) => (lastPage.length < pageSize ? undefined : Number(lastPageParam) + 1),
   });
 
@@ -104,26 +106,9 @@ export default function AttendanceHistoryScreen() {
     return timeOnly.substring(0, 5);
   };
 
-  const getStatusType = (status?: string) => {
-    switch (status) {
-      case 'HADIR': return 'secondary';
-      case 'TERLAMBAT': return 'error';
-      case 'TIDAK HADIR': return 'error';
-      default: return 'secondary';
-    }
-  };
-
   const getAttendanceDate = (item: any) => item.attendance_date || item.date || '-';
   const getCheckinTime = (item: any) => item.checkin_at || item.checkin_time;
   const getCheckoutTime = (item: any) => item.checkout_at || item.checkout_time;
-  const getAttendanceStatus = (item: any) => {
-    const status = item.attendance_status || item.status || 'PRESENT';
-    const s = status.toUpperCase();
-    if (s === 'PRESENT') return 'HADIR';
-    if (s === 'LATE') return 'TERLAMBAT';
-    if (s === 'ABSENT') return 'TIDAK HADIR';
-    return status;
-  };
   const getBranchName = (item: any) => item.branch_name || item.branch?.name || item.branch?.code || '';
 
   return (
@@ -201,20 +186,25 @@ export default function AttendanceHistoryScreen() {
                     <MaterialIcons name="calendar-today" size={16} color={Tokens.colors.primary} />
                     <Text className="font-inter-bold text-base text-black">{getAttendanceDate(item)}</Text>
                   </View>
-                  <StatusBadge label={getAttendanceStatus(item)} type={getStatusType(getAttendanceStatus(item)) as any} />
+                  <StatusBadge 
+                    label={getAttendanceBadgeProps(item.attendance_status || item.status).label} 
+                    type={getAttendanceBadgeProps(item.attendance_status || item.status).type} 
+                  />
                 </View>
 
-                <View className="flex-row justify-between bg-black/5 p-3 rounded-xl">
-                  <View className="items-center flex-1">
-                    <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-1">Check In</Text>
-                    <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(getCheckinTime(item))}</Text>
+                {(getCheckinTime(item) || getCheckoutTime(item) || ['PRESENT', 'LATE', 'EARLY_CHECKOUT'].includes(String(item.attendance_status || item.status || 'PRESENT').toUpperCase())) && (
+                  <View className="flex-row justify-between bg-black/5 p-3 rounded-xl mt-1">
+                    <View className="items-center flex-1">
+                      <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-1">Check In</Text>
+                      <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(getCheckinTime(item))}</Text>
+                    </View>
+                    <View className="w-[1px] bg-black/10 mx-2" />
+                    <View className="items-center flex-1">
+                      <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-1">Check Out</Text>
+                      <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(getCheckoutTime(item))}</Text>
+                    </View>
                   </View>
-                  <View className="w-[1px] bg-black/10 mx-2" />
-                  <View className="items-center flex-1">
-                    <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-1">Check Out</Text>
-                    <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(getCheckoutTime(item))}</Text>
-                  </View>
-                </View>
+                )}
 
                 {getBranchName(item) ? (
                   <View className="flex-row items-center mt-3 gap-1.5 ml-1">

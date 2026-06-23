@@ -14,6 +14,7 @@ import { attendanceService } from '../src/services/attendance.service';
 import { useAuthStore } from '../src/stores/auth.store';
 import { AttendanceItem } from '../src/types/attendance';
 import { AttendanceCorrection, CorrectionRequest } from '../src/types/correction';
+import { getAttendanceBadgeProps } from '../src/utils/status';
 
 function formatTime(time?: string | null) {
   if (!time) return '--:--';
@@ -33,6 +34,15 @@ function formatTime(time?: string | null) {
 
 function getAttendanceDate(item: any) {
   return item.attendance_date || item.date || '-';
+}
+
+function getCorrectionDate(item: AttendanceCorrection) {
+  if (item.attendance_date) return item.attendance_date;
+  if (item.attendance?.attendance_date) return item.attendance.attendance_date;
+  if (item.attendance?.date) return item.attendance.date;
+  if (item.original_checkin) return item.original_checkin.split('T')[0];
+  if (item.corrected_checkin) return item.corrected_checkin.split('T')[0];
+  return '-';
 }
 
 function getCheckIn(item: any) {
@@ -341,7 +351,7 @@ export default function CorrectionScreen() {
                 <View className="flex-row justify-between items-center mb-3">
                   <View className="flex-row items-center gap-2">
                     <MaterialIcons name="calendar-today" size={16} color={Tokens.colors.primary} />
-                    <Text className="font-inter-bold text-base text-black">{item.attendance_date || '-'}</Text>
+                    <Text className="font-inter-bold text-base text-black">{getCorrectionDate(item)}</Text>
                   </View>
                   <StatusBadge label={item.status || 'PENDING'} type={getStatusType(item.status) as any} />
                 </View>
@@ -565,13 +575,16 @@ export default function CorrectionScreen() {
                               <Text className={`font-inter-bold text-sm ${isSelected ? 'text-primary' : 'text-on-surface'}`}>
                                 {getAttendanceDate(att)}
                               </Text>
-                              {att.attendance_status && (
-                                <View className={`px-1.5 py-0.5 rounded-md ${att.attendance_status === 'PRESENT' ? 'bg-secondary-container' : 'bg-error-container/10'}`}>
-                                  <Text className={`font-inter-bold text-[8px] ${att.attendance_status === 'PRESENT' ? 'text-secondary' : 'text-error'}`}>
-                                    {att.attendance_status === 'PRESENT' ? 'HADIR' : att.attendance_status === 'LATE' ? 'TERLAMBAT' : 'TIDAK HADIR'}
-                                  </Text>
-                                </View>
-                              )}
+                              {att.attendance_status && (() => {
+                                const badgeProps = getAttendanceBadgeProps(att.attendance_status);
+                                return (
+                                  <View className={`px-1.5 py-0.5 rounded-md ${badgeProps.bgClass}`}>
+                                    <Text className={`font-inter-bold text-[8px] ${badgeProps.textClass}`}>
+                                      {badgeProps.label}
+                                    </Text>
+                                  </View>
+                                );
+                              })()}
                             </View>
                             <Text className="font-inter-medium text-[10px] text-text-muted mt-0.5">
                               {formatTime(getCheckIn(att))} - {formatTime(getCheckOut(att))}

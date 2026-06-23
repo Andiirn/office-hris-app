@@ -6,6 +6,7 @@ import { Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GlassCard } from '../src/components/ui/GlassCard';
 import { Skeleton, SkeletonCard } from '../src/components/ui/Skeleton';
+import { qk } from '../src/core/query/query-keys';
 import { Tokens } from '../src/core/theme/tokens';
 import { authService } from '../src/services/auth.service';
 import { payrollService } from '../src/services/payroll.service';
@@ -18,7 +19,7 @@ export default function PayrollScreen() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   const { data: profile } = useQuery({
-    queryKey: ['profile', user?.id],
+    queryKey: qk.profile(),
     queryFn: () => authService.getProfile(),
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000,
@@ -28,9 +29,10 @@ export default function PayrollScreen() {
 
   // 1. Fetch Payroll Preview
   const { data: payroll, isLoading, refetch, isFetching, isError, error } = useQuery({
-    queryKey: ['payroll-preview', user?.id, companyId, selectedYear, selectedMonth],
+    queryKey: qk.payrollPreview(user?.id, companyId, selectedYear, selectedMonth),
     queryFn: () => payrollService.getPreview(user?.id || '', { month: selectedMonth, year: selectedYear, company_id: companyId }),
     enabled: !!user?.id,
+    staleTime: 5 * 60_000,
     retry: 1, // Minimize retries for production if server is down
   });
 
@@ -40,7 +42,7 @@ export default function PayrollScreen() {
   const readNumber = (value: unknown) =>
     typeof value === 'number' && Number.isFinite(value) ? value : 0;
 
-  const baseSalary = readNumber(payroll?.base_salary);
+  const baseSalary = readNumber(payroll?.salary_original ?? payroll?.base_salary);
   const totalAllowanceVal = readNumber(payroll?.total_allowance);
   const totalOvertimeVal = readNumber(payroll?.total_overtime);
   const customEarningVal = readNumber(payroll?.employee_custom_earning);
@@ -51,9 +53,6 @@ export default function PayrollScreen() {
   const lateDeductionVal = readNumber(payroll?.late_deduction);
   const leaveDeductionVal = readNumber(payroll?.leave_deduction);
   const customDeductionVal = readNumber(payroll?.employee_custom_deduction);
-
-  const bpjsKesCompanyVal = readNumber(payroll?.bpjs_kes_company);
-  const bpjsTkCompanyVal = readNumber(payroll?.bpjs_tk_company);
 
   // Custom component lines from API
   const rawComponents = React.useMemo(() => [
@@ -69,13 +68,23 @@ export default function PayrollScreen() {
     .map((c: any) => ({ name: c.name as string, amount: readNumber(c.amount), keterangan: c.keterangan })), [rawComponents]);
 
   const customDeductions = React.useMemo(() => rawComponents
-    .filter((c: any) => normalizeComponentType(c.component_type || c.type) === "deduction")
+    .filter((c: any) => normalizeComponentType(c.component_type || c.type) === "deduction" && c.source !== 'bpjs')
     .map((c: any) => ({ name: c.name as string, amount: readNumber(c.amount), keterangan: c.keterangan })), [rawComponents]);
 
-  const totalAllowance = totalAllowanceVal || allowances.reduce((sum: number, item: any) => sum + item.amount, 0);
-  const totalDeduction = payroll?.total_deductions || (taxAmountVal + bpjsKesEmployeeVal + bpjsTkEmployeeVal + lateDeductionVal + leaveDeductionVal + customDeductionVal + customDeductions.reduce((sum: number, item: any) => sum + item.amount, 0));
+  const sumCustomDeductions = customDeductions.reduce((sum: number, item: any) => sum + item.amount, 0);
+  const displayCustomDeductionVal = customDeductionVal > 0 ? customDeductionVal : sumCustomDeductions;
 
-  const grossIncome = payroll?.bruto_salary || (baseSalary + totalAllowance + totalOvertimeVal + customEarningVal);
+  // Calculate Absent Deduction if salary_original is used as baseSalary
+  const originalSalary = readNumber(payroll?.salary_original);
+  const actualBaseSalary = readNumber(payroll?.base_salary);
+  const absentDeduction = originalSalary > actualBaseSalary ? originalSalary - actualBaseSalary : 0;
+
+  const totalAllowance = totalAllowanceVal || allowances.reduce((sum: number, item: any) => sum + item.amount, 0);
+
+  // Recalculate Gross and Total Deductions manually to balance the inflated Base Salary
+  const grossIncome = baseSalary + totalAllowance + totalOvertimeVal + customEarningVal;
+  const totalDeduction = taxAmountVal + bpjsKesEmployeeVal + bpjsTkEmployeeVal + lateDeductionVal + leaveDeductionVal + displayCustomDeductionVal + absentDeduction;
+
   const netSalary = payroll?.take_home_pay || (grossIncome - totalDeduction);
 
   React.useEffect(() => {
@@ -88,7 +97,7 @@ export default function PayrollScreen() {
   const generateMutation = useMutation({
     mutationFn: () => payrollService.generatePreview(user?.id || '', { month: selectedMonth, year: selectedYear }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['payroll-preview'] });
+      queryClient.invalidateQueries({ queryKey: qk.payrollPreview(user?.id, companyId, selectedYear, selectedMonth) });
       Alert.alert('Success', 'Payslip generated for this month');
     },
     onError: (error: any) => {
@@ -102,8 +111,9 @@ export default function PayrollScreen() {
 
   const handleDownload = async () => {
     try {
-      const localUri = await payrollService.downloadPdf(user?.id || '', { month: selectedMonth, year: selectedYear, company_id: companyId });
-      Alert.alert('Sukses', `Slip gaji berhasil diunduh.\n\nFile tersimpan sementara sebagai: ${localUri.split('/').pop()}`);
+      const { localUri, filename } = await payrollService.downloadPdf(user?.id || '', { month: selectedMonth, year: selectedYear, company_id: companyId });
+      const savedUri = await payrollService.savePdfToDownloads(localUri, filename);
+      Alert.alert('Sukses', `Slip gaji tersimpan ke folder pilihan.\n\nFile: ${savedUri.split('/').pop() || filename}`);
     } catch (err: any) {
       console.error('[Payroll Download Error]', err);
       const status = err?.response?.status;
@@ -133,6 +143,15 @@ export default function PayrollScreen() {
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
+
+  const formatDurationHuman = (hoursDecimal: number | undefined | null) => {
+    if (!hoursDecimal) return '0j';
+    const hrs = Math.floor(hoursDecimal);
+    const mins = Math.round((hoursDecimal - hrs) * 60);
+    if (hrs === 0) return `${mins}m`;
+    if (mins === 0) return `${hrs}j`;
+    return `${hrs}j ${mins}m`;
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-[#fbf9f8]">
@@ -270,7 +289,17 @@ export default function PayrollScreen() {
                 </View>
 
                 <View className="flex-row justify-between">
-
+                  <View>
+                    <Text className="font-inter-semibold text-[10px] text-[#454652] uppercase tracking-wider mb-1">BANK TRANSFER</Text>
+                    <Text className="font-manrope-bold text-sm text-[#1b1c1c]">{payroll.bank_account?.bank_name || '—'}</Text>
+                  </View>
+                  <View className="items-end">
+                    <Text className="font-inter-semibold text-[10px] text-[#454652] uppercase tracking-wider mb-1">NO. REKENING</Text>
+                    <Text className="font-manrope-bold text-sm text-[#1b1c1c]">{payroll.bank_account?.account_number || '—'}</Text>
+                    {payroll.bank_account?.account_holder_name && (
+                      <Text className="font-inter text-[10px] text-[#454652]">{payroll.bank_account.account_holder_name}</Text>
+                    )}
+                  </View>
                 </View>
               </View>
             </GlassCard>
@@ -281,32 +310,42 @@ export default function PayrollScreen() {
                 <MaterialIcons name="event-note" size={18} color={Tokens.colors.primary} />
                 <Text className="font-manrope-bold text-base text-[#000666]">Ringkasan Kehadiran</Text>
               </View>
-              <GlassCard style={{ padding: 16, backgroundColor: 'rgba(255, 255, 255, 0.95)' }}>
-                <View className="flex-row flex-wrap justify-between" style={{ gap: 8 }}>
-                  <View className="bg-black/5 rounded-2xl p-3 items-center justify-center" style={{ width: '30%' }}>
-                    <Text className="font-inter-bold text-[10px] text-[#454652] uppercase">Hari Kerja</Text>
-                    <Text className="font-manrope-bold text-base text-[#1b1c1c] mt-1">{payroll.work_days ?? 0}</Text>
+              <GlassCard style={{ padding: 18, backgroundColor: 'rgba(255, 255, 255, 0.95)' }}>
+                <View className="gap-3">
+                  <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
+                    <Text className="font-inter text-sm text-[#454652]">Hadir</Text>
+                    <Text className="font-inter-semibold text-sm text-[#1b1c1c]">{payroll?.present_days ?? 0} Hari</Text>
                   </View>
-                  <View className="bg-emerald-50 rounded-2xl p-3 items-center justify-center border border-emerald-100" style={{ width: '30%' }}>
-                    <Text className="font-inter-bold text-[10px] text-emerald-700 uppercase">Hadir</Text>
-                    <Text className="font-manrope-bold text-base text-emerald-700 mt-1">{payroll.present_days ?? 0}</Text>
+                  <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
+                    <Text className="font-inter text-sm text-[#454652]">Alpha / Absen</Text>
+                    <Text className="font-inter-semibold text-sm text-[#1b1c1c]">{payroll?.absensi?.alpha ?? payroll?.absent_days ?? 0} Hari</Text>
                   </View>
-                  <View className="bg-red-50 rounded-2xl p-3 items-center justify-center border border-red-100" style={{ width: '30%' }}>
-                    <Text className="font-inter-bold text-[10px] text-red-700 uppercase">Absen</Text>
-                    <Text className="font-manrope-bold text-base text-red-700 mt-1">{payroll.absent_days ?? 0}</Text>
+                  <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
+                    <Text className="font-inter text-sm text-[#454652]">Izin</Text>
+                    <Text className="font-inter-semibold text-sm text-[#1b1c1c]">{payroll?.absensi?.ijin ?? 0} Hari</Text>
                   </View>
-                  <View className="bg-blue-50 rounded-2xl p-3 items-center justify-center border border-blue-100" style={{ width: '30%' }}>
-                    <Text className="font-inter-bold text-[10px] text-blue-700 uppercase">Cuti</Text>
-                    <Text className="font-manrope-bold text-base text-blue-700 mt-1">{payroll.total_leave_days ?? 0}</Text>
+                  <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
+                    <Text className="font-inter text-sm text-[#454652]">Sakit</Text>
+                    <Text className="font-inter-semibold text-sm text-[#1b1c1c]">{payroll?.absensi?.sakit ?? 0} Hari</Text>
                   </View>
-                  <View className="bg-amber-50 rounded-2xl p-3 items-center justify-center border border-amber-100" style={{ width: '30%' }}>
-                    <Text className="font-inter-bold text-[10px] text-amber-700 uppercase">Lembur</Text>
-                    <Text className="font-manrope-bold text-base text-amber-700 mt-1">{payroll.overtime_hours ?? 0}j</Text>
+                  <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
+                    <Text className="font-inter text-sm text-[#454652]">Cuti</Text>
+                    <Text className="font-inter-semibold text-sm text-[#1b1c1c]">{payroll?.absensi?.cuti ?? payroll?.total_leave_days ?? 0} Hari</Text>
                   </View>
-                  <View className="bg-amber-50 rounded-2xl p-2 items-center justify-center border border-amber-100" style={{ width: '30%' }}>
-                    <Text className="font-inter-bold text-[9px] text-amber-700 uppercase">Terlambat</Text>
-                    <Text className="font-manrope-bold text-sm text-amber-700 mt-0.5">{payroll.late_days ?? 0} H</Text>
-                    <Text className="font-inter text-[8px] text-text-muted mt-0.5">({payroll.minor_late_days ?? 0}r / {payroll.major_late_days ?? 0}b)</Text>
+                  <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
+                    <Text className="font-inter text-sm text-[#454652]">Lembur</Text>
+                    <Text className="font-inter-semibold text-sm text-[#1b1c1c]">{formatDurationHuman(payroll?.overtime_hours)}</Text>
+                  </View>
+                  <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
+                    <View>
+                      <Text className="font-inter text-sm text-[#454652]">Terlambat</Text>
+                    </View>
+                    <View className="items-end">
+                      <Text className="font-inter-semibold text-sm text-[#1b1c1c]">{payroll?.late_days ?? 0} Hari</Text>
+                      {((payroll?.minor_late_days ?? 0) > 0 || (payroll?.major_late_days ?? 0) > 0) && (
+                        <Text className="font-inter text-[10px] text-[#454652] italic">{payroll?.minor_late_days ?? 0} Ringan / {payroll?.major_late_days ?? 0} Berat</Text>
+                      )}
+                    </View>
                   </View>
                 </View>
               </GlassCard>
@@ -324,10 +363,10 @@ export default function PayrollScreen() {
                     <Text className="font-inter text-sm text-[#454652]">Gaji Pokok</Text>
                     <Text className="font-inter-semibold text-sm text-[#1b1c1c]">{formatCurrency(baseSalary)}</Text>
                   </View>
-                  <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
+                  {/* <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
                     <Text className="font-inter text-sm text-[#454652]">Total Tunjangan</Text>
                     <Text className="font-inter-semibold text-sm text-[#1b1c1c]">{formatCurrency(totalAllowanceVal)}</Text>
-                  </View>
+                  </View> */}
                   <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
                     <Text className="font-inter text-sm text-[#454652]">Total Lembur</Text>
                     <Text className="font-inter-semibold text-sm text-[#1b1c1c]">{formatCurrency(totalOvertimeVal)}</Text>
@@ -371,11 +410,11 @@ export default function PayrollScreen() {
                     <Text className="font-inter-semibold text-sm text-error">-{formatCurrency(taxAmountVal)}</Text>
                   </View>
                   <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
-                    <Text className="font-inter text-sm text-[#454652]">BPJS Kesehatan (Karyawan)</Text>
+                    <Text className="font-inter text-sm text-[#454652]">BPJS Kesehatan</Text>
                     <Text className="font-inter-semibold text-sm text-error">-{formatCurrency(bpjsKesEmployeeVal)}</Text>
                   </View>
                   <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
-                    <Text className="font-inter text-sm text-[#454652]">BPJS Ketenagakerjaan (Karyawan)</Text>
+                    <Text className="font-inter text-sm text-[#454652]">BPJS Ketenagakerjaan</Text>
                     <Text className="font-inter-semibold text-sm text-error">-{formatCurrency(bpjsTkEmployeeVal)}</Text>
                   </View>
                   <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
@@ -383,12 +422,18 @@ export default function PayrollScreen() {
                     <Text className="font-inter-semibold text-sm text-error">-{formatCurrency(lateDeductionVal)}</Text>
                   </View>
                   <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
-                    <Text className="font-inter text-sm text-[#454652]">Potongan Cuti</Text>
+                    <Text className="font-inter text-sm text-[#454652]">Potongan Izin / Cuti</Text>
                     <Text className="font-inter-semibold text-sm text-error">-{formatCurrency(leaveDeductionVal)}</Text>
                   </View>
+                  {absentDeduction > 0 && (
+                    <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
+                      <Text className="font-inter text-sm text-[#454652]">Potongan Tidak Hadir ({payroll?.absent_days ?? 0} Hari)</Text>
+                      <Text className="font-inter-semibold text-sm text-error">-{formatCurrency(absentDeduction)}</Text>
+                    </View>
+                  )}
                   <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
                     <Text className="font-inter text-sm text-[#454652]">Potongan Lain-lain</Text>
-                    <Text className="font-inter-semibold text-sm text-error">-{formatCurrency(customDeductionVal)}</Text>
+                    <Text className="font-inter-semibold text-sm text-error">-{formatCurrency(displayCustomDeductionVal)}</Text>
                   </View>
 
                   {/* Component Lines (Deductions) */}
@@ -407,26 +452,6 @@ export default function PayrollScreen() {
                   <View className="mt-2 pt-3 flex-row justify-between items-center">
                     <Text className="font-manrope-bold text-sm text-error">Total Potongan</Text>
                     <Text className="font-manrope-extrabold text-sm text-error">-{formatCurrency(totalDeduction)}</Text>
-                  </View>
-                </View>
-              </GlassCard>
-            </View>
-
-            {/* BPJS Ditanggung Perusahaan */}
-            <View>
-              <View className="flex-row items-center mb-3 ml-1 gap-2">
-                <MaterialIcons name="info" size={18} color="#1a237e" />
-                <Text className="font-manrope-bold text-base text-primaryContainer">BPJS (Ditanggung Perusahaan)</Text>
-              </View>
-              <GlassCard style={{ padding: 18, backgroundColor: 'rgba(255, 255, 255, 0.95)' }}>
-                <View className="gap-3">
-                  <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
-                    <Text className="font-inter text-sm text-[#454652]">BPJS Kesehatan (Perusahaan)</Text>
-                    <Text className="font-inter-semibold text-sm text-[#1b1c1c]">{formatCurrency(bpjsKesCompanyVal)}</Text>
-                  </View>
-                  <View className="flex-row justify-between items-center">
-                    <Text className="font-inter text-sm text-[#454652]">BPJS Ketenagakerjaan (Perusahaan)</Text>
-                    <Text className="font-inter-semibold text-sm text-[#1b1c1c]">{formatCurrency(bpjsTkCompanyVal)}</Text>
                   </View>
                 </View>
               </GlassCard>

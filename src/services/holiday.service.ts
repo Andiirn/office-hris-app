@@ -21,7 +21,7 @@ export const holidayService = {
 
       return [];
     } catch (error) {
-      console.error('[HolidayService] getHolidays error:', error);
+      console.log('[HolidayService] getHolidays error:', error);
       return [];
     }
   },

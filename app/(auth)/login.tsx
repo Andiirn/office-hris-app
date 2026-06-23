@@ -25,7 +25,7 @@ import { useAuthStore } from '../../src/stores/auth.store';
 
 const loginSchema = z.object({
   nik: z.string().min(1, 'NIK is required'),
-  password: z.string().min(4, 'Password must be at least 4 characters'),
+  password: z.string().min(4, 'Password must be at least 6 characters'),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;

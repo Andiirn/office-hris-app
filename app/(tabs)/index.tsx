@@ -13,6 +13,7 @@ import { leaveService } from '../../src/services/leave.service';
 import { overtimeService } from '../../src/services/overtime.service';
 import { resignService } from '../../src/services/resign.service';
 import { useAuthStore } from '../../src/stores/auth.store';
+import { getAttendanceBadgeProps } from '../../src/utils/status';
 
 type FeedType =
   | 'attendance.checkin'
@@ -54,6 +55,7 @@ type MenuItem = {
   title: string;
   onPress: () => void;
   badgeCount?: number;
+  disabled?: boolean;
 };
 
 type MenuSlot = MenuItem | null;
@@ -184,9 +186,8 @@ export default function HomeScreen() {
       const attendanceDate = item.attendance_date || item.date || '-';
       const checkinTime = item.checkin_at || item.checkin_time;
       const checkoutTime = item.checkout_at || item.checkout_time;
-      const rawStatus = item.attendance_status || item.status || 'PRESENT';
-      const statusUpper = rawStatus.toUpperCase();
-      const status = statusUpper === 'PRESENT' ? 'HADIR' : statusUpper === 'LATE' ? 'TERLAMBAT' : statusUpper === 'ABSENT' ? 'TIDAK HADIR' : rawStatus;
+      const badgeProps = getAttendanceBadgeProps(item.attendance_status || item.status);
+      const status = badgeProps.label;
 
       if (checkinTime) {
         items.push({
@@ -378,9 +379,6 @@ export default function HomeScreen() {
           <View className="max-w-[118px] px-0 py-0">
             <View className="flex-row items-center gap-1.5 mb-1">
               <View className={`w-2 h-2 rounded-full ${isClockedIn ? 'bg-secondary' : isClockedOut ? 'bg-primary' : 'bg-error'}`} />
-              <Text className={`font-inter-bold text-[9px] uppercase tracking-wider ${attendanceChipTextClass}`}>
-                Status
-              </Text>
             </View>
             <Text
               className={`font-inter-bold text-[10px] leading-4 ${attendanceChipTextClass}`}
@@ -393,22 +391,12 @@ export default function HomeScreen() {
       </View>
 
       <View className="flex-1" style={{ paddingHorizontal: 20, paddingTop: 10 }}>
-        <View className="items-center">
-          <Pressable
-            className="w-[150px] h-[150px] rounded-full bg-primary-container items-center justify-center gap-1.5 shadow-lg shadow-black/10 elevation-6"
-            onPress={() => router.push('/attendance-scan')}
-          >
-            <View className="w-[30px] h-[30px] rounded-full bg-white/15 items-center justify-center">
-              <MaterialIcons name="qr-code-scanner" size={30} color="#fff" />
-            </View>
-            <Text className="font-inter-bold text-[12px] text-white">Scan QR Code</Text>
-          </Pressable>
-          <Text className="font-inter text-[10px] text-text-muted mt-2">
-            Tap untuk mulai absensi
-          </Text>
+        <View className="flex-1 rounded-3xl border-2 border-dashed border-primary/20 items-center justify-center bg-white/30 mb-2">
+          <MaterialIcons name="insert-chart-outlined" size={36} color={Tokens.colors.primary} style={{ opacity: 0.5 }} />
+          <Text className="font-inter-medium text-xs text-text-muted mt-2">Space Statistik</Text>
         </View>
 
-        <View className="h-[196px] mt-[18px] mb-2">
+        <View className="h-[196px] mt-2 mb-2">
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -425,7 +413,7 @@ export default function HomeScreen() {
                     item ? (
                       <Pressable
                         key={item.title}
-                        className="relative rounded-2xl bg-white/80 border border-white/80 px-2.5 py-2.5 mb-3 shadow-sm"
+                        className={`relative rounded-2xl bg-white/80 border border-white/80 px-2.5 py-2.5 mb-3 shadow-sm ${item.disabled ? 'opacity-50' : ''}`}
                         style={{ width: menuColumnWidth }}
                         onPress={item.onPress}
                       >
@@ -472,7 +460,7 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
-          <View className="h-[360px] rounded-2xl bg-white/45 border border-white/70 overflow-hidden">
+          <View className="h-[340px] rounded-2xl bg-white/45 border border-white/70 overflow-hidden">
             <ScrollView
               className="flex-1"
               contentContainerStyle={{ padding: 12, paddingBottom: 18 }}
