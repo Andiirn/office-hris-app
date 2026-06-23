@@ -390,6 +390,11 @@ export default function HomeScreen() {
       </View>
 
       <View className="flex-1" style={{ paddingHorizontal: 20, paddingTop: 10 }}>
+        <View className="flex-1 rounded-3xl border-2 border-dashed border-primary/20 items-center justify-center bg-white/30 mb-2">
+          <MaterialIcons name="insert-chart-outlined" size={36} color={Tokens.colors.primary} style={{ opacity: 0.5 }} />
+          <Text className="font-inter-medium text-xs text-text-muted mt-2">Space Statistik</Text>
+        </View>
+
         <View className="h-[196px] mt-2 mb-2">
           <ScrollView
             horizontal
@@ -446,7 +451,7 @@ export default function HomeScreen() {
           </ScrollView>
         </View>
 
-        <View className="flex-1 mt-3">
+        <View className="mt-3">
           <View className="flex-row justify-between items-center mb-3">
             <Text className="font-manrope-bold text-base text-primary">Aktivitas Terbaru</Text>
             <Pressable onPress={() => router.push('/activity')}>
@@ -454,7 +459,7 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
-          <View className="flex-1 rounded-2xl bg-white/45 border border-white/70 overflow-hidden">
+          <View className="h-[340px] rounded-2xl bg-white/45 border border-white/70 overflow-hidden">
             <ScrollView
               className="flex-1"
               contentContainerStyle={{ padding: 12, paddingBottom: 18 }}

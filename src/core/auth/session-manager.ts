@@ -1,17 +1,18 @@
-import { tokenStore } from './token-store';
-import { useAuthStore } from '../../stores/auth.store';
+import { CancelledError } from '@tanstack/react-query';
+import axios from 'axios';
 import { authService } from '../../services/auth.service';
+import { useAuthStore } from '../../stores/auth.store';
+import { setSuppressAuthErrorAlerts } from '../api/client';
 import { queryClient } from '../api/query-client';
 import { qk } from '../query/query-keys';
-import axios from 'axios';
-import { setSuppressAuthErrorAlerts } from '../api/client';
+import { tokenStore } from './token-store';
 
 export const sessionManager = {
   async initialize() {
     const accessToken = await tokenStore.getAccessToken();
     if (!accessToken) {
       console.log('[SessionManager] No access token found');
-      useAuthStore.getState().setBootstrapError(null);
+      alert('Sesi berakhir. Silahkan login kembali');
       await useAuthStore.getState().setInitialized(true);
       return;
     }
@@ -20,7 +21,7 @@ export const sessionManager = {
       console.log('[SessionManager] Fetching profile...');
       useAuthStore.getState().setBootstrapError(null);
       setSuppressAuthErrorAlerts(true);
-      
+
       // Fetch profile and store in cache
       const profile = await queryClient.fetchQuery({
         queryKey: qk.profile(),
@@ -42,12 +43,17 @@ export const sessionManager = {
       };
 
       const refreshToken = await tokenStore.getRefreshToken();
-      
+
       // Update Auth Store
       await useAuthStore.getState().setAuth(user, accessToken, refreshToken || '');
 
       console.log('[SessionManager] Session initialized for:', user.full_name);
     } catch (error) {
+      if (error instanceof CancelledError) {
+        console.log('[SessionManager] Session initialization cancelled');
+        return;
+      }
+
       console.error('[SessionManager] Failed to initialize session:', error);
 
       if (axios.isAxiosError(error) && error.response?.status === 401) {
