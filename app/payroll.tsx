@@ -289,7 +289,17 @@ export default function PayrollScreen() {
                 </View>
 
                 <View className="flex-row justify-between">
-
+                  <View>
+                    <Text className="font-inter-semibold text-[10px] text-[#454652] uppercase tracking-wider mb-1">BANK TRANSFER</Text>
+                    <Text className="font-manrope-bold text-sm text-[#1b1c1c]">{payroll.bank_account?.bank_name || '—'}</Text>
+                  </View>
+                  <View className="items-end">
+                    <Text className="font-inter-semibold text-[10px] text-[#454652] uppercase tracking-wider mb-1">NO. REKENING</Text>
+                    <Text className="font-manrope-bold text-sm text-[#1b1c1c]">{payroll.bank_account?.account_number || '—'}</Text>
+                    {payroll.bank_account?.account_holder_name && (
+                      <Text className="font-inter text-[10px] text-[#454652]">{payroll.bank_account.account_holder_name}</Text>
+                    )}
+                  </View>
                 </View>
               </View>
             </GlassCard>
@@ -300,32 +310,42 @@ export default function PayrollScreen() {
                 <MaterialIcons name="event-note" size={18} color={Tokens.colors.primary} />
                 <Text className="font-manrope-bold text-base text-[#000666]">Ringkasan Kehadiran</Text>
               </View>
-              <GlassCard style={{ padding: 16, backgroundColor: 'rgba(255, 255, 255, 0.95)' }}>
-                <View className="flex-row flex-wrap justify-between" style={{ gap: 8 }}>
-                  <View className="bg-black/5 rounded-2xl p-3 items-center justify-center" style={{ width: '30%' }}>
-                    <Text className="font-inter-bold text-[10px] text-[#454652] uppercase">Hari Kerja</Text>
-                    <Text className="font-manrope-bold text-base text-[#1b1c1c] mt-1">{payroll.work_days ?? 0}</Text>
+              <GlassCard style={{ padding: 18, backgroundColor: 'rgba(255, 255, 255, 0.95)' }}>
+                <View className="gap-3">
+                  <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
+                    <Text className="font-inter text-sm text-[#454652]">Hadir</Text>
+                    <Text className="font-inter-semibold text-sm text-[#1b1c1c]">{payroll?.present_days ?? 0} Hari</Text>
                   </View>
-                  <View className="bg-emerald-50 rounded-2xl p-3 items-center justify-center border border-emerald-100" style={{ width: '30%' }}>
-                    <Text className="font-inter-bold text-[10px] text-emerald-700 uppercase">Hadir</Text>
-                    <Text className="font-manrope-bold text-base text-emerald-700 mt-1">{payroll.present_days ?? 0}</Text>
+                  <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
+                    <Text className="font-inter text-sm text-[#454652]">Alpha / Absen</Text>
+                    <Text className="font-inter-semibold text-sm text-[#1b1c1c]">{payroll?.absensi?.alpha ?? payroll?.absent_days ?? 0} Hari</Text>
                   </View>
-                  <View className="bg-red-50 rounded-2xl p-3 items-center justify-center border border-red-100" style={{ width: '30%' }}>
-                    <Text className="font-inter-bold text-[10px] text-red-700 uppercase">Absen</Text>
-                    <Text className="font-manrope-bold text-base text-red-700 mt-1">{payroll.absent_days ?? 0}</Text>
+                  <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
+                    <Text className="font-inter text-sm text-[#454652]">Izin</Text>
+                    <Text className="font-inter-semibold text-sm text-[#1b1c1c]">{payroll?.absensi?.ijin ?? 0} Hari</Text>
                   </View>
-                  <View className="bg-blue-50 rounded-2xl p-3 items-center justify-center border border-blue-100" style={{ width: '30%' }}>
-                    <Text className="font-inter-bold text-[10px] text-blue-700 uppercase">Cuti</Text>
-                    <Text className="font-manrope-bold text-base text-blue-700 mt-1">{payroll.total_leave_days ?? 0}</Text>
+                  <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
+                    <Text className="font-inter text-sm text-[#454652]">Sakit</Text>
+                    <Text className="font-inter-semibold text-sm text-[#1b1c1c]">{payroll?.absensi?.sakit ?? 0} Hari</Text>
                   </View>
-                  <View className="bg-amber-50 rounded-2xl p-3 items-center justify-center border border-amber-100" style={{ width: '30%' }}>
-                    <Text className="font-inter-bold text-[10px] text-amber-700 uppercase">Lembur</Text>
-                    <Text className="font-manrope-bold text-base text-amber-700 mt-1">{formatDurationHuman(payroll.overtime_hours)}</Text>
+                  <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
+                    <Text className="font-inter text-sm text-[#454652]">Cuti</Text>
+                    <Text className="font-inter-semibold text-sm text-[#1b1c1c]">{payroll?.absensi?.cuti ?? payroll?.total_leave_days ?? 0} Hari</Text>
                   </View>
-                  <View className="bg-amber-50 rounded-2xl p-2 items-center justify-center border border-amber-100" style={{ width: '30%' }}>
-                    <Text className="font-inter-bold text-[9px] text-amber-700 uppercase">Terlambat</Text>
-                    <Text className="font-manrope-bold text-sm text-amber-700 mt-0.5">{payroll.late_days ?? 0} H</Text>
-                    <Text className="font-inter text-[8px] text-text-muted mt-0.5">({payroll.minor_late_days ?? 0}r / {payroll.major_late_days ?? 0}b)</Text>
+                  <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
+                    <Text className="font-inter text-sm text-[#454652]">Lembur</Text>
+                    <Text className="font-inter-semibold text-sm text-[#1b1c1c]">{formatDurationHuman(payroll?.overtime_hours)}</Text>
+                  </View>
+                  <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
+                    <View>
+                      <Text className="font-inter text-sm text-[#454652]">Terlambat</Text>
+                    </View>
+                    <View className="items-end">
+                      <Text className="font-inter-semibold text-sm text-[#1b1c1c]">{payroll?.late_days ?? 0} Hari</Text>
+                      {((payroll?.minor_late_days ?? 0) > 0 || (payroll?.major_late_days ?? 0) > 0) && (
+                        <Text className="font-inter text-[10px] text-[#454652] italic">{payroll?.minor_late_days ?? 0} Ringan / {payroll?.major_late_days ?? 0} Berat</Text>
+                      )}
+                    </View>
                   </View>
                 </View>
               </GlassCard>
@@ -390,11 +410,11 @@ export default function PayrollScreen() {
                     <Text className="font-inter-semibold text-sm text-error">-{formatCurrency(taxAmountVal)}</Text>
                   </View>
                   <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
-                    <Text className="font-inter text-sm text-[#454652]">BPJS Kesehatan (Karyawan)</Text>
+                    <Text className="font-inter text-sm text-[#454652]">BPJS Kesehatan</Text>
                     <Text className="font-inter-semibold text-sm text-error">-{formatCurrency(bpjsKesEmployeeVal)}</Text>
                   </View>
                   <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
-                    <Text className="font-inter text-sm text-[#454652]">BPJS Ketenagakerjaan (Karyawan)</Text>
+                    <Text className="font-inter text-sm text-[#454652]">BPJS Ketenagakerjaan</Text>
                     <Text className="font-inter-semibold text-sm text-error">-{formatCurrency(bpjsTkEmployeeVal)}</Text>
                   </View>
                   <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
@@ -402,7 +422,7 @@ export default function PayrollScreen() {
                     <Text className="font-inter-semibold text-sm text-error">-{formatCurrency(lateDeductionVal)}</Text>
                   </View>
                   <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
-                    <Text className="font-inter text-sm text-[#454652]">Potongan Cuti</Text>
+                    <Text className="font-inter text-sm text-[#454652]">Potongan Izin / Cuti</Text>
                     <Text className="font-inter-semibold text-sm text-error">-{formatCurrency(leaveDeductionVal)}</Text>
                   </View>
                   {absentDeduction > 0 && (

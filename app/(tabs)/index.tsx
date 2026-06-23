@@ -55,6 +55,7 @@ type MenuItem = {
   title: string;
   onPress: () => void;
   badgeCount?: number;
+  disabled?: boolean;
 };
 
 type MenuSlot = MenuItem | null;
@@ -412,7 +413,7 @@ export default function HomeScreen() {
                     item ? (
                       <Pressable
                         key={item.title}
-                        className="relative rounded-2xl bg-white/80 border border-white/80 px-2.5 py-2.5 mb-3 shadow-sm"
+                        className={`relative rounded-2xl bg-white/80 border border-white/80 px-2.5 py-2.5 mb-3 shadow-sm ${item.disabled ? 'opacity-50' : ''}`}
                         style={{ width: menuColumnWidth }}
                         onPress={item.onPress}
                       >

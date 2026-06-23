@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { Alert } from 'react-native';
 import { canApprove } from '../../core/auth/rbac';
 
 export type HomeMenuItem = {
@@ -6,6 +7,7 @@ export type HomeMenuItem = {
   title: string;
   onPress: () => void;
   badgeCount?: number;
+  disabled?: boolean;
 };
 
 export function buildHomeMenuItems(role?: string | null, approvalCount?: number): HomeMenuItem[] {
@@ -19,14 +21,21 @@ export function buildHomeMenuItems(role?: string | null, approvalCount?: number)
     { icon: 'place', title: 'Visit', onPress: () => router.push('/visit' as any) },
   ];
 
-  if (canApprove(role)) {
-    items.push({
-      icon: 'assignment-turned-in',
-      title: 'Persetujuan',
-      onPress: () => router.push('/approvals'),
-      badgeCount: approvalCount && approvalCount > 0 ? approvalCount : undefined,
-    });
-  }
+  const hasApprovalAccess = canApprove(role);
+
+  items.push({
+    icon: 'assignment-turned-in',
+    title: 'Persetujuan',
+    onPress: () => {
+      if (hasApprovalAccess) {
+        router.push('/approvals');
+      } else {
+        Alert.alert('Akses Ditolak', 'Fitur ini hanya tersedia untuk atasan atau HR.');
+      }
+    },
+    badgeCount: hasApprovalAccess && approvalCount && approvalCount > 0 ? approvalCount : undefined,
+    disabled: !hasApprovalAccess,
+  });
 
   return items;
 }

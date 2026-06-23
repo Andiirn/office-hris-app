@@ -49,6 +49,17 @@ export interface PayrollPreview {
     amount: number;
     keterangan?: string | null;
   }>;
+  absensi?: {
+    alpha: number;
+    ijin: number;
+    cuti: number;
+    sakit: number;
+  };
+  bank_account?: {
+    bank_name: string;
+    account_number: string;
+    account_holder_name: string;
+  };
   // Fallbacks for compatibility
   components?: PayrollComponent[];
   status?: string;

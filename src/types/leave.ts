@@ -39,6 +39,7 @@ export interface CreateLeaveRequest {
   end_time?: string | null;
   reason: string;
   document_url?: string | null;
+  replacement_id?: string | null;
 }
 
 export interface LeaveHistoryQuery {
