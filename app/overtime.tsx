@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../src/components/ui/Button';
 import { GlassCard } from '../src/components/ui/GlassCard';
 import { Input } from '../src/components/ui/Input';
+import { SuccessAnimation } from '../src/components/ui/SuccessAnimation';
 import { StatusBadge } from '../src/components/ui/StatusBadge';
 import { Tokens } from '../src/core/theme/tokens';
 import { getAttendanceBadgeProps } from '../src/utils/status';
@@ -62,6 +63,7 @@ export default function OvertimeScreen() {
   const [timePickerVisible, setTimePickerVisible] = useState(false);
   const [timeField, setTimeField] = useState<TimeField>('start_time');
   const [mode, setMode] = useState<OvertimeMode>('attendance');
+  const [showSuccessAnim, setShowSuccessAnim] = useState(false);
   const [form, setForm] = useState<CreateOvertimeRequest>({
     attendance_id: null,
     overtime_date: new Date().toISOString().slice(0, 10),
@@ -132,16 +134,7 @@ export default function OvertimeScreen() {
       setModalVisible(false);
       setAttendancePickerVisible(false);
       setTimePickerVisible(false);
-      setMode('attendance');
-      setForm({
-        attendance_id: null,
-        overtime_date: new Date().toISOString().slice(0, 10),
-        start_time: '',
-        end_time: '',
-        overtime_type: 'REGULAR',
-        reason: '',
-      });
-      Alert.alert('Success', 'Overtime request submitted');
+      setShowSuccessAnim(true);
     },
     onError: (error: any) => {
       Alert.alert('Error', error?.response?.data?.message || 'Failed to submit overtime');
@@ -156,6 +149,7 @@ export default function OvertimeScreen() {
     setModalVisible(false);
     setAttendancePickerVisible(false);
     setTimePickerVisible(false);
+    setShowSuccessAnim(false);
   };
 
   const handlePickAttendance = (attendance: AttendanceItem) => {
@@ -174,6 +168,18 @@ export default function OvertimeScreen() {
       return next;
     });
     setTimePickerVisible(false);
+  };
+
+  const resetForm = () => {
+    setMode('attendance');
+    setForm({
+      attendance_id: null,
+      overtime_date: new Date().toISOString().slice(0, 10),
+      start_time: '',
+      end_time: '',
+      overtime_type: 'REGULAR',
+      reason: '',
+    });
   };
 
   const handleCreate = () => {
@@ -241,8 +247,8 @@ export default function OvertimeScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      <View className="absolute -top-12 -right-12 w-64 h-64 rounded-full bg-on-primary-container/5" />
-      <View className="absolute bottom-40 -left-12 w-48 h-48 rounded-full bg-secondary-container/10" />
+      <View pointerEvents="none" className="absolute -top-12 -right-12 w-64 h-64 rounded-full bg-on-primary-container/5" />
+      <View pointerEvents="none" className="absolute bottom-40 -left-12 w-48 h-48 rounded-full bg-secondary-container/10" />
 
       <View className="flex-row justify-between items-center px-5 pt-2 pb-5 z-10">
         <View className="flex-row items-center gap-3 flex-1">
@@ -411,7 +417,7 @@ export default function OvertimeScreen() {
               </Pressable>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               {mode === 'attendance' ? (
                 <View className="mb-4">
                   <Text className="font-inter-bold text-sm text-primary mb-3 ml-1">Pilih Kehadiran</Text>
@@ -512,116 +518,125 @@ export default function OvertimeScreen() {
               />
               <View className="h-8" />
             </ScrollView>
-          </View>
-        </View>
-      </Modal>
 
-      <Modal
-        animationType="fade"
-        transparent
-        visible={attendancePickerVisible}
-        onRequestClose={() => setAttendancePickerVisible(false)}
-      >
-        <View className="flex-1 bg-black/40 justify-end">
-          <View className="bg-background rounded-t-[28px] p-5 max-h-[80%]">
-            <View className="flex-row justify-between items-center mb-4">
-              <View>
-                <Text className="font-manrope-bold text-xl text-primary">Pilih Kehadiran</Text>
-                <Text className="font-inter text-xs text-text-muted">Scroll lalu tap salah satu attendance</Text>
-              </View>
-              <Pressable onPress={() => setAttendancePickerVisible(false)} className="w-9 h-9 rounded-full bg-black/5 items-center justify-center">
-                <MaterialIcons name="close" size={18} color={Tokens.colors.text} />
-              </Pressable>
-            </View>
+            {(attendancePickerVisible || timePickerVisible) ? (
+              <View className="absolute inset-0">
+                <Pressable
+                  className="absolute inset-0 bg-black/40"
+                  onPress={() => {
+                    setAttendancePickerVisible(false);
+                    setTimePickerVisible(false);
+                  }}
+                />
 
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {isLoadingAttendance ? (
-                <Text className="font-inter text-sm text-text-muted py-6 text-center">Memuat attendance...</Text>
-              ) : attendanceHistory.length === 0 ? (
-                <View className="p-4 bg-black/5 rounded-xl border border-dashed border-outline">
-                  <Text className="font-inter text-xs text-text-muted text-center">Tidak ada data kehadiran terbaru</Text>
-                </View>
-              ) : (
-                selectableAttendanceHistory.slice(0, 30).map((att) => {
-                  const isSelected = form.attendance_id === att.id;
-                  return (
-                    <Pressable
-                      key={att.id}
-                      className={`p-4 rounded-xl border mb-2 ${isSelected ? 'bg-primary/5 border-primary' : 'bg-[#f8f8f8] border-transparent'}`}
-                      onPress={() => handlePickAttendance(att)}
-                    >
-                      <View className="flex-row justify-between items-center">
-                        <View className="flex-row items-center gap-3 flex-1">
-                          <View className={`w-8 h-8 rounded-full items-center justify-center ${isSelected ? 'bg-primary' : 'bg-outline/20'}`}>
-                            <MaterialIcons name="event" size={14} color={isSelected ? '#fff' : Tokens.colors.textMuted} />
-                          </View>
-                          <View className="flex-1">
-                            <View className="flex-row items-center gap-2">
-                              <Text className={`font-inter-bold text-sm ${isSelected ? 'text-primary' : 'text-on-surface'}`}>
-                                {att.attendance_date || att.date}
-                              </Text>
-                              {att.attendance_status && (() => {
-                                const badgeProps = getAttendanceBadgeProps(att.attendance_status);
-                                return (
-                                  <View className={`px-1.5 py-0.5 rounded-md ${badgeProps.bgClass}`}>
-                                    <Text className={`font-inter-bold text-[8px] ${badgeProps.textClass}`}>
-                                      {badgeProps.label}
+                {attendancePickerVisible ? (
+                  <View className="absolute inset-x-0 bottom-0 bg-background rounded-t-[28px] p-5 max-h-[80%]">
+                    <View className="flex-row justify-between items-center mb-4">
+                      <View>
+                        <Text className="font-manrope-bold text-xl text-primary">Pilih Kehadiran</Text>
+                        <Text className="font-inter text-xs text-text-muted">Scroll lalu tap salah satu attendance</Text>
+                      </View>
+                      <Pressable onPress={() => setAttendancePickerVisible(false)} className="w-9 h-9 rounded-full bg-black/5 items-center justify-center">
+                        <MaterialIcons name="close" size={18} color={Tokens.colors.text} />
+                      </Pressable>
+                    </View>
+
+                    <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                      {isLoadingAttendance ? (
+                        <Text className="font-inter text-sm text-text-muted py-6 text-center">Memuat attendance...</Text>
+                      ) : attendanceHistory.length === 0 ? (
+                        <View className="p-4 bg-black/5 rounded-xl border border-dashed border-outline">
+                          <Text className="font-inter text-xs text-text-muted text-center">Tidak ada data kehadiran terbaru</Text>
+                        </View>
+                      ) : (
+                        selectableAttendanceHistory.slice(0, 30).map((att) => {
+                          const isSelected = form.attendance_id === att.id;
+                          return (
+                            <Pressable
+                              key={att.id}
+                              className={`p-4 rounded-xl border mb-2 ${isSelected ? 'bg-primary/5 border-primary' : 'bg-[#f8f8f8] border-transparent'}`}
+                              onPress={() => handlePickAttendance(att)}
+                            >
+                              <View className="flex-row justify-between items-center">
+                                <View className="flex-row items-center gap-3 flex-1">
+                                  <View className={`w-8 h-8 rounded-full items-center justify-center ${isSelected ? 'bg-primary' : 'bg-outline/20'}`}>
+                                    <MaterialIcons name="event" size={14} color={isSelected ? '#fff' : Tokens.colors.textMuted} />
+                                  </View>
+                                  <View className="flex-1">
+                                    <View className="flex-row items-center gap-2">
+                                      <Text className={`font-inter-bold text-sm ${isSelected ? 'text-primary' : 'text-on-surface'}`}>
+                                        {att.attendance_date || att.date}
+                                      </Text>
+                                      {att.attendance_status && (() => {
+                                        const badgeProps = getAttendanceBadgeProps(att.attendance_status);
+                                        return (
+                                          <View className={`px-1.5 py-0.5 rounded-md ${badgeProps.bgClass}`}>
+                                            <Text className={`font-inter-bold text-[8px] ${badgeProps.textClass}`}>
+                                              {badgeProps.label}
+                                            </Text>
+                                          </View>
+                                        );
+                                      })()}
+                                    </View>
+                                    <Text className="font-inter-medium text-[10px] text-text-muted">
+                                      {formatTime(att.checkin_at || att.checkin_time)} - {formatTime(att.checkout_at || att.checkout_time)}
                                     </Text>
                                   </View>
-                                );
-                              })()}
-                            </View>
-                            <Text className="font-inter-medium text-[10px] text-text-muted">
-                              {formatTime(att.checkin_at || att.checkin_time)} - {formatTime(att.checkout_at || att.checkout_time)}
-                            </Text>
-                          </View>
-                        </View>
-                        {isSelected ? <MaterialIcons name="check-circle" size={20} color={Tokens.colors.primary} /> : null}
+                                </View>
+                                {isSelected ? <MaterialIcons name="check-circle" size={20} color={Tokens.colors.primary} /> : null}
+                              </View>
+                            </Pressable>
+                          );
+                        })
+                      )}
+                    </ScrollView>
+                  </View>
+                ) : null}
+
+                {timePickerVisible ? (
+                  <View className="absolute inset-x-0 bottom-0 bg-background rounded-t-[28px] p-5 max-h-[70%]">
+                    <View className="flex-row justify-between items-center mb-4">
+                      <View>
+                        <Text className="font-manrope-bold text-xl text-primary">Pilih Jam</Text>
+                        <Text className="font-inter text-xs text-text-muted">Scroll untuk memilih {timeField === 'start_time' ? 'start time' : 'end time'}</Text>
                       </View>
-                    </Pressable>
-                  );
-                })
-              )}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+                      <Pressable onPress={() => setTimePickerVisible(false)} className="w-9 h-9 rounded-full bg-black/5 items-center justify-center">
+                        <MaterialIcons name="close" size={18} color={Tokens.colors.text} />
+                      </Pressable>
+                    </View>
 
-      <Modal
-        animationType="slide"
-        transparent
-        visible={timePickerVisible}
-        onRequestClose={() => setTimePickerVisible(false)}
-      >
-        <View className="flex-1 bg-black/40 justify-end">
-          <View className="bg-background rounded-t-[28px] p-5 max-h-[70%]">
-            <View className="flex-row justify-between items-center mb-4">
-              <View>
-                <Text className="font-manrope-bold text-xl text-primary">Pilih Jam</Text>
-                <Text className="font-inter text-xs text-text-muted">Scroll untuk memilih {timeField === 'start_time' ? 'start time' : 'end time'}</Text>
+                    <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                      {TIME_OPTIONS.map((value) => {
+                        const active = selectedTimeLabel(timeField) === value;
+                        return (
+                          <Pressable
+                            key={value}
+                            onPress={() => handleSelectTime(value)}
+                            className={`px-4 py-3 rounded-xl mb-2 ${active ? 'bg-primary/5 border border-primary' : 'bg-[#f8f8f8]'}`}
+                          >
+                            <Text className={`font-inter-bold text-sm ${active ? 'text-primary' : 'text-on-surface'}`}>{value}</Text>
+                          </Pressable>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                ) : null}
               </View>
-              <Pressable onPress={() => setTimePickerVisible(false)} className="w-9 h-9 rounded-full bg-black/5 items-center justify-center">
-                <MaterialIcons name="close" size={18} color={Tokens.colors.text} />
-              </Pressable>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {TIME_OPTIONS.map((value) => {
-                const active = selectedTimeLabel(timeField) === value;
-                return (
-                  <Pressable
-                    key={value}
-                    onPress={() => handleSelectTime(value)}
-                    className={`px-4 py-3 rounded-xl mb-2 ${active ? 'bg-primary/5 border border-primary' : 'bg-[#f8f8f8]'}`}
-                  >
-                    <Text className={`font-inter-bold text-sm ${active ? 'text-primary' : 'text-on-surface'}`}>{value}</Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+            ) : null}
           </View>
         </View>
       </Modal>
+
+      <SuccessAnimation
+        visible={showSuccessAnim}
+        title="Terkirim!"
+        message="Pengajuan lembur Anda sedang diproses."
+        onDone={() => {
+          setShowSuccessAnim(false);
+          setModalVisible(false);
+          resetForm();
+        }}
+      />
     </SafeAreaView>
   );
 }

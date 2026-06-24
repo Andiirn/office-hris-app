@@ -2,10 +2,13 @@ export const qk = {
   profile: () => ['profile'] as const,
   payrollPreview: (employeeId?: string | null, companyId?: string | null, year?: number | null, month?: number | null) =>
     ['payroll-preview', employeeId ?? null, companyId ?? null, year ?? null, month ?? null] as const,
+  attendanceHistoryRoot: () => ['attendance-history'] as const,
   attendanceHistory: (employeeId?: string | null, dateFrom?: string, dateTo?: string) =>
     ['attendance-history', employeeId ?? null, dateFrom ?? null, dateTo ?? null] as const,
+  attendanceHistoryFullRoot: () => ['attendance-history-full'] as const,
   attendanceHistoryFull: (employeeId?: string | null, dateFrom?: string, dateTo?: string) =>
     ['attendance-history-full', employeeId ?? null, dateFrom ?? null, dateTo ?? null] as const,
+  attendanceHistoryInfiniteRoot: () => ['attendance-history-infinite'] as const,
   attendanceHistoryInfinite: (employeeId?: string | null, dateFrom?: string, dateTo?: string) =>
     ['attendance-history-infinite', employeeId ?? null, dateFrom ?? null, dateTo ?? null] as const,
   notifications: (employeeId?: string | null) => ['notifications', employeeId ?? null] as const,

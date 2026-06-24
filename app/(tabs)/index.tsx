@@ -1,11 +1,12 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
+import { MotiView } from 'moti';
 import React from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MotiView } from 'moti';
 import { Skeleton } from '../../src/components/ui/Skeleton';
+import { qk } from '../../src/core/query/query-keys';
 import { Tokens } from '../../src/core/theme/tokens';
 import { buildHomeMenuItems } from '../../src/features/home/home-menu';
 import { approvalService } from '../../src/services/approval.service';
@@ -70,18 +71,25 @@ export default function HomeScreen() {
   const [expandedFeedId, setExpandedFeedId] = React.useState<string | null>(null);
 
   // 1. Fetch Data locally
+  const formatLocalDate = React.useCallback((date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, []);
+
   const dateRange = React.useMemo(() => {
     const dateTo = new Date();
     const dateFrom = new Date();
     dateFrom.setDate(dateFrom.getDate() - 7);
     return {
-      dateFrom: dateFrom.toISOString().slice(0, 10),
-      dateTo: dateTo.toISOString().slice(0, 10),
+      dateFrom: formatLocalDate(dateFrom),
+      dateTo: formatLocalDate(dateTo),
     };
-  }, []);
+  }, [formatLocalDate]);
 
   const { data: attendanceFeed = [], isLoading: isLoadingAttendanceFeed, refetch: refetchAttendanceFeed, isFetching: isFetchingAttendanceFeed } = useQuery({
-    queryKey: ['attendance-history', user?.id, dateRange.dateFrom, dateRange.dateTo],
+    queryKey: qk.attendanceHistory(user?.id, dateRange.dateFrom, dateRange.dateTo),
     queryFn: () => {
       if (!user?.id) return [];
       return attendanceService.getAttendanceHistory({
@@ -112,6 +120,72 @@ export default function HomeScreen() {
     },
     enabled: !!user?.id,
   });
+
+  const todayString = formatLocalDate(new Date());
+  const latestAttendance = React.useMemo(() => {
+    return attendanceFeed.find((item: any) => (item.attendance_date || item.date) === todayString) || null;
+  }, [attendanceFeed, todayString]);
+  const latestAttendanceDate = latestAttendance?.attendance_date || latestAttendance?.date;
+  const hasCheckIn = !!(latestAttendance?.checkin_time || latestAttendance?.checkin_at);
+  const hasCheckOut = !!(latestAttendance?.checkout_time || latestAttendance?.checkout_at);
+  const isTodayAttendance = !!latestAttendance;
+  const isClockedIn = hasCheckIn && !hasCheckOut && isTodayAttendance;
+  const isClockedOut = hasCheckOut && isTodayAttendance;
+  const attendanceChipText = isClockedIn
+    ? 'Masuk. Selamat bekerja.'
+    : isClockedOut
+      ? 'Keluar. Selamat istirahat.'
+      : 'Belum absen hari ini.';
+  const attendanceChipTextClass = isClockedIn
+    ? 'text-primary'
+    : isClockedOut
+      ? 'text-primary'
+      : 'text-error';
+
+  const [workingDuration, setWorkingDuration] = React.useState({ hours: 0, minutes: 0 });
+
+  let journeyProgress = 0;
+  if (isClockedOut) {
+    journeyProgress = 100;
+  } else if (isClockedIn) {
+    const elapsedMinutes = (workingDuration.hours * 60) + workingDuration.minutes;
+    journeyProgress = Math.min(10 + (elapsedMinutes / 540) * 85, 95);
+  }
+
+  React.useEffect(() => {
+    if (!isClockedIn && !isClockedOut) {
+      setWorkingDuration({ hours: 0, minutes: 0 });
+      return;
+    }
+    if (isTodayAttendance && latestAttendance) {
+      const calculateDiff = () => {
+        const startStr = latestAttendance.checkin_at || latestAttendance.checkin_time;
+        if (!startStr) return;
+        const startFull = startStr.includes('T') || startStr.includes(' ') ? startStr : `${todayString}T${startStr}`;
+        const startTime = new Date(startFull).getTime();
+
+        let endTime = new Date().getTime();
+        if (isClockedOut) {
+          const endStr = latestAttendance.checkout_at || latestAttendance.checkout_time;
+          if (endStr) {
+            const endFull = endStr.includes('T') || endStr.includes(' ') ? endStr : `${todayString}T${endStr}`;
+            endTime = new Date(endFull).getTime();
+          }
+        }
+
+        const diffMs = Math.max(0, endTime - startTime);
+        const hours = Math.floor(diffMs / (1000 * 60 * 60));
+        const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+        setWorkingDuration({ hours, minutes });
+      };
+
+      calculateDiff();
+      if (!isClockedOut) {
+        const interval = setInterval(calculateDiff, 60000);
+        return () => clearInterval(interval);
+      }
+    }
+  }, [formatLocalDate, isClockedIn, isClockedOut, isTodayAttendance, latestAttendance, todayString]);
 
   const { data: resignRequests = [], isLoading: isLoadingResignFeed, refetch: refetchResignFeed, isFetching: isFetchingResignFeed } = useQuery({
     queryKey: ['resign-requests', user?.id],
@@ -322,25 +396,6 @@ export default function HomeScreen() {
       .map((item) => ({ ...item, isExpanded: item.id === expandedFeedId }));
   }, [attendanceFeed, expandedFeedId, leaveRequests, overtimeRecords, resignRequests]);
 
-  const latestAttendance = attendanceFeed[0];
-  const todayString = new Date().toISOString().slice(0, 10);
-  const latestAttendanceDate = latestAttendance?.attendance_date || latestAttendance?.date;
-  const hasCheckIn = !!(latestAttendance?.checkin_time || latestAttendance?.checkin_at);
-  const hasCheckOut = !!(latestAttendance?.checkout_time || latestAttendance?.checkout_at);
-  const isTodayAttendance = latestAttendanceDate === todayString;
-  const isClockedIn = hasCheckIn && !hasCheckOut && isTodayAttendance;
-  const isClockedOut = hasCheckOut && isTodayAttendance;
-  const attendanceChipText = isClockedIn
-    ? 'Masuk. Selamat bekerja.'
-    : isClockedOut
-      ? 'Keluar. Selamat istirahat.'
-      : 'Belum absen hari ini.';
-  const attendanceChipTextClass = isClockedIn
-    ? 'text-primary'
-    : isClockedOut
-      ? 'text-primary'
-      : 'text-error';
-
   const menuItems = React.useMemo<MenuItem[]>(() => buildHomeMenuItems(user?.role, pendingApprovals.length), [user?.role, pendingApprovals.length]);
   const menuColumns = React.useMemo(() => {
     const paddedItems: MenuSlot[] = [...menuItems];
@@ -365,39 +420,156 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      {/* Fixed Sticky Header Card */}
-      <View className="px-5 pt-3 pb-1 bg-background z-20">
-        <View className="flex-row items-start justify-between gap-3">
-          <View className="flex-1 pr-2">
-            <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-[0.25em] mb-1.5">
-              Halo
-            </Text>
-            <Text className="font-manrope-extrabold text-[20px] text-primary leading-7" numberOfLines={1}>
-              {name}
-            </Text>
-            <Text className="font-inter text-[12px] text-text-muted mt-1.5" numberOfLines={1}>
-              {user?.position_name || 'Employee'}
-            </Text>
-          </View>
-          <View className="max-w-[118px] px-0 py-0">
-            <View className="flex-row items-center gap-1.5 mb-1">
-              <View className={`w-2 h-2 rounded-full ${isClockedIn ? 'bg-secondary' : isClockedOut ? 'bg-primary' : 'bg-error'}`} />
-            </View>
-            <Text
-              className={`font-inter-bold text-[10px] leading-4 ${attendanceChipTextClass}`}
-              numberOfLines={2}
-            >
-              {attendanceChipText}
-            </Text>
-          </View>
-        </View>
-      </View>
+      <MotiView
+        from={{ opacity: 0, translateY: -20 }}
+        animate={{ opacity: 1, translateY: 0 }}
+        transition={{ type: 'spring', delay: 100 }}
+        className="mx-5 mt-4 mb-2 rounded-[32px] bg-primary overflow-hidden shadow-sm"
+      >
+        {/* Decorative Overlay */}
+        <View className="absolute -top-20 -right-20 w-48 h-48 rounded-full bg-white/10" />
+        <View className="absolute -bottom-10 -left-10 w-32 h-32 rounded-full bg-black/10" />
 
-      <View className="flex-1" style={{ paddingHorizontal: 20, paddingTop: 10 }}>
-        <View className="flex-1 rounded-3xl border-2 border-dashed border-primary/20 items-center justify-center bg-white/30 mb-2">
-          <MaterialIcons name="insert-chart-outlined" size={36} color={Tokens.colors.primary} style={{ opacity: 0.5 }} />
-          <Text className="font-inter-medium text-xs text-text-muted mt-2">Space Statistik</Text>
+        <View className="p-6">
+          {/* Top Row: Welcome & Status */}
+          <View className="flex-row justify-between items-start mb-6">
+            <View className="flex-1 pr-4">
+              <Text className="font-inter-bold text-[10px] text-white/70 uppercase tracking-[0.2em] mb-1">
+                Halo, Selamat Datang
+              </Text>
+              <Text className="font-manrope-extrabold text-2xl text-white leading-8" numberOfLines={1}>
+                {name}
+              </Text>
+            </View>
+            <View className="bg-white/20 px-3 py-1.5 rounded-full border border-white/30 items-center justify-center">
+              <View className="flex-row items-center gap-1.5">
+                <MaterialIcons name="badge" size={12} color="#fff" />
+                <Text className="font-inter-bold text-[9px] text-white uppercase tracking-wider">
+                  {user?.position_name || user?.role || 'Karyawan'}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Bottom Row: Cute Working Status */}
+          <MotiView
+            className="rounded-[20px] p-4 flex-col gap-3 overflow-hidden"
+            style={{ borderWidth: 1 }}
+            from={{
+              backgroundColor: isClockedOut ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.1)',
+              borderColor: isClockedOut ? 'rgba(16, 185, 129, 0.4)' : 'rgba(255, 255, 255, 0.15)'
+            }}
+            animate={{
+              backgroundColor: isClockedOut ? 'rgba(16, 185, 129, 0.15)' : 'rgba(255, 255, 255, 0.1)',
+              borderColor: isClockedOut
+                ? 'rgba(16, 185, 129, 0.4)'
+                : (!isClockedIn ? 'rgba(245, 158, 11, 0.6)' : 'rgba(255, 255, 255, 0.45)')
+            }}
+            transition={{ type: 'timing', duration: 1500, loop: true, repeatReverse: true }}
+          >
+            <View className="flex-row items-center gap-4">
+              {/* The Cute Icon */}
+              <View className="w-12 h-12 bg-white/20 rounded-2xl items-center justify-center relative">
+                {isClockedOut ? (
+                  <MotiView
+                    from={{ translateY: 0, scale: 1 }}
+                    animate={{ translateY: -6, scale: 1.15 }}
+                    transition={{ type: 'timing', duration: 600, loop: true, repeatReverse: true }}
+                  >
+                    <MaterialIcons name="weekend" size={24} color="#fff" />
+                  </MotiView>
+                ) : isClockedIn ? (
+                  <MotiView
+                    from={{ rotate: '-8deg' }}
+                    animate={{ rotate: '8deg' }}
+                    transition={{ type: 'timing', duration: 2500, loop: true, repeatReverse: true }}
+                    className="items-center justify-center relative"
+                  >
+                    <MaterialIcons name="local-florist" size={26} color="#a5d6a7" />
+                    <MotiView
+                      from={{ scale: 0.5, opacity: 0, translateY: -5, translateX: 5 }}
+                      animate={{ scale: 1, opacity: [0, 1, 0], translateY: -15, translateX: 10 }}
+                      transition={{ type: 'timing', duration: 3000, loop: true }}
+                      className="absolute top-0 right-0"
+                    >
+                      <MaterialIcons name="eco" size={10} color="#81c784" />
+                    </MotiView>
+                  </MotiView>
+                ) : (
+                  <MotiView
+                    from={{ translateY: -3 }}
+                    animate={{ translateY: 3 }}
+                    transition={{ type: 'timing', duration: 1500, loop: true, repeatReverse: true }}
+                  >
+                    <MaterialIcons name="bedtime" size={24} color="#fff" />
+                  </MotiView>
+                )}
+              </View>
+
+              {/* The Text */}
+              <View className="flex-1">
+                <Text className="font-inter-bold text-[11px] text-white/90 mb-1">
+                  {isClockedOut ? 'Kerja Selesai 🎉' : isClockedIn ? 'Semangat Kerjanya! 🚀' : 'Lagi Santai Nih? 🌙'}
+                </Text>
+                <Text className="font-inter-medium text-[10px] text-white/70 leading-4">
+                  {isClockedOut
+                    ? 'Kerja hari ini luar biasa! Beristirahat lah agar energimu kembali pulih!'
+                    : isClockedIn
+                      ? 'Fokus dan kerjakan satu per satu. Kamu pasti bisa!'
+                      : 'Belum ada catatan absen hari ini. Kalo mau mulai kerja, jangan lupa check-in ya!'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Progress Bar Area */}
+            <View className="relative w-full mt-1">
+              {/* Empty Track */}
+              <MotiView
+                className="h-2.5 w-full rounded-full"
+                style={{ backgroundColor: 'rgba(0,0,0,0.15)' }}
+                animate={!isClockedIn && !isClockedOut ? { backgroundColor: ['rgba(0,0,0,0.15)', 'rgba(255,255,255,0.3)', 'rgba(0,0,0,0.15)'] } : { backgroundColor: 'rgba(0,0,0,0.15)' }}
+                transition={{ type: 'timing', duration: 1500, loop: true }}
+              />
+
+              {/* The Fill */}
+              {(isClockedIn || isClockedOut) && (
+                <MotiView
+                  className="absolute left-0 top-0 bottom-0 rounded-full"
+                  style={{ backgroundColor: isClockedOut ? '#81c784' : '#ffffff' }}
+                  from={{ width: '0%' }}
+                  animate={{ width: `${journeyProgress}%` }}
+                  transition={{ type: 'spring', damping: 20, stiffness: 90 }}
+                />
+              )}
+
+              {/* Shimmer for active state */}
+              {isClockedIn && !isClockedOut && (
+                <MotiView
+                  className="absolute left-0 top-0 bottom-0 rounded-full bg-white"
+                  from={{ width: '0%', opacity: 0.5 }}
+                  animate={{ width: `${journeyProgress}%`, opacity: 0 }}
+                  transition={{ type: 'timing', duration: 2000, loop: true }}
+                />
+              )}
+
+              {/* Sparkles for completed state */}
+              {isClockedOut && (
+                <MotiView
+                  className="absolute -top-1.5"
+                  style={{ left: '95%' }}
+                  from={{ opacity: 0, translateY: 3, scale: 0.5 }}
+                  animate={{ opacity: [0, 1, 0], translateY: -6, scale: [0.5, 1.3, 0.5] }}
+                  transition={{ type: 'timing', duration: 1500, loop: true }}
+                >
+                  <Text style={{ fontSize: 12 }}>✨</Text>
+                </MotiView>
+              )}
+            </View>
+          </MotiView>
         </View>
+      </MotiView>
+
+      <View className="flex-1" style={{ paddingHorizontal: 20, paddingTop: 4 }}>
 
         <View className="h-[196px] mt-2 mb-2">
           <ScrollView

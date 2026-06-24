@@ -2,6 +2,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
+import LottieView from 'lottie-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { ActivityIndicator, Linking, Pressable, Text, useWindowDimensions, View } from 'react-native';
@@ -155,10 +156,11 @@ export default function AttendanceScanScreen() {
       const latest = await attendanceService.getTodayRecord();
       setTodayRecord(latest ?? null);
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: qk.attendanceHistory(user?.id) }),
-        queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryFull(user?.id) }),
+        queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryRoot() }),
+        queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryFullRoot() }),
         queryClient.invalidateQueries({ queryKey: qk.homeApprovals(user?.id) }),
         queryClient.invalidateQueries({ queryKey: qk.activityAttendanceFeed(user?.id, null, null) }),
+        queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryInfiniteRoot() }),
       ]);
     } catch (error: any) {
       setErrorMessage(error?.response?.data?.message ?? error?.message ?? 'Gagal memproses absensi');
@@ -288,21 +290,29 @@ export default function AttendanceScanScreen() {
             )}
 
             {hasSuccessState && (
-              <View className="w-full max-w-[320px] rounded-3xl bg-white border border-emerald-200 shadow-sm p-6 items-center gap-3">
-                <View className="w-14 h-14 rounded-full bg-emerald-50 items-center justify-center">
-                  <MaterialIcons name="check-circle" size={34} color="#059669" />
+              <View className="w-full max-w-[320px] rounded-3xl bg-white border border-emerald-100 shadow-sm p-8 items-center justify-center mt-4">
+                <View className="bg-emerald-100 px-6 py-2 rounded-full mb-2">
+                  <Text className="font-manrope-extrabold text-lg text-emerald-700 tracking-wide">
+                    Scan Berhasil!
+                  </Text>
                 </View>
-                <Text className="font-manrope-extrabold text-2xl text-emerald-700 text-center">
+
+                <LottieView
+                  source={require('../assets/Clap.json')}
+                  autoPlay
+                  loop={false}
+                  style={{ width: 200, height: 200 }}
+                />
+
+                <Text className="font-inter-semibold text-base text-text-muted mt-2 mb-8 text-center">
                   {checkinMessage}
                 </Text>
-                <Text className="font-inter text-sm text-text-muted text-center">
-                  Silahkan aktifkan kamera kembali jika perlu scan ulang.
-                </Text>
+
                 <Button
-                  title="Scan Ulang"
-                  onPress={handleRetryScanner}
-                  className="w-full mt-2 h-13 rounded-2xl bg-primary"
-                  textStyle={{ color: '#ffffff' }}
+                  title="Kembali ke Home"
+                  onPress={() => router.replace('/(tabs)')}
+                  className="w-full h-14 rounded-2xl bg-primary"
+                  textStyle={{ color: '#ffffff', fontSize: 16 }}
                 />
               </View>
             )}

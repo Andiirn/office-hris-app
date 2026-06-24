@@ -20,6 +20,7 @@ import { GlassCard } from '../src/components/ui/GlassCard';
 import { Input } from '../src/components/ui/Input';
 import { SkeletonCard } from '../src/components/ui/Skeleton';
 import { StatusBadge } from '../src/components/ui/StatusBadge';
+import { SuccessAnimation } from '../src/components/ui/SuccessAnimation';
 import { Tokens } from '../src/core/theme/tokens';
 import { authService } from '../src/services/auth.service';
 import { employeeService } from '../src/services/employee.service';
@@ -68,6 +69,7 @@ export default function LeaveScreen() {
   const [selectedRange, setSelectedRange] = useState<{ start?: string, end?: string }>({});
   const [selectedHourlyDate, setSelectedHourlyDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [documentFile, setDocumentFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
+  const [showSuccessAnim, setShowSuccessAnim] = useState(false);
   const [form, setForm] = useState<CreateLeaveRequest>({
     leave_type_id: '',
     start_date: '',
@@ -149,19 +151,13 @@ export default function LeaveScreen() {
       ]);
 
       setModalVisible(false);
+      setTimePickerVisible(false);
       setSelectedRange({});
       setSelectedHourlyDate(new Date().toISOString().slice(0, 10));
       setDocumentFile(null);
-      setForm({
-        leave_type_id: '',
-        start_date: '',
-        end_date: null,
-        start_time: '',
-        end_time: '',
-        reason: '',
-        replacement_id: '',
-      });
-      Alert.alert('Berhasil', 'Pengajuan berhasil dikirim');
+      setReplacementModalVisible(false);
+      setColleagueSearch('');
+      setShowSuccessAnim(true);
     },
     onError: (error: any) => {
       const response = error?.response?.data;
@@ -361,6 +357,25 @@ export default function LeaveScreen() {
   const handleSelectTime = (value: string) => {
     setForm((prev) => ({ ...prev, [timeField]: value }));
     setTimePickerVisible(false);
+  };
+
+  const resetForm = () => {
+    setForm({
+      leave_type_id: '',
+      start_date: '',
+      end_date: null,
+      start_time: '',
+      end_time: '',
+      reason: '',
+      replacement_id: '',
+    });
+    setSelectedRange({});
+    setSelectedHourlyDate(new Date().toISOString().slice(0, 10));
+    setDocumentFile(null);
+    setColleagueSearch('');
+    setTimePickerVisible(false);
+    setReplacementModalVisible(false);
+    setModalVisible(false);
   };
 
   const selectedTimeLabel = (field: TimeField) => {
@@ -804,6 +819,16 @@ export default function LeaveScreen() {
           </View>
         )}
       </Modal>
+
+      <SuccessAnimation
+        visible={showSuccessAnim}
+        title="Terkirim!"
+        message="Pengajuan izin atau cuti Anda sedang diproses."
+        onDone={() => {
+          setShowSuccessAnim(false);
+          resetForm();
+        }}
+      />
     </SafeAreaView>
   )
 }
