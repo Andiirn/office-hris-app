@@ -4,6 +4,7 @@ import React from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { MotiView } from 'moti';
 import { Tokens } from '../src/core/theme/tokens';
 import { attendanceService } from '../src/services/attendance.service';
 import { leaveService } from '../src/services/leave.service';
@@ -276,43 +277,67 @@ export default function ActivityScreen() {
             <Text className="font-inter text-sm text-text-muted text-center mt-2">Aktivitas akan muncul di sini ketika ada riwayat baru.</Text>
           </View>
         ) : (
-          <View className="gap-3">
-            {feedItems.map((item) => (
-              <Pressable
+          <View className="gap-0 mt-2">
+            {feedItems.map((item, index) => {
+              const statusLabel = item.type.split('.')[1]?.toUpperCase() || 'INFO';
+              return (
+              <MotiView
                 key={item.id}
-                className="bg-white/80 rounded-xl px-3 py-3 border border-white/90 shadow-sm"
-                onPress={() => setExpandedId((current) => (current === item.id ? null : item.id))}
+                className="flex-row"
+                from={{ opacity: 0, translateY: 15 }}
+                animate={{ opacity: 1, translateY: 0 }}
+                transition={{ type: 'timing', delay: Math.min(index, 20) * 100 }}
               >
-                <View className="flex-row items-start justify-between gap-2">
-                  <View className="w-10 h-10 rounded-2xl items-center justify-center mr-1" style={{ backgroundColor: item.bgColor }}>
-                    <MaterialIcons name={item.icon} size={18} color={item.color} />
+                {/* Timeline Line & Dot */}
+                <View className="items-center mr-4">
+                  <View className="w-8 h-8 rounded-full items-center justify-center z-10" style={{ backgroundColor: item.bgColor }}>
+                    <MaterialIcons name={item.icon as any} size={16} color={item.color} />
                   </View>
-                  <View className="flex-1">
-                    <Text className="font-inter-bold text-[13px] text-on-surface" numberOfLines={1}>{item.title}</Text>
-                    <Text className="font-inter text-[10px] text-text-muted mt-0.5" numberOfLines={1}>{item.summary}</Text>
-                    {expandedId === item.id ? (
-                      <ScrollView
-                        className="mt-2"
-                        style={{ maxHeight: 88 }}
-                        nestedScrollEnabled
-                        showsVerticalScrollIndicator={false}
-                      >
-                        <View className="gap-1 pr-1">
-                          <Text className="font-inter text-[10px] text-on-surface-variant">
-                            Tipe: {item.type}
-                          </Text>
-                          {(item.details || []).filter(Boolean).map((detail: string) => (
-                            <Text key={detail} className="font-inter text-[10px] text-on-surface-variant">
-                              {detail}
-                            </Text>
-                          ))}
-                        </View>
-                      </ScrollView>
-                    ) : null}
-                  </View>
+                  {index !== feedItems.length - 1 && (
+                    <View className="w-0.5 flex-1 bg-primary/10 mt-1.5 mb-1.5" />
+                  )}
                 </View>
-              </Pressable>
-            ))}
+
+                {/* Content */}
+                <Pressable
+                  className="flex-1 pb-5 pt-0.5"
+                  onPress={() => setExpandedId((current) => (current === item.id ? null : item.id))}
+                >
+                  <View className="flex-row items-start justify-between gap-2">
+                    <Text className="font-inter-bold text-[13px] text-text flex-1 leading-4" numberOfLines={1}>
+                      {item.title}
+                    </Text>
+                    <View className="bg-primary/5 px-2 py-0.5 rounded-full border border-primary/10">
+                      <Text className="font-inter-bold text-[9px] text-primary uppercase tracking-wider">
+                        {statusLabel}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text className="font-inter text-[11px] text-text-muted mt-1" numberOfLines={1}>
+                    {item.summary}
+                  </Text>
+
+                  {expandedId === item.id ? (
+                    <MotiView
+                      from={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      className="mt-3 bg-white/60 px-3 py-2.5 rounded-xl border border-white/90 overflow-hidden"
+                    >
+                      <View className="gap-1.5">
+                        <Text className="font-inter text-[11px] text-text-muted">
+                          Tipe: {item.type}
+                        </Text>
+                        {(item.details || []).filter(Boolean).map((detail: string) => (
+                          <Text key={detail} className="font-inter text-[11px] text-text-muted">
+                            {detail}
+                          </Text>
+                        ))}
+                      </View>
+                    </MotiView>
+                  ) : null}
+                </Pressable>
+              </MotiView>
+            )})}
           </View>
         )}
       </ScrollView>

@@ -12,7 +12,6 @@ export const sessionManager = {
     const accessToken = await tokenStore.getAccessToken();
     if (!accessToken) {
       console.log('[SessionManager] No access token found');
-      alert('Sesi berakhir. Silahkan login kembali');
       await useAuthStore.getState().setInitialized(true);
       return;
     }

@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MotiView, AnimatePresence } from 'moti';
 import { Button } from '../src/components/ui/Button';
 import { GlassCard } from '../src/components/ui/GlassCard';
 import { Input } from '../src/components/ui/Input';
@@ -263,7 +264,7 @@ export default function LeaveScreen() {
 
       while (curr < end) {
         const d = curr.toISOString().split('T')[0];
-        marks[d] = { color: 'rgba(0, 6, 102, 0.2)', textColor: Tokens.colors.primary };
+        marks[d] = { color: 'rgba(244, 63, 94, 0.15)', textColor: Tokens.colors.primary };
         curr.setDate(curr.getDate() + 1);
       }
     }
@@ -391,10 +392,6 @@ export default function LeaveScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background">
-      {/* Decorative Background Elements */}
-      <View className="absolute -top-12 -right-12 w-64 h-64 rounded-full bg-on-primary-container/15" />
-      <View className="absolute top-64 -left-24 w-72 h-72 rounded-full bg-error-container/10" />
-      <View className="absolute -bottom-12 -right-4 w-44 h-44 rounded-full bg-secondary-container/20" />
 
       <View className="flex-row items-center px-5 pt-2 pb-5 z-10">
         <Pressable
@@ -443,10 +440,10 @@ export default function LeaveScreen() {
                 return (
                   <Pressable
                     key={type.id}
-                    className={`px-4 py-3 rounded-2xl border ${active ? 'bg-primary border-primary' : 'bg-[#f0eded] border-transparent'}`}
+                    className={`px-4 py-2.5 rounded-full border ${active ? 'bg-primary border-primary' : 'bg-primary/5 border-primary/10'}`}
                     onPress={() => handleSelectLeaveType(type.id)}
                   >
-                    <Text className={`font-inter-bold text-sm ${active ? 'text-white' : 'text-text-muted'}`}>
+                    <Text className={`font-inter-bold text-[13px] ${active ? 'text-white' : 'text-primary'}`}>
                       {formatLeaveTypeName(type.name)}
                     </Text>
                   </Pressable>
@@ -476,40 +473,48 @@ export default function LeaveScreen() {
             </View>
           </GlassCard>
         ) : (
-          history.map((item) => (
-            <GlassCard key={item.id} style={{ marginBottom: 12, padding: 16 }}>
-              <View className="flex-row justify-between items-start mb-2.5">
-                <View className="flex-1">
-                  <Text className="font-inter-bold text-base text-black">{formatLeaveTypeName(item.leave_type_name) || 'Leave Request'}</Text>
-                  <View className="flex-row items-center mt-1 gap-1.5">
-                    <MaterialIcons name="calendar-today" size={12} color={Tokens.colors.textMuted} />
-                    <Text className="font-inter-medium text-xs text-text-muted">
-                      {item.start_date} {item.end_date ? `to ${item.end_date}` : ''}
-                    </Text>
+          <View className="gap-0">
+            {history.map((item, index) => (
+              <MotiView
+                key={item.id}
+                from={{ opacity: 0, translateY: 20 }}
+                animate={{ opacity: 1, translateY: 0 }}
+                transition={{ type: 'spring', delay: Math.min(index, 10) * 100 }}
+                className="bg-white/80 rounded-[20px] px-4 py-4 border border-white/90 mb-3 shadow-sm"
+              >
+                <View className="flex-row justify-between items-start mb-2.5">
+                  <View className="flex-1">
+                    <Text className="font-inter-bold text-base text-on-surface">{formatLeaveTypeName(item.leave_type_name) || 'Leave Request'}</Text>
+                    <View className="flex-row items-center mt-1 gap-1.5">
+                      <MaterialIcons name="calendar-today" size={12} color={Tokens.colors.textMuted} />
+                      <Text className="font-inter-medium text-xs text-text-muted">
+                        {item.start_date} {item.end_date ? `- ${item.end_date}` : ''}
+                      </Text>
+                    </View>
                   </View>
+                  <StatusBadge label={item.status} type={getStatusType(item.status) as any} />
                 </View>
-                <StatusBadge label={item.status} type={getStatusType(item.status) as any} />
-              </View>
-              <Text className="font-inter text-sm text-black leading-5 bg-black/5 p-2.5 rounded-lg" numberOfLines={2}>
-                {item.reason}
-              </Text>
+                <Text className="font-inter text-[13px] text-text-muted leading-5 mt-1" numberOfLines={2}>
+                  {item.reason}
+                </Text>
 
-              {item.status === 'PENDING' && (
-                <Pressable
-                  onPress={() => handleCancel(item.id)}
-                  className="mt-3.5 flex-row items-center gap-1 self-start"
-                >
-                  <MaterialIcons name="close" size={14} color={Tokens.colors.error} />
-                  <Text className="font-inter-bold text-xs text-error">Cancel Request</Text>
-                </Pressable>
-              )}
-            </GlassCard>
-          ))
+                {item.status === 'PENDING' && (
+                  <Pressable
+                    onPress={() => handleCancel(item.id)}
+                    className="mt-4 flex-row items-center justify-center gap-1.5 bg-error/10 px-4 py-2 rounded-full self-start"
+                  >
+                    <MaterialIcons name="close" size={14} color={Tokens.colors.error} />
+                    <Text className="font-inter-bold text-[11px] text-error uppercase tracking-wider">Batalkan</Text>
+                  </Pressable>
+                )}
+              </MotiView>
+            ))}
+          </View>
         )}
       </ScrollView>
 
       <Modal
-        animationType="slide"
+        animationType="fade"
         transparent={true}
         visible={modalVisible}
         onRequestClose={() => {
@@ -520,8 +525,13 @@ export default function LeaveScreen() {
           setColleagueSearch('');
         }}
       >
-        <View className="flex-1 bg-primary/40 justify-end">
-          <View className="bg-background rounded-t-[32px] p-6 max-h-[85%] shadow-2xl">
+        <View className="flex-1 bg-black/40 justify-end">
+          <MotiView 
+            from={{ translateY: 800 }}
+            animate={{ translateY: 0 }}
+            transition={{ type: 'spring', damping: 22, stiffness: 200 }}
+            className="bg-background rounded-t-[32px] p-6 pb-12 max-h-[90%] shadow-2xl"
+          >
             <View className="flex-row justify-between items-start mb-6">
               <View>
                 <Text className="font-manrope-extrabold text-2xl text-primary">Pengajuan {formatLeaveTypeName(selectedLeaveType?.name)}</Text>
@@ -705,8 +715,9 @@ export default function LeaveScreen() {
                 className="mt-5 h-14 rounded-2xl"
               />
               <View className="h-10" />
+              <View className="h-6" />
             </ScrollView>
-          </View>
+          </MotiView>
         </View>
 
         {timePickerVisible && (

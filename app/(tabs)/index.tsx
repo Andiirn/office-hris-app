@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import React from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MotiView } from 'moti';
 import { Skeleton } from '../../src/components/ui/Skeleton';
 import { Tokens } from '../../src/core/theme/tokens';
 import { buildHomeMenuItems } from '../../src/features/home/home-menu';
@@ -53,6 +54,8 @@ type FeedItem = {
 type MenuItem = {
   icon: string;
   title: string;
+  color?: string;
+  bgColor?: string;
   onPress: () => void;
   badgeCount?: number;
   disabled?: boolean;
@@ -413,24 +416,24 @@ export default function HomeScreen() {
                     item ? (
                       <Pressable
                         key={item.title}
-                        className={`relative rounded-2xl bg-white/80 border border-white/80 px-2.5 py-2.5 mb-3 shadow-sm ${item.disabled ? 'opacity-50' : ''}`}
+                        className={`relative px-0.5 py-1 mb-4 ${item.disabled ? 'opacity-50' : ''}`}
                         style={{ width: menuColumnWidth }}
                         onPress={item.onPress}
                       >
-                        <View className="items-center justify-center gap-1">
+                        <View className="items-center justify-center gap-1.5">
                           {item.badgeCount ? (
-                            <View className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full bg-error items-center justify-center px-1.5 z-20">
+                            <View className="absolute -top-1 -right-0 min-w-[18px] h-[18px] rounded-full bg-error items-center justify-center px-1.5 z-20">
                               <Text className="font-inter-bold text-[10px] text-white leading-[18px]">
                                 {item.badgeCount > 9 ? '9+' : item.badgeCount}
                               </Text>
                             </View>
                           ) : null}
-                          <View className="w-9 h-9 rounded-2xl bg-primary/10 items-center justify-center">
-                            <MaterialIcons name={item.icon as any} size={20} color={Tokens.colors.primary} />
+                          <View className="w-11 h-11 rounded-[16px] items-center justify-center" style={{ backgroundColor: item.bgColor || '#f0eded' }}>
+                            <MaterialIcons name={item.icon as any} size={24} color={item.color || '#1b1c1c'} />
                           </View>
                           <Text
-                            className="font-inter-bold text-[10px] text-on-surface text-center leading-3"
-                            numberOfLines={1}
+                            className="font-inter-bold text-[10px] text-on-surface text-center leading-[14px]"
+                            numberOfLines={2}
                             adjustsFontSizeToFit
                             minimumFontScale={0.85}
                           >
@@ -460,7 +463,7 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
-          <View className="h-[340px] rounded-2xl bg-white/45 border border-white/70 overflow-hidden">
+          <View className="h-[340px] rounded-3xl bg-white/50 border border-white/80 overflow-hidden">
             <ScrollView
               className="flex-1"
               contentContainerStyle={{ padding: 12, paddingBottom: 18 }}
@@ -491,52 +494,61 @@ export default function HomeScreen() {
                   <Text className="font-inter text-[13px] text-text-muted">No recent activities</Text>
                 </View>
               ) : (
-                <View className="gap-2">
-                  {feedItems.map((item) => (
-                    <Pressable
+                <View className="gap-0 mt-2">
+                  {feedItems.map((item, index) => (
+                    <MotiView
                       key={item.id}
-                      className="bg-white/80 rounded-xl px-3 py-2.5 border border-white/90 shadow-sm"
-                      onPress={() => setExpandedFeedId((current) => (current === item.id ? null : item.id))}
+                      className="flex-row"
+                      from={{ opacity: 0, translateY: 15 }}
+                      animate={{ opacity: 1, translateY: 0 }}
+                      transition={{ type: 'timing', delay: index * 100 }}
                     >
-                      <View className="flex-row items-start justify-between gap-2">
-                        <View className="w-10 h-10 rounded-2xl items-center justify-center mr-1" style={{ backgroundColor: item.bgColor }}>
-                          <MaterialIcons name={item.icon} size={18} color={item.color} />
+                      {/* Timeline Line & Dot */}
+                      <View className="items-center mr-4">
+                        <View className="w-8 h-8 rounded-full items-center justify-center z-10" style={{ backgroundColor: item.bgColor }}>
+                          <MaterialIcons name={item.icon as any} size={16} color={item.color} />
                         </View>
-
-                        <View className="flex-1">
-                          <View className="flex-row items-center justify-between gap-2">
-                            <Text className="font-inter-bold text-[12px] text-on-surface flex-1" numberOfLines={1}>
-                              {item.title}
-                            </Text>
-                            <View className="bg-primary/5 px-2 py-0.5 rounded-md">
-                              <Text className="font-inter-bold text-[8px] text-primary uppercase tracking-wider">
-                                {item.status}
-                              </Text>
-                            </View>
-                          </View>
-                          <Text className="font-inter text-[10px] text-text-muted mt-0.5" numberOfLines={1}>
-                            {item.summary}
-                          </Text>
-
-                          {item.isExpanded ? (
-                            <ScrollView
-                              className="mt-2"
-                              style={{ maxHeight: 88 }}
-                              nestedScrollEnabled
-                              showsVerticalScrollIndicator={false}
-                            >
-                              <View className="gap-1 pr-1">
-                                {item.details.filter(Boolean).map((detail) => (
-                                  <Text key={detail} className="font-inter text-[10px] text-on-surface-variant">
-                                    {detail}
-                                  </Text>
-                                ))}
-                              </View>
-                            </ScrollView>
-                          ) : null}
-                        </View>
+                        {index !== feedItems.length - 1 && (
+                          <View className="w-0.5 flex-1 bg-primary/10 mt-1.5 mb-1.5" />
+                        )}
                       </View>
-                    </Pressable>
+
+                      {/* Content */}
+                      <Pressable
+                        className="flex-1 pb-5 pt-0.5"
+                        onPress={() => setExpandedFeedId((current) => (current === item.id ? null : item.id))}
+                      >
+                        <View className="flex-row items-start justify-between gap-2">
+                          <Text className="font-inter-bold text-[13px] text-text flex-1 leading-4" numberOfLines={1}>
+                            {item.title}
+                          </Text>
+                          <View className="bg-primary/5 px-2 py-0.5 rounded-full border border-primary/10">
+                            <Text className="font-inter-bold text-[9px] text-primary uppercase tracking-wider">
+                              {item.status}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text className="font-inter text-[11px] text-text-muted mt-1" numberOfLines={1}>
+                          {item.summary}
+                        </Text>
+
+                        {item.isExpanded ? (
+                          <MotiView
+                            from={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            className="mt-3 bg-white/60 px-3 py-2.5 rounded-xl border border-white/90 overflow-hidden"
+                          >
+                            <View className="gap-1.5">
+                              {item.details.filter(Boolean).map((detail) => (
+                                <Text key={detail} className="font-inter text-[11px] text-text-muted">
+                                  {detail}
+                                </Text>
+                              ))}
+                            </View>
+                          </MotiView>
+                        ) : null}
+                      </Pressable>
+                    </MotiView>
                   ))}
                 </View>
               )}

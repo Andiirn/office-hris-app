@@ -15,6 +15,7 @@ import {
   View
 } from 'react-native';
 import * as z from 'zod';
+import { MotiView } from 'moti';
 
 import { Button } from '../../src/components/ui/Button';
 import { Input } from '../../src/components/ui/Input';
@@ -97,65 +98,105 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.backdropTop} />
-          <View style={styles.backdropBottom} />
+          <MotiView 
+            from={{ opacity: 0, scale: 0 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: 'timing', duration: 1000 }}
+            style={styles.backdropTop} 
+          />
+          <MotiView 
+            from={{ opacity: 0, scale: 0 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: 'timing', duration: 1000 }}
+            style={styles.backdropBottom} 
+          />
 
           <View style={styles.shell}>
             <View style={styles.heroCard}>
-              <View style={styles.hero}>
-                <Image
-                  source={require('../../assets/images/screen/login.png')}
-                  style={styles.illustration}
-                />
-              </View>
               <View style={styles.header}>
-                <Text style={styles.title}>Selamat Datang</Text>
-                <Text style={styles.subtitle}>
-                  Masuk dengan akun Anda untuk melanjutkan
-                </Text>
+                <MotiView
+                  from={{ opacity: 0, translateY: 20 }}
+                  animate={{ opacity: 1, translateY: 0 }}
+                  transition={{ type: 'spring', delay: 150 }}
+                >
+                  <Text style={styles.title}>Selamat Datang</Text>
+                </MotiView>
+                <MotiView
+                  from={{ opacity: 0, translateY: 20 }}
+                  animate={{ opacity: 1, translateY: 0 }}
+                  transition={{ type: 'spring', delay: 250 }}
+                >
+                  <Text style={styles.subtitle}>
+                    Masuk dengan akun Anda untuk melanjutkan
+                  </Text>
+                </MotiView>
               </View>
             </View>
 
             <View style={styles.formCard}>
               <View style={styles.form}>
-                <Controller
-                  control={control}
-                  name="nik"
-                  render={({ field: { onChange, onBlur, value } }) => (
-                    <Input
-                      label="Nomor Induk Karyawan"
-                      placeholder="Masukkan NIK Anda"
-                      onBlur={onBlur}
-                      onChangeText={onChange}
-                      value={value}
-                      error={errors.nik?.message}
-                      autoCapitalize="none"
-                    />
-                  )}
-                />
+                <MotiView
+                  from={{ opacity: 0, translateX: -20 }}
+                  animate={{ opacity: 1, translateX: 0 }}
+                  transition={{ type: 'spring', delay: 350 }}
+                >
+                  <Controller
+                    control={control}
+                    name="nik"
+                    render={({ field: { onChange, onBlur, value } }) => (
+                      <Input
+                        label="Nomor Induk Karyawan"
+                        placeholder="Masukkan NIK Anda"
+                        onBlur={onBlur}
+                        onChangeText={onChange}
+                        value={value}
+                        error={errors.nik?.message}
+                        autoCapitalize="none"
+                      />
+                    )}
+                  />
+                </MotiView>
 
-                <Controller
-                  control={control}
-                  name="password"
-                  render={({ field: { onChange, onBlur, value } }) => (
-                    <Input
-                      label="Password"
-                      placeholder="Masukkan Password Anda"
-                      onBlur={onBlur}
-                      onChangeText={onChange}
-                      value={value}
-                      error={errors.password?.message}
-                      secureTextEntry
-                    />
-                  )}
-                />
+                <MotiView
+                  from={{ opacity: 0, translateX: -20 }}
+                  animate={{ opacity: 1, translateX: 0 }}
+                  transition={{ type: 'spring', delay: 450 }}
+                >
+                  <Controller
+                    control={control}
+                    name="password"
+                    render={({ field: { onChange, onBlur, value } }) => (
+                      <Input
+                        label="Password"
+                        placeholder="Masukkan Password Anda"
+                        onBlur={onBlur}
+                        onChangeText={onChange}
+                        value={value}
+                        error={errors.password?.message}
+                        secureTextEntry
+                      />
+                    )}
+                  />
+                </MotiView>
 
-                <Button
-                  title="Sign In"
-                  onPress={handleSubmit(onSubmit)}
-                  loading={mutation.isPending}
-                  style={styles.button}
-                />
+                <MotiView
+                  from={{ opacity: 0, scale: 0.5, translateY: 30 }}
+                  animate={{ opacity: 1, scale: 1, translateY: 0 }}
+                  transition={{ 
+                    type: 'spring', 
+                    delay: 600,
+                    damping: 10,
+                    stiffness: 200,
+                    mass: 0.8
+                  }}
+                >
+                  <Button
+                    title="Sign In"
+                    onPress={handleSubmit(onSubmit)}
+                    loading={mutation.isPending}
+                    style={styles.button}
+                  />
+                </MotiView>
               </View>
             </View>
           </View>
@@ -184,7 +225,7 @@ const styles = StyleSheet.create({
     width: 240,
     height: 240,
     borderRadius: 240,
-    backgroundColor: 'rgba(0, 6, 102, 0.08)',
+    backgroundColor: 'rgba(244, 63, 94, 0.08)',
   },
   backdropBottom: {
     position: 'absolute',
@@ -193,7 +234,7 @@ const styles = StyleSheet.create({
     width: 180,
     height: 180,
     borderRadius: 180,
-    backgroundColor: 'rgba(26, 35, 126, 0.08)',
+    backgroundColor: 'rgba(190, 18, 60, 0.08)',
   },
   shell: {
     width: '100%',

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { queryClient } from '../core/api/query-client';
 import { tokenStore } from '../core/auth/token-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface User {
   id: string;
@@ -20,18 +21,22 @@ interface AuthState {
   user: User | null;
   isLoggedIn: boolean;
   isInitialized: boolean;
+  hasSeenOnboarding: boolean | null;
   bootstrapError: string | null;
   setAuth: (user: User, access: string, refresh: string) => Promise<void>;
   setUser: (user: User | null) => void;
   setInitialized: (val: boolean) => void;
   setBootstrapError: (message: string | null) => void;
   logout: () => Promise<void>;
+  checkOnboarding: () => Promise<void>;
+  setOnboardingSeen: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   isLoggedIn: false,
   isInitialized: false,
+  hasSeenOnboarding: null,
   bootstrapError: null,
   setAuth: async (user, access, refresh) => {
     await tokenStore.setTokens(access, refresh);
@@ -44,5 +49,21 @@ export const useAuthStore = create<AuthState>((set) => ({
     await tokenStore.clearTokens();
     queryClient.clear();
     set({ user: null, isLoggedIn: false, isInitialized: true, bootstrapError: null });
+  },
+  checkOnboarding: async () => {
+    try {
+      const value = await AsyncStorage.getItem('has_seen_onboarding');
+      set({ hasSeenOnboarding: value === 'true' });
+    } catch (e) {
+      set({ hasSeenOnboarding: false });
+    }
+  },
+  setOnboardingSeen: async () => {
+    try {
+      await AsyncStorage.setItem('has_seen_onboarding', 'true');
+      set({ hasSeenOnboarding: true });
+    } catch (e) {
+      console.error('Failed to set onboarding seen', e);
+    }
   },
 }));
