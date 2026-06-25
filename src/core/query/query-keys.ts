@@ -15,6 +15,8 @@ export const qk = {
   notificationsRoot: () => ['notifications'] as const,
   activityAttendanceFeed: (employeeId?: string | null, dateFrom?: string | null, dateTo?: string | null) =>
     ['activity-attendance-feed', employeeId ?? null, dateFrom ?? null, dateTo ?? null] as const,
+  approvalActivityFeed: (employeeId?: string | null, scope?: string | null) =>
+    ['approval-activity-feed', scope ?? null, employeeId ?? null] as const,
   homeApprovals: (employeeId?: string | null) => ['home-approvals', employeeId ?? null] as const,
   homeApprovalsRoot: () => ['home-approvals'] as const,
 };

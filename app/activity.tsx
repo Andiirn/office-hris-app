@@ -6,6 +6,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MotiView } from 'moti';
 import { Tokens } from '../src/core/theme/tokens';
+import { qk } from '../src/core/query/query-keys';
+import { buildApprovalActivityItems } from '../src/features/activity/approval-activity';
+import { approvalService } from '../src/services/approval.service';
 import { attendanceService } from '../src/services/attendance.service';
 import { leaveService } from '../src/services/leave.service';
 import { overtimeService } from '../src/services/overtime.service';
@@ -20,6 +23,8 @@ type FeedType =
   | 'leave.approved'
   | 'leave.rejected'
   | 'leave.cancelled'
+  | 'approval.approved'
+  | 'approval.rejected'
   | 'overtime.created'
   | 'overtime.approved'
   | 'overtime.rejected'
@@ -32,6 +37,7 @@ type FeedType =
 type FeedItem = {
   id: string;
   type: FeedType;
+  origin: 'self' | 'approval';
   title: string;
   summary: string;
   timestamp: string;
@@ -39,6 +45,7 @@ type FeedItem = {
   icon: keyof typeof MaterialIcons.glyphMap;
   color: string;
   bgColor: string;
+  status?: string;
   details?: string[];
   isExpanded?: boolean;
 };
@@ -100,6 +107,16 @@ export default function ActivityScreen() {
     enabled: !!user?.id,
   });
 
+  const { data: approvalHistory = [], isLoading: isLoadingApproval, refetch: refetchApproval, isFetching: isFetchingApproval } = useQuery({
+    queryKey: qk.approvalActivityFeed(user?.id, 'activity'),
+    queryFn: async () => {
+      if (!user?.id) return [];
+      return approvalService.getHistory({ limit: 50 });
+    },
+    enabled: !!user?.id,
+    staleTime: 30 * 1000,
+  });
+
   const formatTime = (time?: string | null) => {
     if (!time) return '--:--';
     const timeOnly = time.includes(' ') ? time.split(' ')[1] : time.includes('T') ? time.split('T')[1] : time;
@@ -134,6 +151,7 @@ export default function ActivityScreen() {
     refetchLeave();
     refetchOvertime();
     refetchResign();
+    refetchApproval();
   };
 
   const feedItems = React.useMemo(() => {
@@ -150,13 +168,19 @@ export default function ActivityScreen() {
         items.push({
           id: `${item.id}-checkin`,
           type: 'attendance.checkin',
-          title: 'Check-in',
-          summary: `${attendanceDate} · ${formatTime(checkinTime)} · ${status}`,
+          title: 'Anda check-in',
+          summary: `${attendanceDate} · ${formatTime(checkinTime)}`,
+          details: [
+            `Tanggal: ${attendanceDate}`,
+            `Jam masuk: ${formatTime(checkinTime)}`,
+            `Keterangan: ${status}`,
+          ],
           timestamp: checkinTime,
           sortTime: toSortTime(checkinTime),
           icon: 'login',
           color: '#1f6b42',
           bgColor: '#d9e6da',
+          origin: 'self',
         });
       }
 
@@ -164,13 +188,19 @@ export default function ActivityScreen() {
         items.push({
           id: `${item.id}-checkout`,
           type: 'attendance.checkout',
-          title: 'Check-out',
-          summary: `${attendanceDate} · ${formatTime(checkoutTime)} · ${status}`,
+          title: 'Anda check-out',
+          summary: `${attendanceDate} · ${formatTime(checkoutTime)}`,
+          details: [
+            `Tanggal: ${attendanceDate}`,
+            `Jam pulang: ${formatTime(checkoutTime)}`,
+            `Keterangan: ${status}`,
+          ],
           timestamp: checkoutTime,
           sortTime: toSortTime(checkoutTime),
           icon: 'logout',
           color: '#93000a',
           bgColor: '#ffdad6',
+          origin: 'self',
         });
       }
     });
@@ -178,20 +208,20 @@ export default function ActivityScreen() {
     leaveRequests.forEach((item: any) => {
       const leaveTypeLabel = getLeaveTypeLabel(item);
       const isHourlyLeave = /jam|hour/i.test(`${leaveTypeLabel} ${item.leave_type?.code || ''} ${item.leave_type?.category || ''}`);
-      const timeRange = item.start_time && item.end_time ? ` · ${item.start_time.slice(0, 5)} - ${item.end_time.slice(0, 5)}` : '';
-
       items.push({
         id: `leave-${item.id}`,
         type: item.status === 'APPROVED' ? 'leave.approved' : item.status === 'REJECTED' ? 'leave.rejected' : item.status === 'CANCELLED' ? 'leave.cancelled' : 'leave.created',
         title:
-          item.status === 'APPROVED' ? 'Cuti disetujui' :
-            item.status === 'REJECTED' ? 'Cuti ditolak' :
-              item.status === 'CANCELLED' ? 'Cuti dibatalkan' :
-                'Pengajuan cuti dibuat',
-        summary: `${leaveTypeLabel} · ${formatDateOnly(item.start_date)}${item.end_date ? ` - ${formatDateOnly(item.end_date)}` : ''}${timeRange}`,
+          item.status === 'APPROVED' ? `Pengajuan ${leaveTypeLabel} Anda disetujui` :
+            item.status === 'REJECTED' ? `Pengajuan ${leaveTypeLabel} Anda ditolak` :
+              item.status === 'CANCELLED' ? `Pengajuan ${leaveTypeLabel} Anda dibatalkan` :
+                `Pengajuan ${leaveTypeLabel} Anda menunggu persetujuan`,
+        summary: `${formatDateOnly(item.start_date)}${item.end_date ? ` - ${formatDateOnly(item.end_date)}` : ''} · ${leaveTypeLabel} · ${item.status || 'PENDING'}`,
         details: [
-          `Jenis cuti: ${leaveTypeLabel}`,
+          `Pengaju: Anda`,
+          `Jenis: ${leaveTypeLabel}`,
           `Tanggal: ${formatDateOnly(item.start_date)}${item.end_date ? ` - ${formatDateOnly(item.end_date)}` : ''}`,
+          `Status: ${item.status || 'PENDING'}`,
           ...(isHourlyLeave ? [`Jam: ${item.start_time?.slice(0, 5) || '--:--'} - ${item.end_time?.slice(0, 5) || '--:--'}`] : []),
           `Alasan: ${item.reason || '-'}`,
         ],
@@ -200,6 +230,9 @@ export default function ActivityScreen() {
         icon: item.status === 'APPROVED' ? 'check-circle' : item.status === 'REJECTED' ? 'cancel' : item.status === 'CANCELLED' ? 'cancel' : 'event-available',
         color: item.status === 'APPROVED' ? '#1f6b42' : item.status === 'REJECTED' ? '#93000a' : '#000666',
         bgColor: item.status === 'APPROVED' ? '#d9e6da' : item.status === 'REJECTED' ? '#ffdad6' : '#e7ebff',
+        origin: 'self',
+        status: item.status || 'PENDING',
+        isExpanded: false,
       });
     });
 
@@ -208,13 +241,26 @@ export default function ActivityScreen() {
       items.push({
         id: `overtime-${item.id}`,
         type: status === 'APPROVED' ? 'overtime.approved' : status === 'REJECTED' ? 'overtime.rejected' : status === 'CANCELLED' ? 'overtime.cancelled' : 'overtime.created',
-        title: `Lembur ${status.toLowerCase()}`,
-        summary: `${item.overtime_date || item.attendance_date || '-'} · ${item.overtime_hours ?? item.overtime_minutes ?? '-'} jam`,
+        title:
+          status === 'APPROVED' ? 'Pengajuan lembur Anda disetujui' :
+            status === 'REJECTED' ? 'Pengajuan lembur Anda ditolak' :
+              status === 'CANCELLED' ? 'Pengajuan lembur Anda dibatalkan' :
+                'Pengajuan lembur Anda menunggu persetujuan',
+        summary: `${item.overtime_date || item.attendance_date || '-'} · ${item.overtime_hours ?? item.overtime_minutes ?? '-'} jam · ${status}`,
+        details: [
+          `Pengaju: Anda`,
+          `Tanggal: ${item.overtime_date || item.attendance_date || '-'}`,
+          `Durasi: ${item.overtime_hours ?? item.overtime_minutes ?? '-'} jam`,
+          `Status: ${status}`,
+        ],
         timestamp: item.created_at || item.overtime_date || item.attendance_date || '',
         sortTime: toSortTime(item.created_at) || toSortTime(item.approved_at) || toSortTime(item.end_time) || toSortTime(item.start_time) || toSortTime(item.overtime_date) || toSortTime(item.attendance_date),
         icon: status === 'APPROVED' ? 'check-circle' : status === 'REJECTED' ? 'cancel' : status === 'CANCELLED' ? 'cancel' : 'work-history',
         color: status === 'APPROVED' ? '#1f6b42' : status === 'REJECTED' ? '#93000a' : '#000666',
         bgColor: status === 'APPROVED' ? '#d9e6da' : status === 'REJECTED' ? '#ffdad6' : '#e7ebff',
+        origin: 'self',
+        status,
+        isExpanded: false,
       });
     });
 
@@ -222,13 +268,36 @@ export default function ActivityScreen() {
       items.push({
         id: `resign-${item.id}`,
         type: item.status === 'APPROVED' ? 'resign.approved' : item.status === 'REJECTED' ? 'resign.rejected' : item.status === 'CANCELLED' ? 'resign.cancelled' : 'resign.created',
-        title: `Resign ${item.status?.toLowerCase?.() || 'created'}`,
-        summary: `${item.resign_date || '-'} · ${item.reason || '-'}`,
+        title:
+          item.status === 'APPROVED' ? 'Pengajuan resign Anda disetujui' :
+            item.status === 'REJECTED' ? 'Pengajuan resign Anda ditolak' :
+              item.status === 'CANCELLED' ? 'Pengajuan resign Anda dibatalkan' :
+                'Pengajuan resign Anda menunggu persetujuan',
+        summary: `${item.resign_date || '-'} · ${item.reason || '-'} · ${item.status || 'PENDING'}`,
+        details: [
+          `Pengaju: Anda`,
+          `Tanggal resign: ${item.resign_date || '-'}`,
+          `Status: ${item.status || 'PENDING'}`,
+          `Alasan: ${item.reason || '-'}`,
+        ],
         timestamp: item.created_at || item.resign_date || '',
         sortTime: toSortTime(item.created_at) || toSortTime(item.updated_at) || toSortTime(item.resign_date),
         icon: item.status === 'APPROVED' ? 'check-circle' : item.status === 'REJECTED' ? 'cancel' : item.status === 'CANCELLED' ? 'cancel' : 'exit-to-app',
         color: item.status === 'APPROVED' ? '#1f6b42' : item.status === 'REJECTED' ? '#93000a' : '#000666',
         bgColor: item.status === 'APPROVED' ? '#d9e6da' : item.status === 'REJECTED' ? '#ffdad6' : '#e7ebff',
+        origin: 'self',
+        status: item.status || 'PENDING',
+        isExpanded: false,
+      });
+    });
+
+    buildApprovalActivityItems(approvalHistory, {
+      formatDateOnly,
+      toSortTime,
+    }).forEach((item) => {
+      items.push({
+        ...item,
+        origin: 'approval',
       });
     });
 
@@ -237,10 +306,10 @@ export default function ActivityScreen() {
       const dateB = b.sortTime || 0;
       return dateB - dateA;
     });
-  }, [attendanceFeed, leaveRequests, overtimeRecords, resignRequests]);
+  }, [attendanceFeed, leaveRequests, overtimeRecords, resignRequests, approvalHistory]);
 
-  const isLoading = isLoadingAttendance || isLoadingLeave || isLoadingOvertime || isLoadingResign;
-  const isRefreshing = isFetchingAttendance || isFetchingLeave || isFetchingOvertime || isFetchingResign;
+  const isLoading = isLoadingAttendance || isLoadingLeave || isLoadingOvertime || isLoadingResign || isLoadingApproval;
+  const isRefreshing = isFetchingAttendance || isFetchingLeave || isFetchingOvertime || isFetchingResign || isFetchingApproval;
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -279,65 +348,72 @@ export default function ActivityScreen() {
         ) : (
           <View className="gap-0 mt-2">
             {feedItems.map((item, index) => {
-              const statusLabel = item.type.split('.')[1]?.toUpperCase() || 'INFO';
+              const pulse = item.origin === 'self' && item.status === 'PENDING';
               return (
-              <MotiView
-                key={item.id}
-                className="flex-row"
-                from={{ opacity: 0, translateY: 15 }}
-                animate={{ opacity: 1, translateY: 0 }}
-                transition={{ type: 'timing', delay: Math.min(index, 20) * 100 }}
-              >
-                {/* Timeline Line & Dot */}
-                <View className="items-center mr-4">
-                  <View className="w-8 h-8 rounded-full items-center justify-center z-10" style={{ backgroundColor: item.bgColor }}>
-                    <MaterialIcons name={item.icon as any} size={16} color={item.color} />
-                  </View>
-                  {index !== feedItems.length - 1 && (
-                    <View className="w-0.5 flex-1 bg-primary/10 mt-1.5 mb-1.5" />
-                  )}
-                </View>
-
-                {/* Content */}
-                <Pressable
-                  className="flex-1 pb-5 pt-0.5"
-                  onPress={() => setExpandedId((current) => (current === item.id ? null : item.id))}
+                <MotiView
+                  key={item.id}
+                  className="flex-row"
+                  from={{ opacity: 0, translateY: 15 }}
+                  animate={{ opacity: 1, translateY: 0 }}
+                  transition={{ type: 'timing', delay: Math.min(index, 20) * 100 }}
                 >
-                  <View className="flex-row items-start justify-between gap-2">
-                    <Text className="font-inter-bold text-[13px] text-text flex-1 leading-4" numberOfLines={1}>
-                      {item.title}
-                    </Text>
-                    <View className="bg-primary/5 px-2 py-0.5 rounded-full border border-primary/10">
-                      <Text className="font-inter-bold text-[9px] text-primary uppercase tracking-wider">
-                        {statusLabel}
+                  {/* Timeline Line & Dot */}
+                  <View className="items-center mr-4">
+                    {pulse ? (
+                      <MotiView
+                        className="w-8 h-8 rounded-full items-center justify-center z-10"
+                        style={{ backgroundColor: item.bgColor }}
+                        animate={{ scale: [1, 1.08, 1], opacity: [0.85, 1, 0.85] }}
+                        transition={{ type: 'timing', duration: 1400, loop: true }}
+                      >
+                        <MaterialIcons name={item.icon as any} size={16} color={item.color} />
+                      </MotiView>
+                    ) : (
+                      <View className="w-8 h-8 rounded-full items-center justify-center z-10" style={{ backgroundColor: item.bgColor }}>
+                        <MaterialIcons name={item.icon as any} size={16} color={item.color} />
+                      </View>
+                    )}
+                    {index !== feedItems.length - 1 && (
+                      <View className="w-0.5 flex-1 bg-primary/10 mt-1.5 mb-1.5" />
+                    )}
+                  </View>
+
+                  {/* Content */}
+                  <Pressable
+                    className="flex-1 pb-5 pt-0.5"
+                    onPress={() => setExpandedId((current) => (current === item.id ? null : item.id))}
+                  >
+                    <View className="flex-row items-start justify-between gap-2">
+                      <Text className="font-inter-bold text-[13px] text-text flex-1 leading-4" numberOfLines={2}>
+                        {item.title}
                       </Text>
                     </View>
-                  </View>
-                  <Text className="font-inter text-[11px] text-text-muted mt-1" numberOfLines={1}>
-                    {item.summary}
-                  </Text>
+                    <Text className="font-inter text-[11px] text-text-muted mt-1" numberOfLines={1}>
+                      {item.summary}
+                    </Text>
 
-                  {expandedId === item.id ? (
-                    <MotiView
-                      from={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      className="mt-3 bg-white/60 px-3 py-2.5 rounded-xl border border-white/90 overflow-hidden"
-                    >
-                      <View className="gap-1.5">
-                        <Text className="font-inter text-[11px] text-text-muted">
-                          Tipe: {item.type}
-                        </Text>
-                        {(item.details || []).filter(Boolean).map((detail: string) => (
-                          <Text key={detail} className="font-inter text-[11px] text-text-muted">
-                            {detail}
+                    {expandedId === item.id ? (
+                      <MotiView
+                        from={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        className="mt-3 bg-white/60 px-3 py-2.5 rounded-xl border border-white/90 overflow-hidden"
+                      >
+                        <View className="gap-1.5">
+                          <Text className="font-inter text-[11px] text-text-muted">
+                            Tipe: {item.type}
                           </Text>
-                        ))}
-                      </View>
-                    </MotiView>
-                  ) : null}
-                </Pressable>
-              </MotiView>
-            )})}
+                          {(item.details || []).filter(Boolean).map((detail: string) => (
+                            <Text key={detail} className="font-inter text-[11px] text-text-muted">
+                              {detail}
+                            </Text>
+                          ))}
+                        </View>
+                      </MotiView>
+                    ) : null}
+                  </Pressable>
+                </MotiView>
+              );
+            })}
           </View>
         )}
       </ScrollView>

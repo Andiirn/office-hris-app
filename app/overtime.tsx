@@ -353,6 +353,14 @@ export default function OvertimeScreen() {
                         {item.overtime_type?.replace('_', ' ')}
                       </Text>
                     </View>
+                    {(item.start_time || item.end_time) && (
+                      <View className="flex-row items-center gap-1 mt-1.5">
+                        <MaterialIcons name="schedule" size={12} color={Tokens.colors.textMuted} />
+                        <Text className="font-inter text-xs text-text-muted">
+                          {formatTime(item.start_time)} - {formatTime(item.end_time)}
+                        </Text>
+                      </View>
+                    )}
                   </View>
                   <View className="items-end">
                     <StatusBadge
