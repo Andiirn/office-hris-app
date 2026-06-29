@@ -21,6 +21,35 @@ export interface CheckoutRequest {
   gps_lat: number;
   gps_long: number;
   checkout_photo_url?: string | null;
+  location_address?: string | null;
+}
+
+export interface SelfieTimemarkRequest {
+  photoCode?: string;
+  timestamp?: number;
+  timezoneID?: string;
+  lat: number;
+  lng: number;
+  address?: string | null;
+  deviceID: string;
+  deviceModel: string;
+}
+
+export interface SelfieUploadFile {
+  uri: string;
+  name?: string;
+  type?: string | null;
+}
+
+export interface SelfieTimemarkPayload {
+  photoCode: string;
+  timestamp: number;
+  timezoneID: string;
+  lat: number;
+  lng: number;
+  address: string;
+  deviceID: string;
+  deviceModel: string;
 }
 
 export interface AttendanceActionResponse {
