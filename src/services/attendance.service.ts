@@ -68,6 +68,30 @@ export const attendanceService = {
     const response = await api.post('/attendance/checkout', payload);
     return unwrapData<AttendanceActionResponse>(response.data);
   },
+
+  async getPhotoChallenge(): Promise<string> {
+    try {
+      const response = await api.get('/attendance/photo/challenge');
+      return response.data?.challenge || response.data?.data?.challenge || '';
+    } catch (e) {
+      // Return empty string if the endpoint doesn't exist yet so it doesn't crash the UI prototype
+      return '';
+    }
+  },
+
+  async checkinWithPhoto(formData: FormData): Promise<any> {
+    const response = await api.post('/attendance/photo/checkin', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return unwrapData<any>(response.data);
+  },
+
+  async checkoutWithPhoto(formData: FormData): Promise<any> {
+    const response = await api.post('/attendance/photo/checkout', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return unwrapData<any>(response.data);
+  },
   async getTodayRecord() {
     const today = new Date();
     const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;

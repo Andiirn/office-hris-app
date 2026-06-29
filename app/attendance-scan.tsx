@@ -3,9 +3,10 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import LottieView from 'lottie-react-native';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ActivityIndicator, Linking, Pressable, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, Text, useWindowDimensions, View, Alert } from 'react-native';
+import ViewShot from 'react-native-view-shot';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Device from 'expo-device';
 import { Button } from '../src/components/ui/Button';
@@ -33,7 +34,71 @@ export default function AttendanceScanScreen() {
   const [coords, setCoords] = useState<{ lat: number; long: number } | null>(null);
   const [isMocked, setIsMocked] = useState(false);
   const [todayRecord, setTodayRecord] = useState<any | null>(null);
+  const [isSelfieMode, setIsSelfieMode] = useState(false);
+  const viewShotRef = useRef<ViewShot>(null);
   const { width, height } = useWindowDimensions();
+
+  const capturePhoto = async () => {
+    if (viewShotRef.current && viewShotRef.current.capture && coords) {
+      setSubmitting(true);
+      setCheckinMessage(null);
+      setErrorMessage(null);
+      
+      try {
+        const uri = await viewShotRef.current.capture();
+        const hasCheckin = !!todayRecord?.checkin_time || !!todayRecord?.checkin_at;
+        const hasCheckout = !!todayRecord?.checkout_time || !!todayRecord?.checkout_at;
+
+        if (hasCheckin && hasCheckout) {
+          setErrorMessage('Anda sudah check-in dan check-out hari ini.');
+          setSubmitting(false);
+          return;
+        }
+
+        const challenge = await attendanceService.getPhotoChallenge();
+        const formData = new FormData();
+        
+        formData.append('photo', {
+          uri,
+          name: `attendance_${Date.now()}.jpg`,
+          type: 'image/jpeg',
+        } as any);
+
+        formData.append('gps_lat', String(coords.lat));
+        formData.append('gps_long', String(coords.long));
+        formData.append('challenge', challenge);
+        
+        const deviceFingerprint = await getStableDeviceFingerprint();
+        formData.append('device_fingerprint', deviceFingerprint);
+        formData.append('device_model', Device.modelName || Device.deviceName || 'unknown');
+        formData.append('device_os', Device.osName || 'unknown');
+        formData.append('is_mock_location', String(isMocked));
+
+        if (!hasCheckin) {
+          const result = await attendanceService.checkinWithPhoto(formData);
+          setCheckinMessage(result?.message ?? 'Check-in dengan foto berhasil');
+        } else {
+          const result = await attendanceService.checkoutWithPhoto(formData);
+          setCheckinMessage(result?.message ?? 'Check-out dengan foto berhasil');
+        }
+
+        const latest = await attendanceService.getTodayRecord();
+        setTodayRecord(latest ?? null);
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryRoot() }),
+          queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryFullRoot() }),
+          queryClient.invalidateQueries({ queryKey: qk.homeApprovals(user?.id) }),
+          queryClient.invalidateQueries({ queryKey: qk.activityAttendanceFeed(user?.id, null, null) }),
+          queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryInfiniteRoot() }),
+        ]);
+
+      } catch (error: any) {
+        setErrorMessage(error?.response?.data?.message ?? error?.message ?? 'Gagal mengirim foto absensi');
+      } finally {
+        setSubmitting(false);
+      }
+    }
+  };
 
   const parseQrPayload = useCallback((raw: string) => {
     try {
@@ -256,24 +321,69 @@ export default function AttendanceScanScreen() {
 
             {isScannerVisible && (
               <>
-                <View className="w-full max-w-[320px] aspect-square rounded-3xl overflow-hidden border-[4px] border-primary-container/20 shadow-2xl relative">
-                  <CameraView
-                    style={{ flex: 1 }}
-                    barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-                    onBarcodeScanned={scanned ? undefined : ({ data }) => {
-                      setScanned(true);
-                      submitAttendance(data);
-                    }}
-                  />
-                  <View className="absolute inset-0 items-center justify-center pointer-events-none">
-                    <View className="w-48 h-48 border-2 border-dashed border-white/80 rounded-2xl" />
-                    <View className="absolute left-1/2 top-12 w-[1px] h-40 bg-red-500 opacity-60" style={{ transform: [{ translateX: -0.5 }] }} />
+                {!isSelfieMode ? (
+                  <View className="w-full max-w-[320px] aspect-square rounded-3xl overflow-hidden border-[4px] border-primary-container/20 shadow-2xl relative">
+                    <CameraView
+                      style={{ flex: 1 }}
+                      barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                      onBarcodeScanned={scanned ? undefined : ({ data }) => {
+                        setScanned(true);
+                        submitAttendance(data);
+                      }}
+                    />
+                    <View className="absolute inset-0 items-center justify-center pointer-events-none">
+                      <View className="w-48 h-48 border-2 border-dashed border-white/80 rounded-2xl" />
+                      <View className="absolute left-1/2 top-12 w-[1px] h-40 bg-red-500 opacity-60" style={{ transform: [{ translateX: -0.5 }] }} />
+                    </View>
                   </View>
-                </View>
+                ) : (
+                  <View className="w-full max-w-[320px] aspect-square rounded-3xl overflow-hidden border-[4px] border-primary-container/20 shadow-2xl relative bg-black">
+                    <ViewShot ref={viewShotRef} options={{ format: 'jpg', quality: 0.8 }} style={{ flex: 1 }}>
+                      <CameraView
+                        style={{ flex: 1 }}
+                        facing="front"
+                      />
+                      <View className="absolute bottom-4 left-4 right-4 bg-black/50 p-3 rounded-xl border border-white/20">
+                        <Text className="font-inter-bold text-xs text-white">
+                          {new Date().toLocaleString('id-ID')}
+                        </Text>
+                        <Text className="font-inter text-[10px] text-white/80 mt-1">
+                          Lat: {coords?.lat.toFixed(6)}, Long: {coords?.long.toFixed(6)}
+                        </Text>
+                      </View>
+                    </ViewShot>
+                  </View>
+                )}
 
                 <Text className="font-inter text-xs text-text-muted italic text-center mt-2 px-6">
-                  Arahkan kamera ke QR Code cabang untuk check-in atau check-out
+                  {!isSelfieMode 
+                    ? "Arahkan kamera ke QR Code cabang untuk check-in atau check-out" 
+                    : "Posisikan wajah Anda di kamera, lalu tekan tombol foto di bawah."}
                 </Text>
+
+                <View className="flex-row items-center justify-center mt-2 gap-4 w-full">
+                  <Pressable 
+                    onPress={() => setIsSelfieMode(false)}
+                    className={`flex-1 py-3 rounded-xl border items-center ${!isSelfieMode ? 'bg-primary border-primary' : 'bg-transparent border-primary/20'}`}
+                  >
+                    <Text className={`font-inter-bold text-sm ${!isSelfieMode ? 'text-white' : 'text-primary'}`}>Scan QR</Text>
+                  </Pressable>
+                  <Pressable 
+                    onPress={() => setIsSelfieMode(true)}
+                    className={`flex-1 py-3 rounded-xl border items-center ${isSelfieMode ? 'bg-primary border-primary' : 'bg-transparent border-primary/20'}`}
+                  >
+                    <Text className={`font-inter-bold text-sm ${isSelfieMode ? 'text-white' : 'text-primary'}`}>Foto Selfie</Text>
+                  </Pressable>
+                </View>
+
+                {isSelfieMode && (
+                  <Pressable
+                    onPress={capturePhoto}
+                    className="w-16 h-16 rounded-full bg-primary items-center justify-center shadow-lg mt-2"
+                  >
+                    <MaterialIcons name="camera-alt" size={28} color="white" />
+                  </Pressable>
+                )}
               </>
             )}
 
