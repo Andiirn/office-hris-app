@@ -28,6 +28,7 @@ export default function ApprovalsScreen() {
   const [tab, setTab] = useState<'pending' | 'history'>('pending');
   const [selectedModule, setSelectedModule] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const approvalSource = tab === 'pending' ? 'pending' : 'history';
 
   // 1. Query data
   const {
@@ -36,7 +37,7 @@ export default function ApprovalsScreen() {
     isFetching,
     refetch,
   } = useQuery({
-    queryKey: ['approvals', tab, user?.id],
+    queryKey: ['approvals', approvalSource, user?.id],
     queryFn: async () => {
       try {
         return tab === 'pending'
@@ -65,11 +66,10 @@ export default function ApprovalsScreen() {
         variables.action === 'APPROVE' ? 'Permintaan berhasil disetujui' : 'Permintaan berhasil ditolak'
       );
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['approvals', tab, user?.id] }),
         queryClient.invalidateQueries({ queryKey: ['approvals', 'pending', user?.id] }),
+        queryClient.invalidateQueries({ queryKey: ['approvals', 'history', user?.id] }),
         queryClient.invalidateQueries({ queryKey: ['home-approvals', user?.id] }),
-        queryClient.refetchQueries({ queryKey: ['approvals', tab, user?.id], type: 'active' }),
-        queryClient.refetchQueries({ queryKey: ['approvals', 'pending', user?.id], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: ['approvals', approvalSource, user?.id], type: 'active' }),
       ]);
     },
     onError: (error: any) => {
@@ -102,7 +102,7 @@ export default function ApprovalsScreen() {
     { key: 'LEAVE', label: 'Cuti / Izin' },
     { key: 'OVERTIME', label: 'Lembur' },
     { key: 'ATTENDANCE_CORRECTION', label: 'Koreksi Absen' },
-    { key: 'ATTENDANCE_VISIT', label: 'Dinas Luar' },
+    { key: 'VISIT', label: 'Dinas Luar' },
     { key: 'RESIGN', label: 'Resign' },
   ];
 
@@ -111,37 +111,67 @@ export default function ApprovalsScreen() {
       case 'LEAVE': return 'Cuti & Izin';
       case 'OVERTIME': return 'Kerja Lembur';
       case 'ATTENDANCE_CORRECTION': return 'Koreksi Absen';
-      case 'ATTENDANCE_VISIT': return 'Kunjungan Dinas';
+      case 'VISIT': return 'Kunjungan Dinas';
       case 'RESIGN': return 'Resign Kerja';
       default: return moduleName;
     }
   };
 
+  const getApprovalTypeLabel = (item: ApprovalItem) => {
+    const referenceType = String(item.reference_type || '').toLowerCase();
+    switch (referenceType) {
+      case 'overtime_record':
+        return 'Lembur';
+      case 'leave_request':
+        return 'Cuti / Izin';
+      case 'attendance_correction':
+        return 'Koreksi Absen';
+      case 'attendance_visit':
+        return 'Dinas Luar';
+      case 'resign_request':
+        return 'Resign';
+      default:
+        return getModuleLabel(item.module_name);
+    }
+  };
+
+  const getRequesterDisplayName = (item: ApprovalItem) =>
+    item.requester_name || item.requester?.full_name || item.employee_name || '-';
+
   const filteredApprovals = useMemo(() => {
     const list = approvals;
+    const getApprovalState = (item: ApprovalItem) => String(item.action || item.status || '').toUpperCase();
 
     const byModule = selectedModule === 'all'
       ? list
       : list.filter((item) => String(item.module_name || '').toUpperCase() === selectedModule);
 
-    const term = searchQuery.trim().toLowerCase();
-    if (!term) return byModule;
+    const byTab = tab === 'pending'
+      ? byModule.filter((item) => getApprovalState(item) === 'PENDING')
+      : byModule.filter((item) => getApprovalState(item) !== 'PENDING');
 
-    return byModule.filter((item) => {
+    const term = searchQuery.trim().toLowerCase();
+    if (!term) return byTab;
+
+    return byTab.filter((item) => {
       const haystack = [
-        item.employee_name,
+        item.requester_name,
         item.module_name,
         item.reference_type,
         item.status,
+        item.action,
+        item.comment,
+        item.approved_at,
         item.description,
-        item.reference_detail?.reason
+        item.reference_detail?.reason,
+        item.level_order
       ]
         .filter(Boolean)
         .map((val) => String(val).toLowerCase());
 
       return haystack.some((val) => val.includes(term));
     });
-  }, [approvals, selectedModule, searchQuery]);
+  }, [approvals, selectedModule, searchQuery, tab]);
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return '-';
@@ -159,7 +189,19 @@ export default function ApprovalsScreen() {
 
   const renderDetailFields = (item: ApprovalItem) => {
     const detail = item.reference_detail;
-    if (!detail) return null;
+    const approvalDate = item.approved_at || item.requested_at || item.created_at;
+
+    if (!detail) {
+      const timestampLabel = tab === 'pending' ? 'Diajukan pada' : 'Diproses pada';
+      return (
+        <View className="gap-1 mt-1">
+          <Text className="font-inter text-xs text-text-muted">
+            {timestampLabel}: <Text className="font-inter-semibold text-on-surface">{formatDate(approvalDate)}</Text>
+          </Text>
+          {item.comment ? <Text className="font-inter text-xs text-text-muted italic mt-0.5">Catatan: &quot;{item.comment}&quot;</Text> : null}
+        </View>
+      );
+    }
 
     switch (item.module_name) {
       case 'LEAVE':
@@ -183,6 +225,14 @@ export default function ApprovalsScreen() {
             <Text className="font-inter text-xs text-text-muted">
               Durasi: <Text className="font-inter-semibold text-on-surface">{detail.overtime_hours || detail.hours || '-'} Jam</Text>
             </Text>
+            <Text className="font-inter text-xs text-text-muted">
+              Tipe: <Text className="font-inter-semibold text-on-surface">{detail.overtime_type || '-'}</Text>
+            </Text>
+            <Text className="font-inter text-xs text-text-muted">
+              Nominal: <Text className="font-inter-semibold text-on-surface">
+                {typeof detail.overtime_amount === 'number' ? `Rp ${detail.overtime_amount.toLocaleString('id-ID')}` : detail.overtime_amount || '-'}
+              </Text>
+            </Text>
             {detail.reason ? <Text className="font-inter text-xs text-text-muted italic mt-0.5">Alasan: &quot;{detail.reason}&quot;</Text> : null}
           </View>
         );
@@ -199,6 +249,7 @@ export default function ApprovalsScreen() {
           </View>
         );
       case 'ATTENDANCE_VISIT':
+      case 'VISIT':
         return (
           <View className="gap-1 mt-1">
             <Text className="font-inter text-xs text-text-muted">
@@ -220,6 +271,21 @@ export default function ApprovalsScreen() {
         return detail.reason ? <Text className="font-inter text-xs text-text-muted italic mt-1">Catatan: &quot;{detail.reason}&quot;</Text> : null;
     }
   };
+
+  const renderPendingNotice = (item: ApprovalItem) => (
+    <View className="mt-2 rounded-xl bg-primary/5 px-3 py-2">
+      <Text className="font-inter-semibold text-[11px] text-primary">
+        Butuh persetujuan kamu dulu
+      </Text>
+      <Text className="font-inter text-[11px] text-text-muted mt-0.5">
+        Request ini belum bisa lanjut ke level berikutnya sebelum kamu setujui atau tolak.
+      </Text>
+      <Text className="font-inter text-[11px] text-text-muted mt-0.5">
+        Level saat ini: <Text className="font-inter-semibold text-on-surface">{item.current_level ?? '-'}</Text>
+        {' '}dari <Text className="font-inter-semibold text-on-surface">{item.max_level ?? '-'}</Text>
+      </Text>
+    </View>
+  );
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -346,10 +412,10 @@ export default function ApprovalsScreen() {
                       </View>
                       <View className="flex-1">
                         <Text className="font-manrope-bold text-sm text-on-surface" numberOfLines={1}>
-                          {item.employee_name}
+                          {getRequesterDisplayName(item)}
                         </Text>
                         <Text className="font-inter-medium text-[10px] text-text-muted uppercase tracking-wider">
-                          {getModuleLabel(item.module_name)}
+                          {getApprovalTypeLabel(item)}
                         </Text>
                       </View>
                     </View>
@@ -359,25 +425,34 @@ export default function ApprovalsScreen() {
                     />
                   </View>
 
-                  <View className="my-2 py-2 border-t border-b border-black/5 gap-1.5">
-                    <View className="flex-row items-center" style={{ gap: 6 }}>
-                      <MaterialIcons name="access-time" size={13} color={Tokens.colors.textMuted} />
-                      <Text className="font-inter text-[11px] text-text-muted">
-                        Diajukan pada {formatDate(item.requested_at)}
-                      </Text>
+                  {tab === 'history' ? (
+                    <View className="my-2 py-2 border-t border-b border-black/5 gap-1.5">
+                      <View className="flex-row items-center" style={{ gap: 6 }}>
+                        <MaterialIcons name="access-time" size={13} color={Tokens.colors.textMuted} />
+                        <Text className="font-inter text-[11px] text-text-muted">
+                          Diproses pada {formatDate(item.approved_at || item.requested_at || item.created_at)}
+                        </Text>
+                      </View>
+                      {renderDetailFields(item)}
                     </View>
-                    {renderDetailFields(item)}
-                  </View>
+                  ) : null}
+
+                  {tab === 'pending' ? renderPendingNotice(item) : null}
+                  {tab === 'pending' ? (
+                    <View className="my-2 py-2 border-t border-b border-black/5 gap-1.5">
+                      {renderDetailFields(item)}
+                    </View>
+                  ) : null}
 
                   {isPending ? (
                     <View className="flex-row mt-2" style={{ gap: 8 }}>
                       <Pressable
-                        onPress={() => handleAction(item.id, 'REJECT')}
-                        disabled={processMutation.isPending && processMutation.variables?.id === item.id}
+                        onPress={() => handleAction(item.request_id || item.approval_request_id || item.id, 'REJECT')}
+                        disabled={processMutation.isPending && processMutation.variables?.id === (item.request_id || item.approval_request_id || item.id)}
                         className="flex-1 h-10 border border-error rounded-xl flex-row items-center justify-center"
                       >
                         {processMutation.isPending &&
-                          processMutation.variables?.id === item.id &&
+                          processMutation.variables?.id === (item.request_id || item.approval_request_id || item.id) &&
                           processMutation.variables?.action === 'REJECT' ? (
                           <ActivityIndicator size="small" color={Tokens.colors.error} />
                         ) : (
@@ -388,12 +463,12 @@ export default function ApprovalsScreen() {
                         )}
                       </Pressable>
                       <Pressable
-                        onPress={() => handleAction(item.id, 'APPROVE')}
-                        disabled={processMutation.isPending && processMutation.variables?.id === item.id}
+                        onPress={() => handleAction(item.request_id || item.approval_request_id || item.id, 'APPROVE')}
+                        disabled={processMutation.isPending && processMutation.variables?.id === (item.request_id || item.approval_request_id || item.id)}
                         className="flex-1 h-10 bg-primary rounded-xl flex-row items-center justify-center"
                       >
                         {processMutation.isPending &&
-                          processMutation.variables?.id === item.id &&
+                          processMutation.variables?.id === (item.request_id || item.approval_request_id || item.id) &&
                           processMutation.variables?.action === 'APPROVE' ? (
                           <ActivityIndicator size="small" color="#fff" />
                         ) : (

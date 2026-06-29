@@ -1,13 +1,15 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useQuery } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GlassCard } from '../../src/components/ui/GlassCard';
 import { SkeletonCard } from '../../src/components/ui/Skeleton';
 import { StatusBadge } from '../../src/components/ui/StatusBadge';
+import { qk } from '../../src/core/query/query-keys';
 import { Tokens } from '../../src/core/theme/tokens';
+import { getAttendancePeriodWindow, parseAttendancePeriod, shiftAttendancePeriod } from '../../src/features/attendance/period';
 import { attendanceService } from '../../src/services/attendance.service';
 import { useAuthStore } from '../../src/stores/auth.store';
 import { getAttendanceBadgeProps } from '../../src/utils/status';
@@ -32,17 +34,6 @@ function getAttendanceDate(item: any) {
   return item.attendance_date || item.date || '-';
 }
 
-function getAttendanceStatus(item: any) {
-  const status = item.attendance_status || item.status || 'PRESENT';
-  const s = status.toUpperCase();
-  if (s === 'PRESENT') return 'HADIR';
-  if (s === 'LATE') return 'TERLAMBAT';
-  if (s === 'SICK') return 'SAKIT';
-  if (s === 'PERMISSION' || s === 'IZIN') return 'IZIN';
-  if (s === 'ABSENT') return 'TIDAK HADIR';
-  return status;
-}
-
 function getCheckIn(item: any) {
   return item.checkin_at || item.checkin_time;
 }
@@ -51,63 +42,26 @@ function getCheckOut(item: any) {
   return item.checkout_at || item.checkout_time;
 }
 
-function getAttendanceKey(item: any) {
-  return item.attendance_date || item.date || null;
-}
-
-function countsAsAttendance(item: any) {
-  const status = String(item?.attendance_status || item?.status || '').toUpperCase();
-  // Any status other than ABSENT or HOLIDAY implies they had an attendance intent (either present, leave, or sick).
-  return !['ABSENT', 'HOLIDAY'].includes(status);
-}
-
-function getPeriodDates(offset = 0) {
-  const today = new Date();
-  let year = today.getFullYear();
-  let month = today.getMonth();
-  const day = today.getDate();
-  let anchorMonth = day >= 26 ? month + 1 : month;
-  anchorMonth += offset;
-  const startDate = new Date(year, anchorMonth - 1, 26);
-  const endDate = new Date(year, anchorMonth, 25);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const dateFrom = `${startDate.getFullYear()}-${pad(startDate.getMonth() + 1)}-${pad(startDate.getDate())}`;
-  const dateTo = `${endDate.getFullYear()}-${pad(endDate.getMonth() + 1)}-${pad(endDate.getDate())}`;
-  return { startDate, endDate, dateFrom, dateTo };
-}
-
-
-
 export default function AttendanceScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ period?: string | string[] }>();
   const { user } = useAuthStore();
   const [periodOffset, setPeriodOffset] = useState(0);
 
-  const period = useMemo(() => getPeriodDates(periodOffset), [periodOffset]);
+  const periodParam = Array.isArray(params.period) ? params.period[0] : params.period;
+  const basePeriod = useMemo(() => parseAttendancePeriod(periodParam), [periodParam]);
+  const selectedPeriod = useMemo(() => shiftAttendancePeriod(basePeriod, periodOffset), [basePeriod, periodOffset]);
+  const period = useMemo(() => getAttendancePeriodWindow(selectedPeriod), [selectedPeriod]);
 
-  const { data: history = [], isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['attendance-history-full', user?.id, period.dateFrom, period.dateTo],
-    queryFn: () => attendanceService.getAttendanceHistory({
-      employee_id: user?.id,
-      date_from: period.dateFrom,
-      date_to: period.dateTo,
-      limit: 100,
-    }),
+  const { data: periodAttendance = [], isLoading: isLoadingPeriodAttendance, isFetching: isFetchingPeriodAttendance, refetch: refetchPeriodAttendance } = useQuery({
+    queryKey: qk.attendancePeriod(user?.id, period.year, period.month),
+    queryFn: () => user?.id ? attendanceService.getEmployeeAttendancePeriod(user.id, { year: period.year, month: period.month }) : [],
     enabled: !!user?.id,
+    staleTime: 60_000,
   });
 
-  const attendanceCount = useMemo(() => {
-    const uniqueDates = new Set<string>();
-    history.forEach((item: any) => {
-      const key = getAttendanceKey(item);
-      const hasAttendance = !!(getCheckIn(item) || getCheckOut(item));
-      if (key && (hasAttendance || countsAsAttendance(item))) uniqueDates.add(key);
-    });
-    return uniqueDates.size;
-  }, [history]);
-
-  const attendanceSummary = useMemo(() => {
-    return history.reduce(
+  const periodSummary = useMemo(() => {
+    return periodAttendance.reduce(
       (acc: { present: number; late: number; sick: number; permission: number; absent: number }, item: any) => {
         const status = String(item?.attendance_status || item?.status || '').toUpperCase();
         if (['PRESENT', 'EARLY_CHECKOUT'].includes(status)) acc.present += 1;
@@ -119,10 +73,21 @@ export default function AttendanceScreen() {
       },
       { present: 0, late: 0, sick: 0, permission: 0, absent: 0 },
     );
-  }, [history]);
+  }, [periodAttendance]);
+
+  const attendanceCount = periodSummary.present + periodSummary.late + periodSummary.sick + periodSummary.permission;
+
+  const attendanceSummary = periodSummary;
+  const sortedPeriodAttendance = useMemo(() => {
+    return [...periodAttendance].sort((a: any, b: any) => {
+      const dateA = Date.parse(a.attendance_date || a.date || a.created_at || '');
+      const dateB = Date.parse(b.attendance_date || b.date || b.created_at || '');
+      return (Number.isFinite(dateB) ? dateB : 0) - (Number.isFinite(dateA) ? dateA : 0);
+    });
+  }, [periodAttendance]);
 
   const onRefresh = () => {
-    refetch();
+    void refetchPeriodAttendance();
   };
 
   return (
@@ -216,15 +181,15 @@ export default function AttendanceScreen() {
         className="flex-1"
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={onRefresh} tintColor={Tokens.colors.primary} />}
+        refreshControl={<RefreshControl refreshing={isFetchingPeriodAttendance} onRefresh={onRefresh} tintColor={Tokens.colors.primary} />}
       >
-        {isLoading ? (
+        {isLoadingPeriodAttendance ? (
           <View className="mt-2">
             <SkeletonCard />
             <SkeletonCard />
             <SkeletonCard />
           </View>
-        ) : history.length === 0 ? (
+        ) : sortedPeriodAttendance.length === 0 ? (
           <GlassCard style={{ alignItems: 'center', padding: 40, marginTop: 20 }}>
             <View className="w-16 h-16 rounded-2xl bg-primary/10 items-center justify-center">
               <MaterialIcons name="event-busy" size={34} color={Tokens.colors.primary} />
@@ -236,7 +201,7 @@ export default function AttendanceScreen() {
           </GlassCard>
         ) : (
           <View className="gap-3">
-            {history.map((item) => (
+            {sortedPeriodAttendance.map((item) => (
               <GlassCard key={item.id} style={{ padding: 16 }}>
                 <View className="flex-row justify-between items-start mb-4">
                   <View className="flex-1 mr-3">

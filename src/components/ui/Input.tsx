@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   View, 
   Text, 
@@ -6,8 +6,10 @@ import {
   TextInputProps, 
   StyleSheet, 
   StyleProp, 
-  ViewStyle 
+  ViewStyle,
+  Pressable
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { Tokens } from '../../core/theme/tokens';
 
 interface InputProps extends TextInputProps {
@@ -21,16 +23,33 @@ export const Input: React.FC<InputProps> = ({
   error, 
   containerStyle, 
   style, 
+  secureTextEntry,
   ...props 
 }) => {
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   return (
     <View style={[styles.container, containerStyle]}>
       {label ? <Text style={styles.label}>{label}</Text> : null}
-      <TextInput
-        style={[styles.input, style]}
-        placeholderTextColor={Tokens.colors.outline}
-        {...props}
-      />
+      <View style={styles.inputWrapper}>
+        <TextInput
+          style={[styles.input, style, secureTextEntry && { paddingRight: 48 }]}
+          placeholderTextColor={Tokens.colors.outline}
+          secureTextEntry={secureTextEntry && !isPasswordVisible}
+          {...props}
+        />
+        {secureTextEntry && (
+          <Pressable 
+            style={styles.eyeIcon}
+            onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+          >
+            <Feather 
+              name={isPasswordVisible ? 'eye' : 'eye-off'} 
+              size={20} 
+              color={Tokens.colors.outline} 
+            />
+          </Pressable>
+        )}
+      </View>
       {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
   );
@@ -48,6 +67,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginLeft: 4,
   },
+  inputWrapper: {
+    position: 'relative',
+    justifyContent: 'center',
+  },
   input: {
     backgroundColor: Tokens.colors.inputBackground,
     borderRadius: Tokens.radius.lg,
@@ -62,5 +85,11 @@ const styles = StyleSheet.create({
     color: Tokens.colors.error,
     marginTop: 4,
     marginLeft: 4,
+  },
+  eyeIcon: {
+    position: 'absolute',
+    right: 16,
+    height: '100%',
+    justifyContent: 'center',
   },
 });

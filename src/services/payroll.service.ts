@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { api } from '../core/api/client';
 import { unwrapData } from '../core/api/envelope';
 import { tokenStore } from '../core/auth/token-store';
@@ -104,5 +105,17 @@ export const payrollService = {
     });
 
     return targetUri;
+  },
+
+  async sharePdf(localUri: string, filename: string): Promise<void> {
+    if (!(await Sharing.isAvailableAsync())) {
+      throw new Error('Sharing tidak tersedia di perangkat ini');
+    }
+
+    await Sharing.shareAsync(localUri, {
+      mimeType: 'application/pdf',
+      dialogTitle: filename,
+      UTI: 'com.adobe.pdf',
+    });
   },
 };

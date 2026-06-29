@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import { api } from '../core/api/client';
 import { unwrapData } from '../core/api/envelope';
-import { AttendanceActionResponse, AttendanceItem, AttendanceListQuery, CheckinRequest, CheckoutRequest, VisitItem, VisitListQuery, VisitRequest } from '../types/attendance';
+import { AttendanceActionResponse, AttendanceItem, AttendanceListQuery, AttendancePeriodQuery, CheckinRequest, CheckoutRequest, VisitItem, VisitListQuery, VisitRequest } from '../types/attendance';
 import { AttendanceCorrection, CorrectionListQuery, CorrectionRequest } from '../types/correction';
 
 const devLog = (...args: unknown[]) => {
@@ -16,7 +16,45 @@ const devError = (...args: unknown[]) => {
   }
 };
 
+const toLocalDateTimeMillis = (value?: string | null) => {
+  if (!value) return 0;
+  const normalized = value.includes('T') ? value : value.replace(' ', 'T');
+  const parsed = Date.parse(normalized);
+  if (Number.isFinite(parsed)) return parsed;
+
+  const dateOnly = value.split('T')[0].split(' ')[0];
+  const localParsed = Date.parse(`${dateOnly}T00:00:00`);
+  return Number.isFinite(localParsed) ? localParsed : 0;
+};
+
+const extractArray = <T>(raw: any): T[] => {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw as T[];
+  if (Array.isArray(raw.items)) return raw.items as T[];
+  if (Array.isArray(raw.data)) return raw.data as T[];
+  if (Array.isArray(raw.results)) return raw.results as T[];
+  if (Array.isArray(raw.records)) return raw.records as T[];
+  if (Array.isArray(raw.attendances)) return raw.attendances as T[];
+  if (Array.isArray(raw.list)) return raw.list as T[];
+  if (raw.data && typeof raw.data === 'object') {
+    return extractArray<T>(raw.data);
+  }
+  const arrays = Object.values(raw).filter((value) => Array.isArray(value));
+  if (arrays.length > 0) return arrays[0] as T[];
+  return [];
+};
+
 export const attendanceService = {
+  async getEmployeeAttendancePeriod(employeeId: string, query?: AttendancePeriodQuery): Promise<AttendanceItem[]> {
+    const response = await api.get(`/attendance/employee/${employeeId}/period`, {
+      params: query,
+    });
+    const data = unwrapData<any>(response.data);
+    const result = extractArray<AttendanceItem>(data);
+    result.sort((a, b) => toLocalDateTimeMillis(b.attendance_date || b.date || (b as any).created_at) - toLocalDateTimeMillis(a.attendance_date || a.date || (a as any).created_at));
+    return result;
+  },
+
   async checkin(payload: CheckinRequest): Promise<AttendanceActionResponse> {
     const response = await api.post('/attendance/checkin', {
       ...payload,
@@ -31,9 +69,10 @@ export const attendanceService = {
     return unwrapData<AttendanceActionResponse>(response.data);
   },
   async getTodayRecord() {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = new Date();
+    const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     const response = await api.get('/attendance/', {
-      params: { date_from: today, date_to: today, limit: 1, page: 1 },
+      params: { date_from: todayString, date_to: todayString, limit: 1, page: 1 },
     });
     const data = unwrapData<AttendanceItem[]>(response.data);
     return Array.isArray(data) ? data[0] : undefined;
@@ -53,18 +92,14 @@ export const attendanceService = {
       devLog('[AttendanceService] Unwrapped data sample:', JSON.stringify(Array.isArray(data) ? data.slice(0, 1) : data));
 
       // Handle different possible backend pagination shapes
-      let result: AttendanceItem[] = [];
-      if (Array.isArray(data)) {
-        result = data;
-      } else if (data && Array.isArray(data.items)) {
-        result = data.items;
-      } else if (data && Array.isArray(data.data)) {
-        result = data.data;
-      } else if (data && typeof data === 'object') {
-        // Fallback: check if the object itself is the wrapper and has an array property we don't know about
-        const arrays = Object.values(data).filter(v => Array.isArray(v));
-        if (arrays.length > 0) result = arrays[0] as AttendanceItem[];
-      }
+      let result: AttendanceItem[] = extractArray<AttendanceItem>(data);
+
+      // Sort by date descending (newest first)
+      result.sort((a, b) => {
+        const dateA = toLocalDateTimeMillis(a.attendance_date || a.date || (a as any).created_at);
+        const dateB = toLocalDateTimeMillis(b.attendance_date || b.date || (b as any).created_at);
+        return dateB - dateA;
+      });
 
       devLog('[AttendanceService] Returning', result.length, 'items');
       return result;
@@ -106,14 +141,7 @@ export const attendanceService = {
       });
       const data = unwrapData<any>(response.data);
       
-      if (Array.isArray(data)) return data;
-      if (data && Array.isArray(data.items)) return data.items;
-      if (data && Array.isArray(data.data)) return data.data;
-      if (data && data.data && Array.isArray(data.data.items)) return data.data.items;
-      if (data && data.results && Array.isArray(data.results)) return data.results;
-      if (data && data.data && data.data.results && Array.isArray(data.data.results)) return data.data.results;
-      
-      return [];
+      return extractArray<AttendanceCorrection>(data);
     } catch (error: any) {
       devError('[AttendanceService] listCorrections error:', error?.message);
       return [];

@@ -9,6 +9,18 @@ jest.mock('../../core/api/client', () => ({
 }));
 
 describe('attendanceService', () => {
+  describe('getEmployeeAttendancePeriod', () => {
+    it('should send year and month for the selected attendance period', async () => {
+      (api.get as jest.Mock).mockResolvedValue({ data: { data: [] } });
+
+      await attendanceService.getEmployeeAttendancePeriod('EMP001', { year: 2026, month: 6 });
+
+      expect(api.get).toHaveBeenCalledWith('/attendance/employee/EMP001/period', {
+        params: { year: 2026, month: 6 },
+      });
+    });
+  });
+
   describe('getAttendanceHistory', () => {
     it('should fetch attendance history and unwrap data', async () => {
       const mockData = {

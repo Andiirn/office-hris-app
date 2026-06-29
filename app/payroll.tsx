@@ -2,7 +2,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GlassCard } from '../src/components/ui/GlassCard';
 import { Skeleton, SkeletonCard } from '../src/components/ui/Skeleton';
@@ -112,8 +112,14 @@ export default function PayrollScreen() {
   const handleDownload = async () => {
     try {
       const { localUri, filename } = await payrollService.downloadPdf(user?.id || '', { month: selectedMonth, year: selectedYear, company_id: companyId });
-      const savedUri = await payrollService.savePdfToDownloads(localUri, filename);
-      Alert.alert('Sukses', `Slip gaji tersimpan ke folder pilihan.\n\nFile: ${savedUri.split('/').pop() || filename}`);
+      if (Platform.OS === 'android') {
+        const savedUri = await payrollService.savePdfToDownloads(localUri, filename);
+        Alert.alert('Sukses', `Slip gaji tersimpan ke folder pilihan.\n\nFile: ${savedUri.split('/').pop() || filename}`);
+        return;
+      }
+
+      await payrollService.sharePdf(localUri, filename);
+      Alert.alert('Sukses', 'Slip gaji siap dibagikan dari lembar berbagi iOS.');
     } catch (err: any) {
       console.error('[Payroll Download Error]', err);
       const status = err?.response?.status;

@@ -2,13 +2,15 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { Alert, Modal, Pressable, RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MotiView } from 'moti';
 import { Button } from '../src/components/ui/Button';
 import { GlassCard } from '../src/components/ui/GlassCard';
 import { Input } from '../src/components/ui/Input';
 import { SkeletonCard } from '../src/components/ui/Skeleton';
 import { StatusBadge } from '../src/components/ui/StatusBadge';
+import { SuccessAnimation } from '../src/components/ui/SuccessAnimation';
 import { Tokens } from '../src/core/theme/tokens';
 import { attendanceService } from '../src/services/attendance.service';
 import { useAuthStore } from '../src/stores/auth.store';
@@ -53,88 +55,27 @@ function getCheckOut(item: any) {
   return item.checkout_at || item.checkout_time;
 }
 
-function TimePicker({ visible, title, initialHour, initialMinute, onSave, onClose }: {
-  visible: boolean;
-  title: string;
-  initialHour: string;
-  initialMinute: string;
-  onSave: (hour: string, minute: string) => void;
-  onClose: () => void;
-}) {
-  const [selectedHour, setSelectedHour] = React.useState(initialHour);
-  const [selectedMinute, setSelectedMinute] = React.useState(initialMinute);
+function getAttendanceRecordId(item: any) {
+  return item?.attendance_id || item?.record_id || item?.attendanceRecordId || item?.id || '';
+}
 
-  React.useEffect(() => {
-    setSelectedHour(initialHour);
-    setSelectedMinute(initialMinute);
-  }, [initialHour, initialMinute, visible]);
+function normalizeTimePart(value: string, fallback: string) {
+  const digits = value.replace(/[^0-9]/g, '').slice(0, 2);
+  if (!digits) return fallback;
+  return digits.padStart(2, '0');
+}
 
-  if (!visible) return null;
+function clampTimePart(value: string, max: number, fallback: string) {
+  const normalized = normalizeTimePart(value, fallback);
+  const parsed = Number(normalized);
+  if (Number.isNaN(parsed)) return fallback;
+  return String(Math.min(Math.max(parsed, 0), max)).padStart(2, '0');
+}
 
-  const handleSave = () => {
-    const hh = String(parseInt(selectedHour || '0', 10) || 0).padStart(2, '0');
-    const mm = String(parseInt(selectedMinute || '0', 10) || 0).padStart(2, '0');
-    onSave(hh.slice(-2), mm.slice(-2));
-  };
-
-  return (
-    <View
-      style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        zIndex: 2000
-      }}
-    >
-      <View className="bg-background rounded-3xl w-full max-w-[300px] overflow-hidden shadow-2xl border border-white/80 p-5 items-center">
-        <View className="w-full flex-row justify-between items-center mb-3">
-          <Text className="font-manrope-bold text-sm text-text-muted">{title}</Text>
-          <TouchableOpacity className="w-7 h-7 rounded-full bg-black/5 items-center justify-center" onPress={onClose} activeOpacity={0.7}>
-            <MaterialIcons name="close" size={16} color={Tokens.colors.primary} />
-          </TouchableOpacity>
-        </View>
-
-        <View className="w-full gap-3 mb-4">
-          <View className="bg-primary/5 rounded-2xl border border-primary/10 px-4 py-3">
-            <Text className="font-inter-bold text-[11px] text-text-muted uppercase mb-2">Jam</Text>
-            <TextInput
-              value={selectedHour}
-              onChangeText={(text) => setSelectedHour(text.replace(/[^0-9]/g, '').slice(0, 2))}
-              keyboardType="number-pad"
-              maxLength={2}
-              className="font-manrope-extrabold text-3xl text-primary py-0"
-              textAlign="center"
-            />
-          </View>
-
-          <View className="bg-primary/5 rounded-2xl border border-primary/10 px-4 py-3">
-            <Text className="font-inter-bold text-[11px] text-text-muted uppercase mb-2">Menit</Text>
-            <TextInput
-              value={selectedMinute}
-              onChangeText={(text) => setSelectedMinute(text.replace(/[^0-9]/g, '').slice(0, 2))}
-              keyboardType="number-pad"
-              maxLength={2}
-              className="font-manrope-extrabold text-3xl text-primary py-0"
-              textAlign="center"
-            />
-          </View>
-        </View>
-
-        <TouchableOpacity
-          className="bg-primary w-full py-3.5 rounded-2xl items-center justify-center shadow-md active:opacity-90"
-          onPress={handleSave}
-          activeOpacity={0.85}
-        >
-          <Text className="font-inter-bold text-sm text-white">Simpan Waktu</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+function toDateTimeString(dateStr: string, hour: string, minute: string) {
+  if (!dateStr) return '';
+  const cleanDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+  return `${cleanDate}T${clampTimePart(hour, 23, '00')}:${clampTimePart(minute, 59, '00')}:00`;
 }
 
 export default function CorrectionScreen() {
@@ -154,7 +95,8 @@ export default function CorrectionScreen() {
   const [correctedCheckinMin, setCorrectedCheckinMin] = useState('00');
   const [correctedCheckoutHour, setCorrectedCheckoutHour] = useState('17');
   const [correctedCheckoutMin, setCorrectedCheckoutMin] = useState('00');
-  const [pickerTarget, setPickerTarget] = useState<'checkin' | 'checkout' | null>(null);
+  // Success Animation State
+  const [showSuccessAnim, setShowSuccessAnim] = useState(false);
 
   // Fetch correction history
   const { data: corrections = [], isLoading: isLoadingHistory, refetch: refetchHistory, isFetching: isFetchingHistory, isError: isErrorHistory } = useQuery({
@@ -188,8 +130,9 @@ export default function CorrectionScreen() {
         queryClient.invalidateQueries({ queryKey: ['attendance-corrections'] }),
         queryClient.invalidateQueries({ queryKey: ['attendance-history-full'] }),
       ]);
-      resetForm();
-      Alert.alert('Success', 'Pengajuan koreksi berhasil dikirim');
+      setModalVisible(false);
+      setAttendancePickerVisible(false);
+      setShowSuccessAnim(true);
     },
     onError: (error: any) => {
       Alert.alert('Error', error?.response?.data?.message || 'Gagal mengirim koreksi');
@@ -205,6 +148,7 @@ export default function CorrectionScreen() {
     setCorrectedCheckinMin('00');
     setCorrectedCheckoutHour('17');
     setCorrectedCheckoutMin('00');
+    setAttendancePickerVisible(false);
     setModalVisible(false);
   };
 
@@ -219,8 +163,8 @@ export default function CorrectionScreen() {
       setCorrectedCheckinMin(m);
       setCheckinExists(true);
     } else {
-      setCorrectedCheckinHour('--');
-      setCorrectedCheckinMin('--');
+      setCorrectedCheckinHour('08');
+      setCorrectedCheckinMin('00');
       setCheckinExists(false);
     }
 
@@ -232,8 +176,8 @@ export default function CorrectionScreen() {
       setCorrectedCheckoutMin(m);
       setCheckoutExists(true);
     } else {
-      setCorrectedCheckoutHour('--');
-      setCorrectedCheckoutMin('--');
+      setCorrectedCheckoutHour('17');
+      setCorrectedCheckoutMin('00');
       setCheckoutExists(false);
     }
 
@@ -241,7 +185,9 @@ export default function CorrectionScreen() {
   };
 
   const submitCorrection = () => {
-    if (!selectedAttendance?.id) {
+    const attendanceRecordId = getAttendanceRecordId(selectedAttendance);
+
+    if (!attendanceRecordId) {
       Alert.alert('Error', 'Pilih data kehadiran terlebih dahulu');
       return;
     }
@@ -251,11 +197,15 @@ export default function CorrectionScreen() {
     }
     
     const dateStr = getAttendanceDate(selectedAttendance);
-    const corrected_checkin = checkinExists ? `${dateStr}T${correctedCheckinHour}:${correctedCheckinMin}:00` : null;
-    const corrected_checkout = checkoutExists ? `${dateStr}T${correctedCheckoutHour}:${correctedCheckoutMin}:00` : null;
+    const corrected_checkin = checkinExists
+      ? toDateTimeString(dateStr, correctedCheckinHour, correctedCheckinMin)
+      : null;
+    const corrected_checkout = checkoutExists
+      ? toDateTimeString(dateStr, correctedCheckoutHour, correctedCheckoutMin)
+      : null;
 
     createMutation.mutate({
-      attendance_id: selectedAttendance.id,
+      attendance_id: attendanceRecordId,
       reason: reason.trim(),
       corrected_checkin,
       corrected_checkout,
@@ -320,6 +270,13 @@ export default function CorrectionScreen() {
           <RefreshControl refreshing={isFetchingHistory} onRefresh={onRefresh} tintColor={Tokens.colors.primary} />
         }
       >
+        <View className="flex-row justify-between items-center mt-2 mb-4">
+          <Text className="font-manrope-bold text-lg text-primary">Riwayat Koreksi</Text>
+          <View className="bg-primary/10 px-3 py-1 rounded-full">
+            <Text className="font-inter-bold text-[10px] text-primary">{corrections.length} Records</Text>
+          </View>
+        </View>
+
         {isLoadingHistory ? (
           <View className="mt-2">
             <SkeletonCard />
@@ -327,65 +284,91 @@ export default function CorrectionScreen() {
             <SkeletonCard />
           </View>
         ) : isErrorHistory ? (
-          <GlassCard style={{ alignItems: 'center', padding: 32, marginTop: 20 }}>
-            <MaterialIcons name="error-outline" size={48} color={Tokens.colors.error} />
-            <Text className="font-manrope-bold text-base text-primary mt-4">Gagal Memuat Data</Text>
-            <Text className="font-inter text-xs text-text-muted text-center mt-2 mb-4">
-              Ada masalah saat mengambil riwayat koreksi. Silakan coba kembali.
-            </Text>
-            <Button title="Coba Lagi" onPress={onRefresh} style={{ width: 140 }} />
-          </GlassCard>
+          <MotiView from={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
+            <GlassCard style={{ alignItems: 'center', padding: 32, marginTop: 10 }}>
+              <MaterialIcons name="error-outline" size={48} color={Tokens.colors.error} />
+              <Text className="font-manrope-bold text-base text-primary mt-4">Gagal Memuat Data</Text>
+              <Text className="font-inter text-xs text-text-muted text-center mt-2 mb-4">
+                Ada masalah saat mengambil riwayat koreksi. Silakan coba kembali.
+              </Text>
+              <Button title="Coba Lagi" onPress={onRefresh} style={{ width: 140 }} />
+            </GlassCard>
+          </MotiView>
         ) : corrections.length === 0 ? (
-          <GlassCard style={{ alignItems: 'center', padding: 40, marginTop: 20 }}>
-            <MaterialIcons name="fact-check" size={64} color={Tokens.colors.outline} />
-            <Text className="font-manrope-bold text-lg text-primary mt-4">Belum Ada Pengajuan</Text>
-            <Text className="font-inter text-sm text-text-muted text-center mt-2 mb-4">
-              Anda belum pernah mengajukan koreksi kehadiran atau data kosong.
-            </Text>
-            <Button title="Ajukan Koreksi Baru" onPress={() => setModalVisible(true)} />
-          </GlassCard>
+          <MotiView from={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
+            <GlassCard style={{ alignItems: 'center', padding: 40, marginTop: 10 }}>
+              <MotiView
+                from={{ translateY: -8 }}
+                animate={{ translateY: 8 }}
+                transition={{ type: 'timing', duration: 1500, loop: true, repeatReverse: true }}
+              >
+                <View className="w-20 h-20 rounded-full bg-primary/10 items-center justify-center mb-2">
+                  <MaterialIcons name="fact-check" size={40} color={Tokens.colors.primary} />
+                </View>
+              </MotiView>
+              <Text className="font-manrope-bold text-lg text-primary mt-4">Belum Ada Pengajuan</Text>
+              <Text className="font-inter text-sm text-text-muted text-center mt-2 mb-5">
+                Anda belum pernah mengajukan koreksi kehadiran atau data kosong.
+              </Text>
+              <Button title="Ajukan Koreksi Baru" onPress={() => setModalVisible(true)} />
+            </GlassCard>
+          </MotiView>
         ) : (
           <View className="gap-3">
-            {corrections.map((item: AttendanceCorrection) => (
-              <GlassCard key={item.id} style={{ padding: 16 }}>
-                <View className="flex-row justify-between items-center mb-3">
-                  <View className="flex-row items-center gap-2">
-                    <MaterialIcons name="calendar-today" size={16} color={Tokens.colors.primary} />
-                    <Text className="font-inter-bold text-base text-black">{getCorrectionDate(item)}</Text>
-                  </View>
-                  <StatusBadge label={item.status || 'PENDING'} type={getStatusType(item.status) as any} />
-                </View>
-
-                <View className="bg-black/5 p-3 rounded-xl mb-3">
-                  <View className="flex-row justify-between mb-2">
-                    <View className="items-center flex-1">
-                      <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-0.5">Koreksi Masuk</Text>
-                      <Text className="font-manrope-extrabold text-base text-primary">
-                        {item.corrected_checkin ? formatTime(item.corrected_checkin) : '--:--'}
+            {corrections.map((item: AttendanceCorrection, index: number) => (
+              <MotiView
+                key={item.id}
+                from={{ opacity: 0, translateY: 15 }}
+                animate={{ opacity: 1, translateY: 0 }}
+                transition={{ type: 'timing', duration: 400, delay: index * 100 }}
+              >
+                <GlassCard style={{ padding: 16 }}>
+                  <View className="flex-row justify-between items-start mb-2.5">
+                    <View className="flex-1">
+                      <Text className="font-inter-bold text-[11px] text-text-muted uppercase mb-1 tracking-widest">
+                        Pengajuan Koreksi Kehadiran
                       </Text>
+                      <View className="flex-row items-center gap-1.5">
+                        <MaterialIcons name="calendar-today" size={12} color={Tokens.colors.primary} />
+                        <Text className="font-inter-bold text-sm text-black">{getCorrectionDate(item)}</Text>
+                      </View>
                     </View>
-                    <View className="w-[1px] bg-black/10 mx-2" />
-                    <View className="items-center flex-1">
-                      <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-0.5">Koreksi Pulang</Text>
-                      <Text className="font-manrope-extrabold text-base text-primary">
-                        {item.corrected_checkout ? formatTime(item.corrected_checkout) : '--:--'}
-                      </Text>
+                    <StatusBadge label={item.status || 'PENDING'} type={getStatusType(item.status) as any} />
+                  </View>
+
+                  <View className="bg-primary/5 border border-primary/10 p-3 rounded-xl mb-3 mt-1">
+                    <View className="flex-row justify-between mb-1">
+                      <View className="flex-1">
+                        <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-0.5">Koreksi Masuk</Text>
+                        <Text className="font-manrope-extrabold text-base text-primary">
+                          {item.corrected_checkin ? formatTime(item.corrected_checkin) : '--:--'}
+                        </Text>
+                      </View>
+                      <View className="w-[1px] bg-primary/20 mx-3" />
+                      <View className="flex-1">
+                        <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-0.5">Koreksi Pulang</Text>
+                        <Text className="font-manrope-extrabold text-base text-primary">
+                          {item.corrected_checkout ? formatTime(item.corrected_checkout) : '--:--'}
+                        </Text>
+                      </View>
                     </View>
                   </View>
-                </View>
 
-                <View className="border-t border-black/5 pt-2.5">
-                  <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-1">Alasan</Text>
-                  <Text className="font-inter text-xs text-on-surface">{item.reason}</Text>
-                </View>
-
-                {item.notes ? (
-                  <View className="mt-2.5 border-t border-black/5 pt-2">
-                    <Text className="font-inter-semibold text-[10px] text-error uppercase mb-1">Catatan HRD</Text>
-                    <Text className="font-inter text-xs text-error italic">{item.notes}</Text>
+                  <View className="border-t border-black/5 pt-2.5">
+                    <View className="flex-row items-start gap-1.5">
+                      <MaterialIcons name="chat-bubble-outline" size={12} color={Tokens.colors.textMuted} style={{ marginTop: 2 }} />
+                      <Text className="font-inter text-xs text-on-surface flex-1">{item.reason}</Text>
+                    </View>
                   </View>
-                ) : null}
-              </GlassCard>
+
+                  {item.notes ? (
+                    <View className="mt-2.5 border-t border-black/5 pt-2">
+                      <Text className="font-inter-semibold text-[10px] text-error uppercase mb-1">Catatan HRD</Text>
+                      <Text className="font-inter text-xs text-error italic">&quot;{item.notes}&quot;</Text>
+                    </View>
+                  ) : null}
+                </GlassCard>
+              </MotiView>
             ))}
           </View>
         )}
@@ -399,226 +382,244 @@ export default function CorrectionScreen() {
         onRequestClose={resetForm}
       >
         <View className="flex-1 bg-black/40 justify-end">
-          <View className="bg-background rounded-t-[32px] p-6 max-h-[90%] shadow-2xl">
-            <View className="flex-row justify-between items-start mb-4">
-              <View>
-                <Text className="font-manrope-extrabold text-2xl text-primary">Ajukan Koreksi</Text>
-                <Text className="font-inter-medium text-xs text-text-muted mt-0.5">
-                  Koreksi jam masuk/pulang kehadiran yang keliru
-                </Text>
-              </View>
-              <Pressable className="w-9 h-9 rounded-full bg-black/5 items-center justify-center" onPress={resetForm}>
-                <MaterialIcons name="close" size={20} color={Tokens.colors.text} />
-              </Pressable>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Select Attendance Field */}
-              <View className="mb-4">
-                <Text className="font-inter-bold text-sm text-primary mb-2">Pilih Kehadiran</Text>
-                <Pressable
-                  className="flex-row items-center justify-between px-4 py-3 rounded-xl bg-primary/5 border border-primary/10 active:opacity-60"
-                  onPress={() => setAttendancePickerVisible(true)}
-                >
-                  <View className="flex-1 pr-3">
-                    <Text className="font-inter-bold text-sm text-on-surface" numberOfLines={1}>
-                      {selectedAttendance ? attendanceLabel : 'Tap untuk memilih data kehadiran'}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
+            className="bg-background rounded-t-[32px] shadow-2xl relative overflow-hidden"
+            style={{ maxHeight: '90%', minHeight: '50%' }}
+          >
+            {!attendancePickerVisible ? (
+              <>
+                <View className="px-6 pt-6 flex-row justify-between items-start mb-4">
+                  <View>
+                    <Text className="font-manrope-extrabold text-2xl text-primary">Ajukan Koreksi</Text>
+                    <Text className="font-inter-medium text-xs text-text-muted mt-0.5">
+                      Koreksi jam masuk/pulang kehadiran yang keliru
                     </Text>
-                    {selectedAttendance && (
-                      <Text className="font-inter-medium text-[10px] text-text-muted mt-0.5">
-                        Jam awal: {formatTime(getCheckIn(selectedAttendance))} - {formatTime(getCheckOut(selectedAttendance))}
-                      </Text>
-                    )}
                   </View>
-                  <MaterialIcons name="keyboard-arrow-down" size={22} color={Tokens.colors.textMuted} />
-                </Pressable>
-              </View>
-
-              {selectedAttendance && (
-                <>
-                  <View className="flex-row gap-3 mb-4">
-                    {/* Check In Column */}
-                    <View className="flex-1 bg-white border border-black/5 rounded-2xl p-3 shadow-sm">
-                      <View className="flex-row justify-between items-center mb-2">
-                        <Text className="font-inter-bold text-[10px] text-text-muted uppercase">Check In</Text>
-                        <Pressable onPress={() => setCheckinExists(!checkinExists)}>
-                          <MaterialIcons
-                            name={checkinExists ? "check-box" : "check-box-outline-blank"}
-                            size={18}
-                            color={Tokens.colors.primary}
-                          />
-                        </Pressable>
-                      </View>
-                      <Pressable
-                        className={`bg-primary/5 rounded-2xl border border-primary/10 px-3 py-4 ${!checkinExists && 'opacity-40'}`}
-                        onPress={() => checkinExists && setPickerTarget('checkin')}
-                        disabled={!checkinExists}
-                      >
-                        <View className="items-center">
-                          {checkinExists ? (
-                            <Text className="font-manrope-extrabold text-[32px] leading-[36px] text-primary tracking-tight">
-                              {correctedCheckinHour}:{correctedCheckinMin}
-                            </Text>
-                          ) : (
-                            <Text className="font-manrope-extrabold text-[28px] leading-[36px] text-text-muted tracking-tight">
-                              --:--
-                            </Text>
-                          )}
-                        </View>
-                      </Pressable>
-                      <Text className="font-inter text-[10px] text-text-muted mt-2 text-center">
-                        Tap untuk ubah jam
-                      </Text>
-                    </View>
-
-                    {/* Check Out Column */}
-                    <View className="flex-1 bg-white border border-black/5 rounded-2xl p-3 shadow-sm">
-                      <View className="flex-row justify-between items-center mb-2">
-                        <Text className="font-inter-bold text-[10px] text-text-muted uppercase">Check Out</Text>
-                        <Pressable onPress={() => setCheckoutExists(!checkoutExists)}>
-                          <MaterialIcons
-                            name={checkoutExists ? "check-box" : "check-box-outline-blank"}
-                            size={18}
-                            color={Tokens.colors.primary}
-                          />
-                        </Pressable>
-                      </View>
-                      <Pressable
-                        className={`bg-primary/5 rounded-2xl border border-primary/10 px-3 py-4 ${!checkoutExists && 'opacity-40'}`}
-                        onPress={() => checkoutExists && setPickerTarget('checkout')}
-                        disabled={!checkoutExists}
-                      >
-                        <View className="items-center">
-                          {checkoutExists ? (
-                            <Text className="font-manrope-extrabold text-[32px] leading-[36px] text-primary tracking-tight">
-                              {correctedCheckoutHour}:{correctedCheckoutMin}
-                            </Text>
-                          ) : (
-                            <Text className="font-manrope-extrabold text-[28px] leading-[36px] text-text-muted tracking-tight">
-                              --:--
-                            </Text>
-                          )}
-                        </View>
-                      </Pressable>
-                      <Text className="font-inter text-[10px] text-text-muted mt-2 text-center">
-                        Tap untuk ubah jam
-                      </Text>
-                    </View>
-                  </View>
-
-                  <Input
-                    label="Alasan Koreksi"
-                    value={reason}
-                    onChangeText={setReason}
-                    placeholder="Contoh: lupa absen check-in karena buru-buru"
-                    multiline
-                    numberOfLines={3}
-                    style={{ height: 88, textAlignVertical: 'top', paddingTop: 12 }}
-                  />
-
-                  <Button
-                    title="Kirim Koreksi"
-                    onPress={submitCorrection}
-                    loading={createMutation.isPending}
-                    disabled={createMutation.isPending}
-                    className="h-14 rounded-2xl mt-4"
-                  />
-                </>
-              )}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Attendance Picker Modal */}
-      <Modal
-        animationType="fade"
-        transparent
-        visible={attendancePickerVisible}
-        onRequestClose={() => setAttendancePickerVisible(false)}
-      >
-        <View className="flex-1 bg-black/40 justify-end">
-          <View className="bg-background rounded-t-[28px] p-5 max-h-[80%]">
-            <View className="flex-row justify-between items-center mb-4">
-              <View>
-                <Text className="font-manrope-bold text-xl text-primary">Pilih Kehadiran</Text>
-                <Text className="font-inter text-xs text-text-muted">Tap salah satu baris absensi 30 hari terakhir</Text>
-              </View>
-              <Pressable onPress={() => setAttendancePickerVisible(false)} className="w-9 h-9 rounded-full bg-black/5 items-center justify-center">
-                <MaterialIcons name="close" size={18} color={Tokens.colors.text} />
-              </Pressable>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {isLoadingAttendance ? (
-                <Text className="font-inter text-sm text-text-muted py-6 text-center">Memuat data...</Text>
-              ) : attendanceHistory.length === 0 ? (
-                <View className="p-4 bg-black/5 rounded-xl border border-dashed border-outline">
-                  <Text className="font-inter text-xs text-text-muted text-center">Tidak ada data kehadiran</Text>
+                  <Pressable className="w-9 h-9 rounded-full bg-black/5 items-center justify-center" onPress={resetForm}>
+                    <MaterialIcons name="close" size={20} color={Tokens.colors.text} />
+                  </Pressable>
                 </View>
-              ) : (
-                attendanceHistory.map((att: AttendanceItem) => {
-                  const isSelected = selectedAttendance?.id === att.id;
-                  return (
+
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 24 }}
+                >
+                  {/* Select Attendance Field */}
+                  <View className="mb-4">
+                    <Text className="font-inter-bold text-sm text-primary mb-2">Pilih Kehadiran</Text>
                     <Pressable
-                      key={att.id}
-                      className={`p-4 rounded-xl border mb-2 ${isSelected ? 'bg-primary/5 border-primary' : 'bg-[#f8f8f8] border-transparent'}`}
-                      onPress={() => handlePickAttendance(att)}
+                      className="flex-row items-center justify-between px-4 py-3 rounded-xl bg-primary/5 border border-primary/10 active:opacity-60"
+                      onPress={() => setAttendancePickerVisible(true)}
                     >
-                      <View className="flex-row justify-between items-center">
-                        <View className="flex-row items-center gap-3 flex-1">
-                          <View className={`w-8 h-8 rounded-full items-center justify-center ${isSelected ? 'bg-primary' : 'bg-outline/20'}`}>
-                            <MaterialIcons name="event" size={14} color={isSelected ? '#fff' : Tokens.colors.textMuted} />
-                          </View>
-                          <View className="flex-1">
-                            <View className="flex-row items-center gap-2">
-                              <Text className={`font-inter-bold text-sm ${isSelected ? 'text-primary' : 'text-on-surface'}`}>
-                                {getAttendanceDate(att)}
-                              </Text>
-                              {att.attendance_status && (() => {
-                                const badgeProps = getAttendanceBadgeProps(att.attendance_status);
-                                return (
-                                  <View className={`px-1.5 py-0.5 rounded-md ${badgeProps.bgClass}`}>
-                                    <Text className={`font-inter-bold text-[8px] ${badgeProps.textClass}`}>
-                                      {badgeProps.label}
-                                    </Text>
-                                  </View>
-                                );
-                              })()}
-                            </View>
-                            <Text className="font-inter-medium text-[10px] text-text-muted mt-0.5">
-                              {formatTime(getCheckIn(att))} - {formatTime(getCheckOut(att))}
-                            </Text>
-                          </View>
-                        </View>
-                        {isSelected ? <MaterialIcons name="check-circle" size={20} color={Tokens.colors.primary} /> : null}
+                      <View className="flex-1 pr-3">
+                        <Text className="font-inter-bold text-sm text-on-surface" numberOfLines={1}>
+                          {selectedAttendance ? attendanceLabel : 'Tap untuk memilih data kehadiran'}
+                        </Text>
+                        {selectedAttendance && (
+                          <Text className="font-inter-medium text-[10px] text-text-muted mt-0.5">
+                            Jam awal: {formatTime(getCheckIn(selectedAttendance))} - {formatTime(getCheckOut(selectedAttendance))}
+                          </Text>
+                        )}
                       </View>
+                      <MaterialIcons name="keyboard-arrow-down" size={22} color={Tokens.colors.textMuted} />
                     </Pressable>
-                  );
-                })
-              )}
-            </ScrollView>
-          </View>
+                  </View>
+
+                  {selectedAttendance && (
+                    <>
+                      <View className="flex-row gap-3 mb-4">
+                        {/* Check In Column */}
+                        <View className="flex-1 bg-white border border-black/5 rounded-2xl p-3 shadow-sm">
+                          <View className="flex-row justify-between items-center mb-2">
+                            <Text className="font-inter-bold text-[10px] text-text-muted uppercase">Check In</Text>
+                            <Pressable onPress={() => setCheckinExists(!checkinExists)}>
+                              <MaterialIcons
+                                name={checkinExists ? "check-box" : "check-box-outline-blank"}
+                                size={18}
+                                color={Tokens.colors.primary}
+                              />
+                            </Pressable>
+                          </View>
+                          <View
+                            className={`bg-primary/5 rounded-2xl border border-primary/10 px-2 py-4 items-center justify-center ${!checkinExists && 'opacity-40'}`}
+                          >
+                            {checkinExists ? (
+                              <View className="flex-row items-center justify-center w-full">
+                                <TextInput
+                                  value={correctedCheckinHour}
+                                  onChangeText={(t) => setCorrectedCheckinHour(t.replace(/[^0-9]/g, '').slice(0, 2))}
+                                  keyboardType="number-pad"
+                                  maxLength={2}
+                                  selectTextOnFocus
+                                  className="flex-1 font-manrope-extrabold text-[32px] leading-[36px] text-primary tracking-tight p-0 text-right"
+                                />
+                                <Text className="font-manrope-extrabold text-[28px] leading-[36px] text-primary tracking-tight p-0 mx-1">:</Text>
+                                <TextInput
+                                  value={correctedCheckinMin}
+                                  onChangeText={(t) => setCorrectedCheckinMin(t.replace(/[^0-9]/g, '').slice(0, 2))}
+                                  keyboardType="number-pad"
+                                  maxLength={2}
+                                  selectTextOnFocus
+                                  className="flex-1 font-manrope-extrabold text-[32px] leading-[36px] text-primary tracking-tight p-0 text-left"
+                                />
+                              </View>
+                            ) : (
+                              <Text className="font-manrope-extrabold text-[28px] leading-[36px] text-text-muted tracking-tight text-center w-full">
+                                --:--
+                              </Text>
+                            )}
+                          </View>
+                          <Text className="font-inter text-[10px] text-text-muted mt-2 text-center">
+                            Tap angka untuk ubah
+                          </Text>
+                        </View>
+
+                        {/* Check Out Column */}
+                        <View className="flex-1 bg-white border border-black/5 rounded-2xl p-3 shadow-sm">
+                          <View className="flex-row justify-between items-center mb-2">
+                            <Text className="font-inter-bold text-[10px] text-text-muted uppercase">Check Out</Text>
+                            <Pressable onPress={() => setCheckoutExists(!checkoutExists)}>
+                              <MaterialIcons
+                                name={checkoutExists ? "check-box" : "check-box-outline-blank"}
+                                size={18}
+                                color={Tokens.colors.primary}
+                              />
+                            </Pressable>
+                          </View>
+                          <View
+                            className={`bg-primary/5 rounded-2xl border border-primary/10 px-2 py-4 items-center justify-center ${!checkoutExists && 'opacity-40'}`}
+                          >
+                            {checkoutExists ? (
+                              <View className="flex-row items-center justify-center w-full">
+                                <TextInput
+                                  value={correctedCheckoutHour}
+                                  onChangeText={(t) => setCorrectedCheckoutHour(t.replace(/[^0-9]/g, '').slice(0, 2))}
+                                  keyboardType="number-pad"
+                                  maxLength={2}
+                                  selectTextOnFocus
+                                  className="flex-1 font-manrope-extrabold text-[32px] leading-[36px] text-primary tracking-tight p-0 text-right"
+                                />
+                                <Text className="font-manrope-extrabold text-[28px] leading-[36px] text-primary tracking-tight p-0 mx-1">:</Text>
+                                <TextInput
+                                  value={correctedCheckoutMin}
+                                  onChangeText={(t) => setCorrectedCheckoutMin(t.replace(/[^0-9]/g, '').slice(0, 2))}
+                                  keyboardType="number-pad"
+                                  maxLength={2}
+                                  selectTextOnFocus
+                                  className="flex-1 font-manrope-extrabold text-[32px] leading-[36px] text-primary tracking-tight p-0 text-left"
+                                />
+                              </View>
+                            ) : (
+                              <Text className="font-manrope-extrabold text-[28px] leading-[36px] text-text-muted tracking-tight text-center w-full">
+                                --:--
+                              </Text>
+                            )}
+                          </View>
+                          <Text className="font-inter text-[10px] text-text-muted mt-2 text-center">
+                            Tap angka untuk ubah
+                          </Text>
+                        </View>
+                      </View>
+
+                      <Input
+                        label="Alasan Koreksi"
+                        value={reason}
+                        onChangeText={setReason}
+                        placeholder="Contoh: lupa absen check-in karena buru-buru"
+                        multiline
+                        numberOfLines={3}
+                        style={{ height: 88, textAlignVertical: 'top', paddingTop: 12 }}
+                      />
+
+                      <Button
+                        title="Kirim Koreksi"
+                        onPress={submitCorrection}
+                        loading={createMutation.isPending}
+                        disabled={createMutation.isPending}
+                        className="h-14 rounded-2xl mt-4"
+                      />
+                    </>
+                  )}
+                </ScrollView>
+              </>
+            ) : (
+              <View className="flex-1 min-h-[300px]">
+                <View className="px-6 pt-6 flex-row justify-between items-center mb-4">
+                  <View>
+                    <Text className="font-manrope-bold text-xl text-primary">Pilih Kehadiran</Text>
+                    <Text className="font-inter text-xs text-text-muted">Tap salah satu baris absensi 30 hari terakhir</Text>
+                  </View>
+                  <Pressable onPress={() => setAttendancePickerVisible(false)} className="w-9 h-9 rounded-full bg-black/5 items-center justify-center">
+                    <MaterialIcons name="close" size={18} color={Tokens.colors.text} />
+                  </Pressable>
+                </View>
+
+                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 24 }}>
+                  {isLoadingAttendance ? (
+                    <Text className="font-inter text-sm text-text-muted py-6 text-center">Memuat data...</Text>
+                  ) : attendanceHistory.length === 0 ? (
+                    <View className="p-4 bg-black/5 rounded-xl border border-dashed border-outline">
+                      <Text className="font-inter text-xs text-text-muted text-center">Tidak ada data kehadiran</Text>
+                    </View>
+                  ) : (
+                    attendanceHistory.map((att: AttendanceItem) => {
+                      const isSelected = getAttendanceRecordId(selectedAttendance) === getAttendanceRecordId(att);
+                      return (
+                        <Pressable
+                          key={att.id}
+                          className={`p-4 rounded-xl border mb-2 ${isSelected ? 'bg-primary/5 border-primary' : 'bg-[#f8f8f8] border-transparent'}`}
+                          onPress={() => handlePickAttendance(att)}
+                        >
+                          <View className="flex-row justify-between items-center">
+                            <View className="flex-row items-center gap-3 flex-1">
+                              <View className={`w-8 h-8 rounded-full items-center justify-center ${isSelected ? 'bg-primary' : 'bg-outline/20'}`}>
+                                <MaterialIcons name="event" size={14} color={isSelected ? '#fff' : Tokens.colors.textMuted} />
+                              </View>
+                              <View className="flex-1">
+                                <View className="flex-row items-center gap-2">
+                                  <Text className={`font-inter-bold text-sm ${isSelected ? 'text-primary' : 'text-on-surface'}`}>
+                                    {getAttendanceDate(att)}
+                                  </Text>
+                                  {att.attendance_status && (() => {
+                                    const badgeProps = getAttendanceBadgeProps(att.attendance_status);
+                                    return (
+                                      <View className={`px-1.5 py-0.5 rounded-md ${badgeProps.bgClass}`}>
+                                        <Text className={`font-inter-bold text-[8px] ${badgeProps.textClass}`}>
+                                          {badgeProps.label}
+                                        </Text>
+                                      </View>
+                                    );
+                                  })()}
+                                </View>
+                                <Text className="font-inter-medium text-[10px] text-text-muted mt-0.5">
+                                  {formatTime(getCheckIn(att))} - {formatTime(getCheckOut(att))}
+                                </Text>
+                              </View>
+                            </View>
+                            {isSelected ? <MaterialIcons name="check-circle" size={20} color={Tokens.colors.primary} /> : null}
+                          </View>
+                        </Pressable>
+                      );
+                    })
+                  )}
+                </ScrollView>
+              </View>
+            )}
+          </KeyboardAvoidingView>
         </View>
       </Modal>
 
-      {/* Time Picker Modal */}
-      <TimePicker
-        visible={pickerTarget !== null}
-        title={pickerTarget === 'checkin' ? 'Koreksi Jam Masuk' : 'Koreksi Jam Pulang'}
-        initialHour={pickerTarget === 'checkin' ? correctedCheckinHour : correctedCheckoutHour}
-        initialMinute={pickerTarget === 'checkin' ? correctedCheckinMin : correctedCheckoutMin}
-        onSave={(h, m) => {
-          if (pickerTarget === 'checkin') {
-            setCorrectedCheckinHour(h);
-            setCorrectedCheckinMin(m);
-          } else {
-            setCorrectedCheckoutHour(h);
-            setCorrectedCheckoutMin(m);
-          }
-          setPickerTarget(null);
+      <SuccessAnimation
+        visible={showSuccessAnim}
+        title="Terkirim!"
+        message="Pengajuan Anda sedang meluncur ke HRD."
+        onDone={() => {
+          setShowSuccessAnim(false);
+          resetForm();
         }}
-        onClose={() => setPickerTarget(null)}
       />
     </SafeAreaView>
   );

@@ -1,25 +1,24 @@
 // app/_layout.tsx
-import './../src/core/theme/global.css';
-import { Stack } from 'expo-router';
-import { focusManager, QueryClientProvider } from '@tanstack/react-query';
-import { ErrorBoundaryProps, useRouter, useSegments } from 'expo-router';
-import { Alert, Text, View, Pressable, AppState, AppStateStatus, Platform } from 'react-native';
-import { queryClient } from '../src/core/api/query-client';
-import React, { useEffect } from 'react';
-import * as SplashScreen from 'expo-splash-screen';
-import { 
-  useFonts, 
-  Manrope_800ExtraBold, 
-  Manrope_700Bold 
-} from '@expo-google-fonts/manrope';
-import { 
-  Inter_400Regular, 
-  Inter_700Bold 
+import {
+  Inter_400Regular,
+  Inter_700Bold
 } from '@expo-google-fonts/inter';
+import {
+  Manrope_700Bold,
+  Manrope_800ExtraBold,
+  useFonts
+} from '@expo-google-fonts/manrope';
+import { focusManager, QueryClientProvider } from '@tanstack/react-query';
+import { ErrorBoundaryProps, Stack, useRouter, useSegments } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
+import React, { useEffect } from 'react';
+import { AppState, AppStateStatus, Platform, Pressable, Text, View } from 'react-native';
+import { queryClient } from '../src/core/api/query-client';
 import { sessionManager } from '../src/core/auth/session-manager';
-import { useAuthStore } from '../src/stores/auth.store';
-import { notificationService } from '../src/services/notification.service';
 import { qk } from '../src/core/query/query-keys';
+import { notificationService } from '../src/services/notification.service';
+import { useAuthStore } from '../src/stores/auth.store';
+import './../src/core/theme/global.css';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -47,10 +46,10 @@ function onAppStateChange(status: AppStateStatus) {
 }
 
 export default function RootLayout() {
-  const { isInitialized, isLoggedIn, bootstrapError, setBootstrapError } = useAuthStore();
+  const { isInitialized, isLoggedIn, hasSeenOnboarding, checkOnboarding, bootstrapError, setBootstrapError } = useAuthStore();
   const segments = useSegments();
   const router = useRouter();
-  
+
   useEffect(() => {
     const subscription = AppState.addEventListener('change', onAppStateChange);
     return () => subscription.remove();
@@ -65,26 +64,34 @@ export default function RootLayout() {
 
   useEffect(() => {
     sessionManager.initialize();
+    checkOnboarding();
   }, []);
 
   const handleRetryBootstrap = React.useCallback(() => {
     setBootstrapError(null);
     sessionManager.initialize();
-  }, [setBootstrapError]);
+    checkOnboarding();
+  }, [setBootstrapError, checkOnboarding]);
 
   useEffect(() => {
-    if (isInitialized) {
-      const inAuthGroup = segments[0] === '(auth)';
+    if (isInitialized && hasSeenOnboarding !== null) {
+      if (hasSeenOnboarding === false) {
+        if (segments[0] !== 'onboarding') {
+          router.replace('/onboarding');
+        }
+      } else {
+        const inAuthGroup = segments[0] === '(auth)';
 
-      if (!isLoggedIn && !inAuthGroup) {
-        // Redirect to login if not logged in and not in auth group
-        router.replace('/(auth)/login');
-      } else if (isLoggedIn && inAuthGroup) {
-        // Redirect to tabs if logged in and in auth group
-        router.replace('/(tabs)');
+        if (!isLoggedIn && !inAuthGroup) {
+          // Redirect to login if not logged in and not in auth group
+          router.replace('/(auth)/login');
+        } else if (isLoggedIn && inAuthGroup) {
+          // Redirect to tabs if logged in and in auth group
+          router.replace('/(tabs)');
+        }
       }
     }
-  }, [isInitialized, isLoggedIn, segments]);
+  }, [isInitialized, isLoggedIn, hasSeenOnboarding, segments]);
 
   useEffect(() => {
     if (isLoggedIn) {
@@ -137,12 +144,12 @@ export default function RootLayout() {
   }, [isLoggedIn]);
 
   useEffect(() => {
-    if ((loaded || error) && isInitialized) {
-      SplashScreen.hideAsync().catch(() => {});
+    if ((loaded || error) && isInitialized && hasSeenOnboarding !== null) {
+      SplashScreen.hideAsync().catch(() => { });
     }
-  }, [loaded, error, isInitialized]);
+  }, [loaded, error, isInitialized, hasSeenOnboarding]);
 
-  if ((!loaded && !error) || !isInitialized) {
+  if ((!loaded && !error) || !isInitialized || hasSeenOnboarding === null) {
     return null;
   }
 
@@ -164,6 +171,7 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="approvals" options={{ headerShown: false }} />

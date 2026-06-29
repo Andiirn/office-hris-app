@@ -1802,6 +1802,151 @@
         }
       }
     },
+    "/api/v1/approvals/{request_id}": {
+      "get": {
+        "tags": [
+          "Approvals"
+        ],
+        "summary": "Get Approval By Id",
+        "operationId": "get_approval_by_id_api_v1_approvals__request_id__get",
+        "parameters": [
+          {
+            "name": "request_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Request Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_ApprovalRequestResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Bad request — business rule violation",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Resource not found",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Conflict — resource already exists",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Validation error",
+                  "errors": [
+                    {
+                      "field": "nik",
+                      "message": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Not authenticated — missing or invalid token",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Access denied — insufficient permissions",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
     "/api/v1/audit/logs": {
       "get": {
         "tags": [
@@ -12446,6 +12591,151 @@
         }
       }
     },
+    "/api/v1/attendance/import": {
+      "post": {
+        "tags": [
+          "Attendance"
+        ],
+        "summary": "Import Attendances",
+        "operationId": "import_attendances_api_v1_attendance_import_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_attendances_api_v1_attendance_import_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_ImportAttendanceResultResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Bad request — business rule violation",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Resource not found",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Conflict — resource already exists",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Validation error",
+                  "errors": [
+                    {
+                      "field": "nik",
+                      "message": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Not authenticated — missing or invalid token",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Access denied — insufficient permissions",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
     "/api/v1/attendance/checkin": {
       "post": {
         "tags": [
@@ -13177,7 +13467,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PaginatedData_AttendanceResponse_"
+                  "$ref": "#/components/schemas/PaginatedData_AttendanceCalendarResponse_"
                 }
               }
             }
@@ -13322,7 +13612,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SuccessResponse_list_AttendanceResponse__"
+                  "$ref": "#/components/schemas/SuccessResponse_list_AttendanceCalendarResponse__"
                 }
               }
             }
@@ -26131,6 +26421,151 @@
         }
       }
     },
+    "/api/v1/push-notifications/device-token": {
+      "post": {
+        "tags": [
+          "Push Notifications"
+        ],
+        "summary": "Save Device Token",
+        "operationId": "save_device_token_api_v1_push_notifications_device_token_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceTokenUpsertRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_DeviceTokenResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Bad request — business rule violation",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Resource not found",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Conflict — resource already exists",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Validation error",
+                  "errors": [
+                    {
+                      "field": "nik",
+                      "message": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Not authenticated — missing or invalid token",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Access denied — insufficient permissions",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
     "/api/v1/profile": {
       "get": {
         "tags": [
@@ -26596,6 +27031,151 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_dict_"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Bad request — business rule violation",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Resource not found",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Conflict — resource already exists",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Validation error",
+                  "errors": [
+                    {
+                      "field": "nik",
+                      "message": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Not authenticated — missing or invalid token",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Access denied — insufficient permissions",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/profile/device-token": {
+      "post": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Save Device Token",
+        "operationId": "save_device_token_api_v1_profile_device_token_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceTokenUpsertRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_DeviceTokenResponse_"
                 }
               }
             }
@@ -32210,6 +32790,39 @@
           "level_order": {
             "type": "integer",
             "title": "Level Order"
+          },
+          "approver": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EmployeeNested"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reference_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Id"
+          },
+          "reference_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Type"
           }
         },
         "type": "object",
@@ -32520,6 +33133,18 @@
             "type": "array",
             "title": "Histories",
             "default": []
+          },
+          "reference_detail": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Detail"
           }
         },
         "type": "object",
@@ -32565,6 +33190,390 @@
           "full_name"
         ],
         "title": "AssignerBrief"
+      },
+      "AttendanceCalendarResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "employee_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Employee Id"
+          },
+          "branch_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Branch Id"
+          },
+          "station_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Station Id"
+          },
+          "shift_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shift Id"
+          },
+          "attendance_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Attendance Date"
+          },
+          "checkin_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkin At"
+          },
+          "checkout_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkout At"
+          },
+          "checkin_lat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkin Lat"
+          },
+          "checkin_long": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkin Long"
+          },
+          "checkout_lat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkout Lat"
+          },
+          "checkout_long": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkout Long"
+          },
+          "checkin_photo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkin Photo Url"
+          },
+          "attendance_status": {
+            "type": "string",
+            "title": "Attendance Status"
+          },
+          "attendance_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attendance Method"
+          },
+          "is_late": {
+            "type": "boolean",
+            "title": "Is Late"
+          },
+          "late_minutes": {
+            "type": "integer",
+            "title": "Late Minutes"
+          },
+          "early_checkout_minutes": {
+            "type": "integer",
+            "title": "Early Checkout Minutes"
+          },
+          "overtime_minutes": {
+            "type": "integer",
+            "title": "Overtime Minutes"
+          },
+          "overtime_hours": {
+            "type": "number",
+            "title": "Overtime Hours"
+          },
+          "overtime_amount": {
+            "type": "number",
+            "title": "Overtime Amount"
+          },
+          "is_holiday_attendance": {
+            "type": "boolean",
+            "title": "Is Holiday Attendance"
+          },
+          "is_saturday_attendance": {
+            "type": "boolean",
+            "title": "Is Saturday Attendance"
+          },
+          "validation_score": {
+            "type": "integer",
+            "title": "Validation Score"
+          },
+          "validation_flags": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validation Flags"
+          },
+          "validation_decision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validation Decision"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "is_corrected": {
+            "type": "boolean",
+            "title": "Is Corrected"
+          },
+          "timemark_checkin_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timemark Checkin Code"
+          },
+          "timemark_checkout_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timemark Checkout Code"
+          },
+          "timemark_checkin_data": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timemark Checkin Data"
+          },
+          "timemark_checkout_data": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timemark Checkout Data"
+          },
+          "timemark_checkin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TimemarkInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "timemark_checkout": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TimemarkInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "employee": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EmployeeNested"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BranchNested"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "station": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AttendanceStationNested"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shift": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShiftNested"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "holiday_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holiday Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "employee_id",
+          "branch_id",
+          "attendance_date",
+          "attendance_status",
+          "is_late",
+          "late_minutes",
+          "early_checkout_minutes",
+          "overtime_minutes",
+          "overtime_hours",
+          "overtime_amount",
+          "is_holiday_attendance",
+          "is_saturday_attendance",
+          "validation_score",
+          "is_corrected"
+        ],
+        "title": "AttendanceCalendarResponse"
+      },
+      "AttendanceDetailSchema": {
+        "properties": {
+          "alpha": {
+            "type": "integer",
+            "title": "Alpha"
+          },
+          "ijin": {
+            "type": "integer",
+            "title": "Ijin"
+          },
+          "cuti": {
+            "type": "integer",
+            "title": "Cuti"
+          },
+          "sakit": {
+            "type": "integer",
+            "title": "Sakit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "alpha",
+          "ijin",
+          "cuti",
+          "sakit"
+        ],
+        "title": "AttendanceDetailSchema"
       },
       "AttendanceNested": {
         "properties": {
@@ -33395,6 +34404,29 @@
         ],
         "title": "BankAccountCreate"
       },
+      "BankAccountNested": {
+        "properties": {
+          "bank_name": {
+            "type": "string",
+            "title": "Bank Name"
+          },
+          "account_number": {
+            "type": "string",
+            "title": "Account Number"
+          },
+          "account_holder_name": {
+            "type": "string",
+            "title": "Account Holder Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bank_name",
+          "account_number",
+          "account_holder_name"
+        ],
+        "title": "BankAccountNested"
+      },
       "BankAccountResponse": {
         "properties": {
           "id": {
@@ -33495,6 +34527,30 @@
         },
         "type": "object",
         "title": "BankAccountUpdate"
+      },
+      "Body_import_attendances_api_v1_attendance_import_post": {
+        "properties": {
+          "company_id": {
+            "type": "string",
+            "title": "Company Id"
+          },
+          "branch_id": {
+            "type": "string",
+            "title": "Branch Id"
+          },
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "company_id",
+          "branch_id",
+          "file"
+        ],
+        "title": "Body_import_attendances_api_v1_attendance_import_post"
       },
       "Body_import_employee_components_api_v1_payroll_employee_components_import_post": {
         "properties": {
@@ -34634,7 +35690,8 @@
           "PKWTT",
           "OUTSOURCING",
           "DAILY",
-          "INTERNSHIP"
+          "INTERNSHIP",
+          "PROBATION"
         ],
         "title": "ContractTypeEnum"
       },
@@ -35303,6 +36360,92 @@
           "created_at"
         ],
         "title": "DeviceSessionResponse"
+      },
+      "DeviceTokenResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "device_os": {
+            "type": "string",
+            "title": "Device Os"
+          },
+          "device_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Name"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "token",
+          "device_os",
+          "is_active"
+        ],
+        "title": "DeviceTokenResponse"
+      },
+      "DeviceTokenUpsertRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Token"
+          },
+          "device_os": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Device Os",
+            "default": "android"
+          },
+          "device_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "DeviceTokenUpsertRequest"
       },
       "DivisionAssignedItem": {
         "properties": {
@@ -36470,6 +37613,17 @@
               }
             ]
           },
+          "golongan_ptkp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Golongan Ptkp"
+          },
           "allowance": {
             "type": "number",
             "title": "Allowance"
@@ -37417,6 +38571,42 @@
         "type": "object",
         "title": "HolidayUpdate"
       },
+      "ImportAttendanceResultResponse": {
+        "properties": {
+          "success_count": {
+            "type": "integer",
+            "title": "Success Count"
+          },
+          "failed_count": {
+            "type": "integer",
+            "title": "Failed Count"
+          },
+          "success": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Success"
+          },
+          "errors": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success_count",
+          "failed_count",
+          "success",
+          "errors"
+        ],
+        "title": "ImportAttendanceResultResponse"
+      },
       "LeaveApprovalAction": {
         "properties": {
           "action": {
@@ -37682,6 +38872,18 @@
               }
             ],
             "title": "Document Url"
+          },
+          "replacement_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replacement Id"
           }
         },
         "type": "object",
@@ -37775,6 +38977,18 @@
             "type": "integer",
             "title": "Current Approval Level"
           },
+          "replacement_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replacement Id"
+          },
           "employee": {
             "anyOf": [
               {
@@ -37789,6 +39003,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/LeaveTypeNested"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "replacement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EmployeeNested"
               },
               {
                 "type": "null"
@@ -37900,6 +39124,19 @@
           "code": {
             "type": "string",
             "title": "Code"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "enum": [],
+                "title": "Enum",
+                "description": "Create a collection of name/value pairs.\n\nExample enumeration:\n\n>>> class Color(Enum):\n...     RED = 1\n...     BLUE = 2\n...     GREEN = 3\n\nAccess them by:\n\n- attribute access:\n\n  >>> Color.RED\n  <Color.RED: 1>\n\n- value lookup:\n\n  >>> Color(1)\n  <Color.RED: 1>\n\n- name lookup:\n\n  >>> Color['RED']\n  <Color.RED: 1>\n\nEnumerations can be iterated over, and know how many members they have:\n\n>>> len(Color)\n3\n\n>>> list(Color)\n[<Color.RED: 1>, <Color.BLUE: 2>, <Color.GREEN: 3>]\n\nMethods can be added to enumerations, and members can have their own\nattributes -- see the documentation for details."
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
           }
         },
         "type": "object",
@@ -38201,6 +39438,17 @@
             "type": "boolean",
             "title": "Is Read"
           },
+          "action_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Url"
+          },
           "created_at": {
             "anyOf": [
               {
@@ -38343,6 +39591,27 @@
           "auto_break_threshold_hour"
         ],
         "title": "OvertimeBreakOverrideUpsert"
+      },
+      "OvertimeBreakdownSchema": {
+        "properties": {
+          "regular": {
+            "type": "number",
+            "title": "Regular",
+            "default": 0
+          },
+          "saturday": {
+            "type": "number",
+            "title": "Saturday",
+            "default": 0
+          },
+          "holiday": {
+            "type": "number",
+            "title": "Holiday",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "OvertimeBreakdownSchema"
       },
       "OvertimeCreateRequest": {
         "properties": {
@@ -38903,7 +40172,7 @@
         ],
         "title": "PaginatedData[ApprovalActionHistoryResponse]"
       },
-      "PaginatedData_AttendanceResponse_": {
+      "PaginatedData_AttendanceCalendarResponse_": {
         "properties": {
           "success": {
             "type": "boolean",
@@ -38917,7 +40186,7 @@
           },
           "data": {
             "items": {
-              "$ref": "#/components/schemas/AttendanceResponse"
+              "$ref": "#/components/schemas/AttendanceCalendarResponse"
             },
             "type": "array",
             "title": "Data"
@@ -38931,7 +40200,7 @@
           "data",
           "meta"
         ],
-        "title": "PaginatedData[AttendanceResponse]"
+        "title": "PaginatedData[AttendanceCalendarResponse]"
       },
       "PaginatedData_AuditLogResponse_": {
         "properties": {
@@ -40028,6 +41297,16 @@
             "type": "number",
             "title": "Overtime Hours"
           },
+          "overtime_breakdown": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OvertimeBreakdownSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "slip_pdf_url": {
             "anyOf": [
               {
@@ -40050,6 +41329,26 @@
               }
             ],
             "title": "Generated At"
+          },
+          "absensi": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AttendanceDetailSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bank_account": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BankAccountNested"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "employee": {
             "anyOf": [
@@ -42102,6 +43401,32 @@
         "type": "object",
         "title": "SuccessResponse[DashboardStatsResponse]"
       },
+      "SuccessResponse_DeviceTokenResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeviceTokenResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "SuccessResponse[DeviceTokenResponse]"
+      },
       "SuccessResponse_DivisionOvertimeBreakOverrideResponse_": {
         "properties": {
           "success": {
@@ -42465,6 +43790,32 @@
         },
         "type": "object",
         "title": "SuccessResponse[HolidaySyncResult]"
+      },
+      "SuccessResponse_ImportAttendanceResultResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImportAttendanceResultResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "SuccessResponse[ImportAttendanceResultResponse]"
       },
       "SuccessResponse_LeaveBalanceResponse_": {
         "properties": {
@@ -43252,7 +44603,7 @@
         "type": "object",
         "title": "SuccessResponse[list[ApprovalFlowResponse]]"
       },
-      "SuccessResponse_list_AttendanceResponse__": {
+      "SuccessResponse_list_AttendanceCalendarResponse__": {
         "properties": {
           "success": {
             "type": "boolean",
@@ -43268,7 +44619,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/AttendanceResponse"
+                  "$ref": "#/components/schemas/AttendanceCalendarResponse"
                 },
                 "type": "array"
               },
@@ -43280,7 +44631,7 @@
           }
         },
         "type": "object",
-        "title": "SuccessResponse[list[AttendanceResponse]]"
+        "title": "SuccessResponse[list[AttendanceCalendarResponse]]"
       },
       "SuccessResponse_list_BPJSConfigResponse__": {
         "properties": {
@@ -45343,6 +46694,10 @@
     {
       "name": "Notifications",
       "description": "In-app notification inbox"
+    },
+    {
+      "name": "Push Notifications",
+      "description": "FCM device token registration and push delivery"
     },
     {
       "name": "Work Schedules",

@@ -58,6 +58,11 @@ export interface AttendanceListQuery {
   limit?: number;
 }
 
+export interface AttendancePeriodQuery {
+  year: number;
+  month: number;
+}
+
 export interface VisitRequest {
   gps_lat: number;
   gps_long: number;
@@ -103,4 +108,3 @@ export interface VisitListQuery {
   page?: number;
   limit?: number;
 }
-

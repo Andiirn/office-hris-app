@@ -45,4 +45,13 @@ export const authService = {
       throw error;
     }
   },
+
+  async updatePassword(payload: import('../types/auth').ChangePasswordPayload): Promise<void> {
+    try {
+      await api.patch('/profile/password', payload);
+    } catch (error: any) {
+      console.warn('[AuthService] Update Password failed:', error.response?.data?.message || error.message);
+      throw error;
+    }
+  },
 };

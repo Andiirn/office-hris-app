@@ -1,8 +1,8 @@
 export const Tokens = {
   colors: {
-    primary: '#000666',
-    primaryContainer: '#1a237e',
-    onPrimaryContainer: '#8690ee',
+    primary: '#F43F5E', // SaaS Pink
+    primaryContainer: '#BE123C',
+    onPrimaryContainer: '#FFE4E6',
     background: '#fbf9f8',
     surface: '#ffffff',
     onSurface: '#1b1c1c',

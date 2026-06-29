@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  TouchableOpacity,
+  Pressable,
   Text,
   ActivityIndicator,
   StyleSheet,
@@ -9,6 +9,7 @@ import {
   TextStyle,
   Platform
 } from 'react-native';
+import { MotiView } from 'moti';
 import { Tokens } from '../../core/theme/tokens';
 
 interface ButtonProps {
@@ -30,8 +31,14 @@ export const Button: React.FC<ButtonProps> = ({
   textStyle,
   className
 }) => {
+  const [isPressed, setIsPressed] = useState(false);
+
   return (
-    <TouchableOpacity
+    <MotiView
+      animate={{ scale: isPressed ? 0.95 : 1 }}
+      transition={{ type: 'spring', damping: 15, stiffness: 300 }}
+    >
+      <Pressable
       className={className}
       style={[
         styles.button,
@@ -39,15 +46,17 @@ export const Button: React.FC<ButtonProps> = ({
         style
       ]}
       onPress={onPress}
+      onPressIn={() => !disabled && !loading && setIsPressed(true)}
+      onPressOut={() => setIsPressed(false)}
       disabled={disabled || loading}
-      activeOpacity={0.8}
     >
       {loading ? (
         <ActivityIndicator color={Tokens.colors.surface} />
       ) : (
         <Text style={[styles.text, textStyle]}>{title}</Text>
       )}
-    </TouchableOpacity>
+    </Pressable>
+  </MotiView>
   );
 };
 
