@@ -202,6 +202,7 @@ export default function LeaveScreen() {
 
     if (!selectedRange.start || (selectedRange.start && selectedRange.end)) {
       setSelectedRange({ start: dateString });
+      setForm(prev => ({ ...prev, start_date: dateString, end_date: dateString }));
     } else {
       let start = selectedRange.start;
       let end = dateString;
@@ -242,10 +243,10 @@ export default function LeaveScreen() {
         startingDay: true,
         color: Tokens.colors.primary,
         textColor: '#fff',
-        endingDay: !selectedRange.end
+        endingDay: !selectedRange.end || selectedRange.start === selectedRange.end
       };
     }
-    if (selectedRange.end) {
+    if (selectedRange.end && selectedRange.start !== selectedRange.end) {
       marks[selectedRange.end] = {
         ...marks[selectedRange.end],
         endingDay: true,
@@ -489,7 +490,15 @@ export default function LeaveScreen() {
           </GlassCard>
         ) : (
           <View className="gap-0">
-            {history.map((item, index) => (
+            {history.map((item, index) => {
+              const typeName = item.leave_type_name || leaveTypes.find(t => t.id === item.leave_type_id)?.name;
+              const displayTitle = typeName ? `Pengajuan cuti ${formatLeaveTypeName(typeName)}` : 'Pengajuan Izin/Cuti';
+              
+              const isSameDate = item.start_date === item.end_date || !item.end_date;
+              const timeString = item.start_time && item.end_time ? ` (${formatTime(item.start_time)} - ${formatTime(item.end_time)})` : '';
+              const dateDisplay = isSameDate ? `${item.start_date}${timeString}` : `${item.start_date} - ${item.end_date}`;
+
+              return (
               <MotiView
                 key={item.id}
                 from={{ opacity: 0, translateY: 20 }}
@@ -498,12 +507,12 @@ export default function LeaveScreen() {
                 className="bg-white/80 rounded-[20px] px-4 py-4 border border-white/90 mb-3 shadow-sm"
               >
                 <View className="flex-row justify-between items-start mb-2.5">
-                  <View className="flex-1">
-                    <Text className="font-inter-bold text-base text-on-surface">{formatLeaveTypeName(item.leave_type_name) || 'Leave Request'}</Text>
+                  <View className="flex-1 pr-2">
+                    <Text className="font-inter-bold text-base text-on-surface">{displayTitle}</Text>
                     <View className="flex-row items-center mt-1 gap-1.5">
                       <MaterialIcons name="calendar-today" size={12} color={Tokens.colors.textMuted} />
                       <Text className="font-inter-medium text-xs text-text-muted">
-                        {item.start_date} {item.end_date ? `- ${item.end_date}` : ''}
+                        {dateDisplay}
                       </Text>
                     </View>
                   </View>
@@ -523,7 +532,8 @@ export default function LeaveScreen() {
                   </Pressable>
                 )}
               </MotiView>
-            ))}
+            );
+          })}
           </View>
         )}
       </ScrollView>

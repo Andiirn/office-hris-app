@@ -26,6 +26,8 @@ export interface LeaveRequest {
   leave_type_name?: string;
   start_date: string;
   end_date: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
   reason: string;
   status: LeaveStatus;
   created_at: string;

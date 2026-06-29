@@ -34,7 +34,7 @@ export function buildHomeMenuItems(role?: string | null, approvalCount?: number)
       if (hasApprovalAccess) {
         router.push('/approvals');
       } else {
-        Alert.alert('Akses Ditolak', 'Fitur ini hanya tersedia untuk atasan atau HR.');
+        Alert.alert('Akses Ditolak', 'Kamu tidak memiliki akses untuk fitur ini.');
       }
     },
     badgeCount: hasApprovalAccess && approvalCount && approvalCount > 0 ? approvalCount : undefined,

@@ -26421,6 +26421,151 @@
         }
       }
     },
+    "/api/v1/push-notifications/device-token": {
+      "post": {
+        "tags": [
+          "Push Notifications"
+        ],
+        "summary": "Save Device Token",
+        "operationId": "save_device_token_api_v1_push_notifications_device_token_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceTokenUpsertRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_DeviceTokenResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Bad request — business rule violation",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Resource not found",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Conflict — resource already exists",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Validation error",
+                  "errors": [
+                    {
+                      "field": "nik",
+                      "message": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Not authenticated — missing or invalid token",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Access denied — insufficient permissions",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
     "/api/v1/profile": {
       "get": {
         "tags": [
@@ -26886,6 +27031,151 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SuccessResponse_dict_"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Bad request — business rule violation",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Resource not found",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Conflict — resource already exists",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Validation error",
+                  "errors": [
+                    {
+                      "field": "nik",
+                      "message": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Not authenticated — missing or invalid token",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Access denied — insufficient permissions",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/profile/device-token": {
+      "post": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Save Device Token",
+        "operationId": "save_device_token_api_v1_profile_device_token_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeviceTokenUpsertRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_DeviceTokenResponse_"
                 }
               }
             }
@@ -36071,6 +36361,92 @@
         ],
         "title": "DeviceSessionResponse"
       },
+      "DeviceTokenResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "device_os": {
+            "type": "string",
+            "title": "Device Os"
+          },
+          "device_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Name"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "token",
+          "device_os",
+          "is_active"
+        ],
+        "title": "DeviceTokenResponse"
+      },
+      "DeviceTokenUpsertRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Token"
+          },
+          "device_os": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 1,
+            "title": "Device Os",
+            "default": "android"
+          },
+          "device_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "DeviceTokenUpsertRequest"
+      },
       "DivisionAssignedItem": {
         "properties": {
           "division_id": {
@@ -43025,6 +43401,32 @@
         "type": "object",
         "title": "SuccessResponse[DashboardStatsResponse]"
       },
+      "SuccessResponse_DeviceTokenResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeviceTokenResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "SuccessResponse[DeviceTokenResponse]"
+      },
       "SuccessResponse_DivisionOvertimeBreakOverrideResponse_": {
         "properties": {
           "success": {
@@ -46292,6 +46694,10 @@
     {
       "name": "Notifications",
       "description": "In-app notification inbox"
+    },
+    {
+      "name": "Push Notifications",
+      "description": "FCM device token registration and push delivery"
     },
     {
       "name": "Work Schedules",

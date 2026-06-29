@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import { api } from '../core/api/client';
 import { unwrapData } from '../core/api/envelope';
-import { AttendanceActionResponse, AttendanceItem, AttendanceListQuery, CheckinRequest, CheckoutRequest, VisitItem, VisitListQuery, VisitRequest } from '../types/attendance';
+import { AttendanceActionResponse, AttendanceItem, AttendanceListQuery, AttendancePeriodQuery, CheckinRequest, CheckoutRequest, VisitItem, VisitListQuery, VisitRequest } from '../types/attendance';
 import { AttendanceCorrection, CorrectionListQuery, CorrectionRequest } from '../types/correction';
 
 const devLog = (...args: unknown[]) => {
@@ -45,8 +45,10 @@ const extractArray = <T>(raw: any): T[] => {
 };
 
 export const attendanceService = {
-  async getEmployeeAttendancePeriod(employeeId: string): Promise<AttendanceItem[]> {
-    const response = await api.get(`/attendance/employee/${employeeId}/period`);
+  async getEmployeeAttendancePeriod(employeeId: string, query?: AttendancePeriodQuery): Promise<AttendanceItem[]> {
+    const response = await api.get(`/attendance/employee/${employeeId}/period`, {
+      params: query,
+    });
     const data = unwrapData<any>(response.data);
     const result = extractArray<AttendanceItem>(data);
     result.sort((a, b) => toLocalDateTimeMillis(b.attendance_date || b.date || (b as any).created_at) - toLocalDateTimeMillis(a.attendance_date || a.date || (a as any).created_at));

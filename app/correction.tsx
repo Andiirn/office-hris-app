@@ -325,8 +325,8 @@ export default function CorrectionScreen() {
                 <GlassCard style={{ padding: 16 }}>
                   <View className="flex-row justify-between items-start mb-2.5">
                     <View className="flex-1">
-                      <Text className="font-inter-bold text-[10px] text-text-muted uppercase mb-1 tracking-widest">
-                        Correction Request
+                      <Text className="font-inter-bold text-[11px] text-text-muted uppercase mb-1 tracking-widest">
+                        Pengajuan Koreksi Kehadiran
                       </Text>
                       <View className="flex-row items-center gap-1.5">
                         <MaterialIcons name="calendar-today" size={12} color={Tokens.colors.primary} />

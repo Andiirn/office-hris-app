@@ -11,6 +11,8 @@ export const qk = {
   attendanceHistoryInfiniteRoot: () => ['attendance-history-infinite'] as const,
   attendanceHistoryInfinite: (employeeId?: string | null, dateFrom?: string, dateTo?: string) =>
     ['attendance-history-infinite', employeeId ?? null, dateFrom ?? null, dateTo ?? null] as const,
+  attendancePeriod: (employeeId?: string | null, year?: number | null, month?: number | null) =>
+    ['attendance-period', employeeId ?? null, year ?? null, month ?? null] as const,
   notifications: (employeeId?: string | null) => ['notifications', employeeId ?? null] as const,
   notificationsRoot: () => ['notifications'] as const,
   activityAttendanceFeed: (employeeId?: string | null, dateFrom?: string | null, dateTo?: string | null) =>

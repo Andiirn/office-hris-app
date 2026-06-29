@@ -1,13 +1,15 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useQuery } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GlassCard } from '../../src/components/ui/GlassCard';
 import { SkeletonCard } from '../../src/components/ui/Skeleton';
 import { StatusBadge } from '../../src/components/ui/StatusBadge';
+import { qk } from '../../src/core/query/query-keys';
 import { Tokens } from '../../src/core/theme/tokens';
+import { getAttendancePeriodWindow, parseAttendancePeriod, shiftAttendancePeriod } from '../../src/features/attendance/period';
 import { attendanceService } from '../../src/services/attendance.service';
 import { useAuthStore } from '../../src/stores/auth.store';
 import { getAttendanceBadgeProps } from '../../src/utils/status';
@@ -32,17 +34,6 @@ function getAttendanceDate(item: any) {
   return item.attendance_date || item.date || '-';
 }
 
-function getAttendanceStatus(item: any) {
-  const status = item.attendance_status || item.status || 'PRESENT';
-  const s = status.toUpperCase();
-  if (s === 'PRESENT') return 'HADIR';
-  if (s === 'LATE') return 'TERLAMBAT';
-  if (s === 'SICK') return 'SAKIT';
-  if (s === 'PERMISSION' || s === 'IZIN') return 'IZIN';
-  if (s === 'ABSENT') return 'TIDAK HADIR';
-  return status;
-}
-
 function getCheckIn(item: any) {
   return item.checkin_at || item.checkin_time;
 }
@@ -51,44 +42,20 @@ function getCheckOut(item: any) {
   return item.checkout_at || item.checkout_time;
 }
 
-function getPeriodDates(offset = 0) {
-  const today = new Date();
-  let year = today.getFullYear();
-  let month = today.getMonth();
-  const day = today.getDate();
-  let anchorMonth = day >= 26 ? month + 1 : month;
-  anchorMonth += offset;
-  const startDate = new Date(year, anchorMonth - 1, 26);
-  const endDate = new Date(year, anchorMonth, 25);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  const dateFrom = `${startDate.getFullYear()}-${pad(startDate.getMonth() + 1)}-${pad(startDate.getDate())}`;
-  const dateTo = `${endDate.getFullYear()}-${pad(endDate.getMonth() + 1)}-${pad(endDate.getDate())}`;
-  return { startDate, endDate, dateFrom, dateTo };
-}
-
-
-
 export default function AttendanceScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ period?: string | string[] }>();
   const { user } = useAuthStore();
   const [periodOffset, setPeriodOffset] = useState(0);
 
-  const period = useMemo(() => getPeriodDates(periodOffset), [periodOffset]);
+  const periodParam = Array.isArray(params.period) ? params.period[0] : params.period;
+  const basePeriod = useMemo(() => parseAttendancePeriod(periodParam), [periodParam]);
+  const selectedPeriod = useMemo(() => shiftAttendancePeriod(basePeriod, periodOffset), [basePeriod, periodOffset]);
+  const period = useMemo(() => getAttendancePeriodWindow(selectedPeriod), [selectedPeriod]);
 
-  const { data: history = [], isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['attendance-history-full', user?.id, period.dateFrom, period.dateTo],
-    queryFn: () => attendanceService.getAttendanceHistory({
-      employee_id: user?.id,
-      date_from: period.dateFrom,
-      date_to: period.dateTo,
-      limit: 100,
-    }),
-    enabled: !!user?.id,
-  });
-
-  const { data: periodAttendance = [], isLoading: isLoadingPeriodAttendance } = useQuery({
-    queryKey: ['attendance-period', user?.id],
-    queryFn: () => user?.id ? attendanceService.getEmployeeAttendancePeriod(user.id) : [],
+  const { data: periodAttendance = [], isLoading: isLoadingPeriodAttendance, isFetching: isFetchingPeriodAttendance, refetch: refetchPeriodAttendance } = useQuery({
+    queryKey: qk.attendancePeriod(user?.id, period.year, period.month),
+    queryFn: () => user?.id ? attendanceService.getEmployeeAttendancePeriod(user.id, { year: period.year, month: period.month }) : [],
     enabled: !!user?.id,
     staleTime: 60_000,
   });
@@ -120,7 +87,7 @@ export default function AttendanceScreen() {
   }, [periodAttendance]);
 
   const onRefresh = () => {
-    refetch();
+    void refetchPeriodAttendance();
   };
 
   return (
@@ -214,9 +181,9 @@ export default function AttendanceScreen() {
         className="flex-1"
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={onRefresh} tintColor={Tokens.colors.primary} />}
+        refreshControl={<RefreshControl refreshing={isFetchingPeriodAttendance} onRefresh={onRefresh} tintColor={Tokens.colors.primary} />}
       >
-        {isLoadingPeriodAttendance || isLoading ? (
+        {isLoadingPeriodAttendance ? (
           <View className="mt-2">
             <SkeletonCard />
             <SkeletonCard />
