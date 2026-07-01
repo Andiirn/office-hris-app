@@ -1,6 +1,6 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useQuery } from '@tanstack/react-query';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { MotiView } from 'moti';
 import React from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, useWindowDimensions, View } from 'react-native';
@@ -108,7 +108,7 @@ export default function HomeScreen() {
   });
 
   const { data: leaveRequests = [], isLoading: isLoadingLeaveFeed, refetch: refetchLeaveFeed, isFetching: isFetchingLeaveFeed } = useQuery({
-    queryKey: ['leave-requests', user?.id],
+    queryKey: ['leave-history', user?.id, 'home'],
     queryFn: () => {
       if (!user?.id) return [];
       return leaveService.getRequests({ employee_id: user.id, limit: 10 });
@@ -117,7 +117,7 @@ export default function HomeScreen() {
   });
 
   const { data: overtimeRecords = [], isLoading: isLoadingOvertimeFeed, refetch: refetchOvertimeFeed, isFetching: isFetchingOvertimeFeed } = useQuery({
-    queryKey: ['overtime-records', user?.id],
+    queryKey: ['overtime-history', user?.id, 'home'],
     queryFn: () => {
       if (!user?.id) return [];
       return overtimeService.getRecords({ employee_id: user.id, limit: 10 });
@@ -192,10 +192,19 @@ export default function HomeScreen() {
   }, [formatLocalDate, isClockedIn, isClockedOut, isTodayAttendance, latestAttendance, todayString]);
 
   const { data: resignRequests = [], isLoading: isLoadingResignFeed, refetch: refetchResignFeed, isFetching: isFetchingResignFeed } = useQuery({
-    queryKey: ['resign-requests', user?.id],
+    queryKey: ['resign-history', user?.id, 'home'],
     queryFn: () => {
       if (!user?.id) return [];
       return resignService.getMyRequests({ limit: 10 });
+    },
+    enabled: !!user?.id,
+  });
+
+  const { data: attendanceCorrections = [], isLoading: isLoadingCorrectionFeed, refetch: refetchCorrectionFeed, isFetching: isFetchingCorrectionFeed } = useQuery({
+    queryKey: ['attendance-corrections', user?.id, 'home'],
+    queryFn: () => {
+      if (!user?.id) return [];
+      return attendanceService.listCorrections({ employee_id: user.id, limit: 10 });
     },
     enabled: !!user?.id,
   });
@@ -270,13 +279,34 @@ export default function HomeScreen() {
     return 'PENDING';
   };
 
-  const onRefresh = () => {
+  const [isManualRefreshing, setIsManualRefreshing] = React.useState(false);
+  const onManualRefresh = React.useCallback(async () => {
+    setIsManualRefreshing(true);
+    await Promise.all([
+      refetchAttendanceFeed(),
+      refetchLeaveFeed(),
+      refetchOvertimeFeed(),
+      refetchResignFeed(),
+      refetchApprovalFeed(),
+      refetchCorrectionFeed(),
+    ]);
+    setIsManualRefreshing(false);
+  }, [refetchAttendanceFeed, refetchLeaveFeed, refetchOvertimeFeed, refetchResignFeed, refetchApprovalFeed, refetchCorrectionFeed]);
+
+  const onRefresh = React.useCallback(() => {
     refetchAttendanceFeed();
     refetchLeaveFeed();
     refetchOvertimeFeed();
     refetchResignFeed();
     refetchApprovalFeed();
-  };
+    refetchCorrectionFeed();
+  }, [refetchAttendanceFeed, refetchLeaveFeed, refetchOvertimeFeed, refetchResignFeed, refetchApprovalFeed, refetchCorrectionFeed]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      onRefresh();
+    }, [onRefresh])
+  );
 
   const feedItems = React.useMemo(() => {
     const items: FeedItem[] = [];
@@ -287,6 +317,7 @@ export default function HomeScreen() {
       const checkoutTime = item.checkout_at || item.checkout_time;
       const badgeProps = getAttendanceBadgeProps(item.attendance_status || item.status);
       const status = badgeProps.label;
+      if (item.is_corrected) return;
 
       if (checkinTime) {
         items.push({
@@ -416,6 +447,35 @@ export default function HomeScreen() {
       });
     });
 
+    attendanceCorrections.forEach((item: any) => {
+      const attDate = item.attendance_date || item.attendance?.attendance_date || item.attendance?.date || '-';
+      items.push({
+        id: `correction-${item.id}`,
+        type: item.status === 'APPROVED' ? 'approval.approved' : item.status === 'REJECTED' ? 'approval.rejected' : 'attendance.correction_created',
+        title:
+          item.status === 'APPROVED' ? 'Pengajuan koreksi absen disetujui' :
+            item.status === 'REJECTED' ? 'Pengajuan koreksi absen ditolak' :
+              item.status === 'CANCELLED' ? 'Pengajuan koreksi absen dibatalkan' :
+                'Pengajuan koreksi absen menunggu persetujuan',
+        summary: `${attDate} · ${item.status || 'PENDING'}`,
+        details: [
+          `Pengaju: Anda`,
+          `Tanggal Absen: ${attDate}`,
+          `Status: ${item.status || 'PENDING'}`,
+          `Alasan: ${item.reason || '-'}`,
+        ],
+        timestamp: item.created_at || attDate || '',
+        sortTime: toSortTime(item.created_at) || toSortTime(item.updated_at) || toSortTime(attDate),
+        sortRank: 2,
+        icon: item.status === 'APPROVED' ? 'check-circle' : item.status === 'REJECTED' ? 'cancel' : item.status === 'CANCELLED' ? 'cancel' : 'edit-calendar',
+        color: item.status === 'APPROVED' ? '#1f6b42' : item.status === 'REJECTED' ? '#93000a' : '#000666',
+        bgColor: item.status === 'APPROVED' ? '#d9e6da' : item.status === 'REJECTED' ? '#ffdad6' : '#e7ebff',
+        origin: 'self',
+        status: item.status || 'PENDING',
+        isExpanded: false,
+      });
+    });
+
     buildApprovalActivityItems(approvalHistory, {
       formatDateOnly: buildDateLabel,
       toSortTime,
@@ -436,7 +496,7 @@ export default function HomeScreen() {
       })
       .slice(0, 8)
       .map((item) => ({ ...item, isExpanded: item.id === expandedFeedId }));
-  }, [attendanceFeed, expandedFeedId, leaveRequests, overtimeRecords, resignRequests, approvalHistory, buildDateLabel, toSortTime]);
+  }, [attendanceFeed, expandedFeedId, leaveRequests, overtimeRecords, resignRequests, attendanceCorrections, approvalHistory, buildDateLabel, toSortTime]);
 
   const menuItems = React.useMemo<MenuItem[]>(() => buildHomeMenuItems(user?.role, pendingApprovals.length), [user?.role, pendingApprovals.length]);
   const menuColumns = React.useMemo(() => {
@@ -685,25 +745,13 @@ export default function HomeScreen() {
               showsVerticalScrollIndicator={false}
               refreshControl={
                 <RefreshControl
-                  refreshing={isFetchingAttendanceFeed || isFetchingLeaveFeed || isFetchingOvertimeFeed || isFetchingResignFeed || isFetchingApprovalFeed}
-                  onRefresh={onRefresh}
+                  refreshing={isManualRefreshing}
+                  onRefresh={onManualRefresh}
                   tintColor={Tokens.colors.primary}
                 />
               }
             >
-              {isLoadingAttendanceFeed || isLoadingLeaveFeed || isLoadingOvertimeFeed || isLoadingResignFeed || isLoadingApprovalFeed ? (
-                <View className="gap-2">
-                  {[1, 2, 3, 4, 5].map((i) => (
-                    <View key={i} className="bg-white/80 rounded-xl px-3 py-2.5 border border-white/90 shadow-sm flex-row items-center gap-3">
-                      <Skeleton width={40} height={40} radius={16} />
-                      <View className="flex-1 gap-2">
-                        <Skeleton width="50%" height={12} radius={9999} />
-                        <Skeleton width="75%" height={8} radius={9999} />
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              ) : feedItems.length === 0 ? (
+              {feedItems.length === 0 ? (
                 <View className="items-center py-5">
                   <Text className="font-inter text-[13px] text-text-muted">No recent activities</Text>
                 </View>

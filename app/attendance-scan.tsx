@@ -1,18 +1,18 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useQueryClient } from '@tanstack/react-query';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as Device from 'expo-device';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import LottieView from 'lottie-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { ActivityIndicator, Linking, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Device from 'expo-device';
 import { Button } from '../src/components/ui/Button';
 import { Skeleton, SkeletonCard } from '../src/components/ui/Skeleton';
-import { Tokens } from '../src/core/theme/tokens';
 import { getStableDeviceFingerprint } from '../src/core/auth/device-fingerprint';
 import { qk } from '../src/core/query/query-keys';
+import { Tokens } from '../src/core/theme/tokens';
 import { attendanceService } from '../src/services/attendance.service';
 import { useAuthStore } from '../src/stores/auth.store';
 
@@ -300,7 +300,7 @@ export default function AttendanceScanScreen() {
                 <LottieView
                   source={require('../assets/Clap.json')}
                   autoPlay
-                  loop={false}
+                  loop={true}
                   style={{ width: 200, height: 200 }}
                 />
 

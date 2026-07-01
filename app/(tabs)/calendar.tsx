@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, RefreshControl } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { Calendar } from 'react-native-calendars';
@@ -27,10 +28,19 @@ export default function CalendarScreen() {
     refetchInterval: 1000 * 60 * 5,
   });
 
-  const onRefresh = () => {
-    refetchHolidays();
-    refetchLeaves();
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+  const onManualRefresh = async () => {
+    setIsManualRefreshing(true);
+    await Promise.all([refetchHolidays(), refetchLeaves()]);
+    setIsManualRefreshing(false);
   };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      refetchHolidays();
+      refetchLeaves();
+    }, [refetchHolidays, refetchLeaves])
+  );
 
   const isWeekend = (dateString: string) => {
     const day = new Date(`${dateString}T00:00:00`).getDay();
@@ -145,7 +155,7 @@ export default function CalendarScreen() {
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={isFetchingHolidays || isFetchingLeaves || isLoading} onRefresh={onRefresh} tintColor={Tokens.colors.primary} />
+          <RefreshControl refreshing={isManualRefreshing} onRefresh={onManualRefresh} tintColor={Tokens.colors.primary} />
         }
       >
         <GlassCard style={{ padding: 10, marginBottom: 24 }}>

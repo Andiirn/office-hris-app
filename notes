@@ -94,3 +94,9 @@ Agar project siap di-build dan bisa langsung ditest via Firebase Console, ada 3 
   dalam kondisi background (tidak sedang terbuka di layar) saat mengirim test message.
 
   Silakan dimulai build-nya! Ada kendala saat menjalankan eas build?
+
+
+Admin menekan tombol Approve di dashboard web.
+Server merubah status di database, lalu mengirimkan Push Notification tipe silent (tersembunyi) ke HP karyawan.
+Aplikasi mobile menangkap notifikasi silent tersebut di background, lalu menjalankan perintah refetch() untuk menarik data terbaru.
+UI langsung berubah seketika, voila! Terasa instan seperti sihir.

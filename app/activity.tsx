@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import React from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { MotiView } from 'moti';
 import { Tokens } from '../src/core/theme/tokens';
 import { qk } from '../src/core/query/query-keys';
@@ -32,7 +32,8 @@ type FeedType =
   | 'resign.created'
   | 'resign.approved'
   | 'resign.rejected'
-  | 'resign.cancelled';
+  | 'resign.cancelled'
+  | 'attendance.correction_created';
 
 type FeedItem = {
   id: string;
@@ -66,7 +67,7 @@ export default function ActivityScreen() {
   }, []);
 
   const { data: attendanceFeed = [], isLoading: isLoadingAttendance, refetch: refetchAttendance, isFetching: isFetchingAttendance } = useQuery({
-    queryKey: ['activity-attendance-feed', user?.id, dateRange.dateFrom, dateRange.dateTo],
+    queryKey: ['attendance-history', user?.id, 'activity', dateRange.dateFrom, dateRange.dateTo],
     queryFn: async () => {
       if (!user?.id) return [];
       return attendanceService.getAttendanceHistory({
@@ -81,7 +82,7 @@ export default function ActivityScreen() {
   });
 
   const { data: leaveRequests = [], isLoading: isLoadingLeave, refetch: refetchLeave, isFetching: isFetchingLeave } = useQuery({
-    queryKey: ['activity-leave-feed', user?.id],
+    queryKey: ['leave-history', user?.id, 'activity'],
     queryFn: async () => {
       if (!user?.id) return [];
       return leaveService.getRequests({ employee_id: user.id, limit: 50 });
@@ -90,7 +91,7 @@ export default function ActivityScreen() {
   });
 
   const { data: overtimeRecords = [], isLoading: isLoadingOvertime, refetch: refetchOvertime, isFetching: isFetchingOvertime } = useQuery({
-    queryKey: ['activity-overtime-feed', user?.id],
+    queryKey: ['overtime-history', user?.id, 'activity'],
     queryFn: async () => {
       if (!user?.id) return [];
       return overtimeService.getRecords({ employee_id: user.id, limit: 50 });
@@ -99,7 +100,7 @@ export default function ActivityScreen() {
   });
 
   const { data: resignRequests = [], isLoading: isLoadingResign, refetch: refetchResign, isFetching: isFetchingResign } = useQuery({
-    queryKey: ['activity-resign-feed', user?.id],
+    queryKey: ['resign-history', user?.id, 'activity'],
     queryFn: async () => {
       if (!user?.id) return [];
       return resignService.getMyRequests({ limit: 50 });
@@ -115,6 +116,15 @@ export default function ActivityScreen() {
     },
     enabled: !!user?.id,
     staleTime: 30 * 1000,
+  });
+
+  const { data: attendanceCorrections = [], isLoading: isLoadingCorrection, refetch: refetchCorrection, isFetching: isFetchingCorrection } = useQuery({
+    queryKey: ['attendance-corrections', user?.id, 'activity'],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      return attendanceService.listCorrections({ employee_id: user.id, limit: 50 });
+    },
+    enabled: !!user?.id,
   });
 
   const formatTime = (time?: string | null) => {
@@ -146,13 +156,34 @@ export default function ActivityScreen() {
     return 'PENDING';
   };
 
-  const onRefresh = () => {
+  const [isManualRefreshing, setIsManualRefreshing] = React.useState(false);
+  const onManualRefresh = React.useCallback(async () => {
+    setIsManualRefreshing(true);
+    await Promise.all([
+      refetchAttendance(),
+      refetchLeave(),
+      refetchOvertime(),
+      refetchResign(),
+      refetchApproval(),
+      refetchCorrection(),
+    ]);
+    setIsManualRefreshing(false);
+  }, [refetchAttendance, refetchLeave, refetchOvertime, refetchResign, refetchApproval, refetchCorrection]);
+
+  const onRefresh = React.useCallback(() => {
     refetchAttendance();
     refetchLeave();
     refetchOvertime();
     refetchResign();
     refetchApproval();
-  };
+    refetchCorrection();
+  }, [refetchAttendance, refetchLeave, refetchOvertime, refetchResign, refetchApproval, refetchCorrection]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      onRefresh();
+    }, [onRefresh])
+  );
 
   const feedItems = React.useMemo(() => {
     const items: FeedItem[] = [];
@@ -163,6 +194,7 @@ export default function ActivityScreen() {
       const checkoutTime = item.checkout_at || item.checkout_time;
       const badgeProps = getAttendanceBadgeProps(item.attendance_status || item.status);
       const status = badgeProps.label;
+      if (item.is_corrected) return;
 
       if (checkinTime) {
         items.push({
@@ -291,6 +323,34 @@ export default function ActivityScreen() {
       });
     });
 
+    attendanceCorrections.forEach((item: any) => {
+      const attDate = item.attendance_date || item.attendance?.attendance_date || item.attendance?.date || '-';
+      items.push({
+        id: `correction-${item.id}`,
+        type: item.status === 'APPROVED' ? 'approval.approved' : item.status === 'REJECTED' ? 'approval.rejected' : 'attendance.correction_created',
+        title:
+          item.status === 'APPROVED' ? 'Pengajuan koreksi absen disetujui' :
+            item.status === 'REJECTED' ? 'Pengajuan koreksi absen ditolak' :
+              item.status === 'CANCELLED' ? 'Pengajuan koreksi absen dibatalkan' :
+                'Pengajuan koreksi absen menunggu persetujuan',
+        summary: `${attDate} · ${item.status || 'PENDING'}`,
+        details: [
+          `Pengaju: Anda`,
+          `Tanggal Absen: ${attDate}`,
+          `Status: ${item.status || 'PENDING'}`,
+          `Alasan: ${item.reason || '-'}`,
+        ],
+        timestamp: item.created_at || attDate || '',
+        sortTime: toSortTime(item.created_at) || toSortTime(item.updated_at) || toSortTime(attDate),
+        icon: item.status === 'APPROVED' ? 'check-circle' : item.status === 'REJECTED' ? 'cancel' : item.status === 'CANCELLED' ? 'cancel' : 'edit-calendar',
+        color: item.status === 'APPROVED' ? '#1f6b42' : item.status === 'REJECTED' ? '#93000a' : '#000666',
+        bgColor: item.status === 'APPROVED' ? '#d9e6da' : item.status === 'REJECTED' ? '#ffdad6' : '#e7ebff',
+        origin: 'self',
+        status: item.status || 'PENDING',
+        isExpanded: false,
+      });
+    });
+
     buildApprovalActivityItems(approvalHistory, {
       formatDateOnly,
       toSortTime,
@@ -306,10 +366,10 @@ export default function ActivityScreen() {
       const dateB = b.sortTime || 0;
       return dateB - dateA;
     });
-  }, [attendanceFeed, leaveRequests, overtimeRecords, resignRequests, approvalHistory]);
+  }, [attendanceFeed, leaveRequests, overtimeRecords, resignRequests, approvalHistory, attendanceCorrections]);
 
-  const isLoading = isLoadingAttendance || isLoadingLeave || isLoadingOvertime || isLoadingResign || isLoadingApproval;
-  const isRefreshing = isFetchingAttendance || isFetchingLeave || isFetchingOvertime || isFetchingResign || isFetchingApproval;
+  const isLoading = isLoadingAttendance || isLoadingLeave || isLoadingOvertime || isLoadingResign || isLoadingApproval || isLoadingCorrection;
+  const isRefreshing = isFetchingAttendance || isFetchingLeave || isFetchingOvertime || isFetchingResign || isFetchingApproval || isFetchingCorrection;
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -333,13 +393,9 @@ export default function ActivityScreen() {
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
-        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={Tokens.colors.primary} />}
+        refreshControl={<RefreshControl refreshing={isManualRefreshing} onRefresh={onManualRefresh} tintColor={Tokens.colors.primary} />}
       >
-        {isLoading ? (
-          <View className="items-center py-10">
-            <ActivityIndicator size="small" color={Tokens.colors.primary} />
-          </View>
-        ) : feedItems.length === 0 ? (
+        {feedItems.length === 0 ? (
           <View className="items-center py-20">
             <MaterialIcons name="event-note" size={64} color={Tokens.colors.outline} />
             <Text className="font-manrope-bold text-lg text-primary mt-4">Belum ada aktivitas</Text>

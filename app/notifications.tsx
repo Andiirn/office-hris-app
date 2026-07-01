@@ -1,6 +1,6 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { InfiniteData, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import React from 'react';
 import { FlatList, Modal, Pressable, RefreshControl, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -94,7 +94,18 @@ export default function NotificationsScreen() {
     },
   });
 
-  const onRefresh = () => refetch();
+  const [isManualRefreshing, setIsManualRefreshing] = React.useState(false);
+  const onManualRefresh = React.useCallback(async () => {
+    setIsManualRefreshing(true);
+    await refetch();
+    setIsManualRefreshing(false);
+  }, [refetch]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   const notifications = React.useMemo(() => data?.pages.flat() ?? [], [data]);
 
@@ -192,7 +203,7 @@ export default function NotificationsScreen() {
         )}
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={isFetching && !isFetchingNextPage} onRefresh={onRefresh} tintColor={Tokens.colors.primary} />}
+        refreshControl={<RefreshControl refreshing={isManualRefreshing} onRefresh={onManualRefresh} tintColor={Tokens.colors.primary} />}
         onEndReached={handleEndReached}
         onEndReachedThreshold={0.2}
         ListFooterComponent={

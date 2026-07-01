@@ -212,7 +212,14 @@ export default function AttendanceScreen() {
                       <View className="w-8 h-8 rounded-2xl bg-primary/10 items-center justify-center">
                         <MaterialIcons name="calendar-today" size={14} color={Tokens.colors.primary} />
                       </View>
-                      <Text className="font-inter-bold text-base text-black">{getAttendanceDate(item)}</Text>
+                      <View className="flex-row items-center flex-wrap gap-1">
+                        <Text className="font-inter-bold text-base text-black">{getAttendanceDate(item)}</Text>
+                        {item.is_corrected && (
+                          <View className="bg-[#FFF9C4] px-1.5 py-0.5 rounded-md ml-1">
+                            <Text className="font-inter-bold text-[9px] text-black uppercase">Koreksi</Text>
+                          </View>
+                        )}
+                      </View>
                     </View>
                   </View>
                   <StatusBadge

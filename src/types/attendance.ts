@@ -41,6 +41,8 @@ export interface AttendanceItem {
   checkin_at?: string | null;
   checkout_at?: string | null;
   attendance_status?: string;
+  is_corrected?: boolean;
+  attendance_method?: string;
   branch_name?: string | null;
   branch?: {
     id?: string;
