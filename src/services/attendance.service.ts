@@ -122,30 +122,6 @@ export const attendanceService = {
     });
     return unwrapData<AttendanceActionResponse>(response.data);
   },
-
-  async getPhotoChallenge(): Promise<string> {
-    try {
-      const response = await api.get('/attendance/photo/challenge');
-      return response.data?.challenge || response.data?.data?.challenge || '';
-    } catch {
-      // Return empty string if the endpoint doesn't exist yet so it doesn't crash the UI prototype
-      return '';
-    }
-  },
-
-  async checkinWithPhoto(formData: FormData): Promise<any> {
-    const response = await api.post('/attendance/photo/checkin', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return unwrapData<any>(response.data);
-  },
-
-  async checkoutWithPhoto(formData: FormData): Promise<any> {
-    const response = await api.post('/attendance/photo/checkout', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return unwrapData<any>(response.data);
-  },
   async getTodayRecord() {
     const today = new Date();
     const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -153,7 +129,12 @@ export const attendanceService = {
       params: { date_from: todayString, date_to: todayString, limit: 1, page: 1 },
     });
     const data = unwrapData<AttendanceItem[]>(response.data);
-    return Array.isArray(data) ? data[0] : undefined;
+    if (!Array.isArray(data) || data.length === 0) return undefined;
+    return [...data].sort((a, b) => {
+      const dateA = toLocalDateTimeMillis(a.checkin_at || a.checkout_at || a.attendance_date || a.date || (a as any).created_at);
+      const dateB = toLocalDateTimeMillis(b.checkin_at || b.checkout_at || b.attendance_date || b.date || (b as any).created_at);
+      return dateB - dateA;
+    })[0];
   },
   async getAttendanceHistory(query?: AttendanceListQuery): Promise<AttendanceItem[]> {
     try {

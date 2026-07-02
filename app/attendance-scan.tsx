@@ -258,7 +258,6 @@ export default function AttendanceScanScreen() {
             geocode.region,
             geocode.postalCode
           ].filter(Boolean);
-
           const uniqueParts = parts.filter((item, pos) => parts.indexOf(item) === pos);
           setAddress(uniqueParts.join(', '));
         }
