@@ -1,6 +1,5 @@
 export type ParsedAttendanceQrPayload = {
   qrToken: string;
-  branchId?: string;
 };
 
 export const parseAttendanceQrPayload = (raw: string): ParsedAttendanceQrPayload => {
@@ -13,8 +12,7 @@ export const parseAttendanceQrPayload = (raw: string): ParsedAttendanceQrPayload
     const json = JSON.parse(value) as { qr_token?: unknown; branch_id?: unknown };
     if (typeof json.qr_token === 'string' && json.qr_token.trim()) {
       return {
-        qrToken: json.qr_token.trim(),
-        branchId: typeof json.branch_id === 'string' ? json.branch_id.trim() || undefined : undefined,
+        qrToken: json.qr_token.trim()
       };
     }
   } catch {
@@ -27,8 +25,7 @@ export const parseAttendanceQrPayload = (raw: string): ParsedAttendanceQrPayload
 
     if (qrToken) {
       return {
-        qrToken,
-        branchId: url.searchParams.get('branch_id')?.trim() || undefined,
+        qrToken
       };
     }
   }
@@ -38,8 +35,7 @@ export const parseAttendanceQrPayload = (raw: string): ParsedAttendanceQrPayload
     const qrToken = rest.join(':').trim();
     if (qrToken) {
       return {
-        qrToken,
-        branchId: branchId.trim() || undefined,
+        qrToken
       };
     }
   }

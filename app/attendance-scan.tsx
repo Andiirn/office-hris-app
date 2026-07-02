@@ -60,12 +60,12 @@ const formatScanFailure = (error: any, mode: ScanMode): ScanFailure => {
 
   const embeddedFlags = rawMessage.includes(':')
     ? rawMessage
-        .split(':')
-        .slice(1)
-        .join(':')
-        .split(/[,\n]/)
-        .map((item: string) => item.trim())
-        .filter(Boolean)
+      .split(':')
+      .slice(1)
+      .join(':')
+      .split(/[,\n]/)
+      .map((item: string) => item.trim())
+      .filter(Boolean)
     : [];
 
   const errorItems = [
@@ -296,11 +296,13 @@ export default function AttendanceScanScreen() {
         return;
       }
 
-      const { qrToken, branchId } = parseAttendanceQrPayload(rawQrData);
+      const { qrToken } = parseAttendanceQrPayload(rawQrData);
+      const branchId = qrToken.split(':')[0];
       if (!hasCheckin) {
         const deviceFingerprint = await getStableDeviceFingerprint();
         const payload = {
           qr_token: qrToken,
+          branch_id: branchId,
           gps_lat: coords.lat,
           gps_long: coords.long,
           location_address: address || '',
@@ -315,7 +317,6 @@ export default function AttendanceScanScreen() {
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           device_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           checkin_photo_url: '',
-          ...(branchId ? { branch_id: branchId } : {}),
         };
         const result = await attendanceService.checkin(payload);
         setCheckinMessage(result.message ?? 'Check-in berhasil');
