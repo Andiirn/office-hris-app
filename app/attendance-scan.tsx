@@ -1,12 +1,11 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { CameraView, useCameraPermissions, type CameraCapturedPicture } from 'expo-camera';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import LottieView from 'lottie-react-native';
-import React, { useCallback, useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { ActivityIndicator, Linking, Pressable, Text, useWindowDimensions, View, Alert } from 'react-native';
-import ViewShot from 'react-native-view-shot';
+import { ActivityIndicator, Linking, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Device from 'expo-device';
 import { Button } from '../src/components/ui/Button';
@@ -14,15 +13,103 @@ import { Skeleton, SkeletonCard } from '../src/components/ui/Skeleton';
 import { Tokens } from '../src/core/theme/tokens';
 import { getStableDeviceFingerprint } from '../src/core/auth/device-fingerprint';
 import { qk } from '../src/core/query/query-keys';
-import { attendanceService } from '../src/services/attendance.service';
+import { attendanceService, createSelfiePhotoCode } from '../src/services/attendance.service';
 import { useAuthStore } from '../src/stores/auth.store';
 
 type LocationStatus = 'loading' | 'granted' | 'denied';
 type CameraStatus = 'loading' | 'granted' | 'denied';
+type ScanMode = 'qr' | 'selfie';
+
+type ScanFailure = {
+  title: string;
+  message: string;
+  reasons: string[];
+  mode: ScanMode;
+};
+
+const FRAUD_REASON_LABELS: Record<string, string> = {
+  TAMPERED_TOKEN: 'Token selfie tidak valid atau berubah',
+  HIGH_PRECISION_GPS: 'Presisi GPS belum cukup untuk verifikasi',
+  OUTSIDE_RADIUS: 'Lokasi berada di luar radius cabang',
+  EMULATOR_DETECTED: 'Perangkat terdeteksi sebagai emulator atau lingkungan virtual',
+};
+
+const normalizeErrorItems = (value: unknown) => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item: unknown) => {
+      if (typeof item === 'string') return item;
+      if (item && typeof item === 'object') {
+        const candidate = (item as { message?: unknown; field?: unknown }).message;
+        if (typeof candidate === 'string') return candidate;
+      }
+      return '';
+    })
+    .map((item) => item.trim())
+    .filter(Boolean);
+};
+
+const formatScanFailure = (error: any, mode: ScanMode): ScanFailure => {
+  const response = error?.response?.data ?? {};
+  const rawMessage = typeof response.message === 'string'
+    ? response.message
+    : typeof error?.message === 'string'
+      ? error.message
+      : 'Gagal memproses absensi';
+
+  const embeddedFlags = rawMessage.includes(':')
+    ? rawMessage
+        .split(':')
+        .slice(1)
+        .join(':')
+        .split(/[,\n]/)
+        .map((item: string) => item.trim())
+        .filter(Boolean)
+    : [];
+
+  const errorItems = [
+    ...normalizeErrorItems(response.errors),
+    ...normalizeErrorItems(response.detail),
+  ];
+
+  const flags = Array.from(new Set([...embeddedFlags, ...errorItems]));
+  const isFraud = /anti-fraud|fraud/i.test(rawMessage) || flags.length > 0;
+
+  if (!isFraud) {
+    return {
+      title: 'Gagal memproses absensi',
+      message: rawMessage,
+      reasons: [],
+      mode,
+    };
+  }
+
+  const formattedReasons = flags.length > 0
+    ? flags.map((flag) => FRAUD_REASON_LABELS[flag] ?? flag)
+    : [rawMessage];
+
+  return {
+    title: mode === 'selfie'
+      ? 'Selfie ditolak sistem anti-fraud'
+      : 'QR ditolak sistem anti-fraud',
+    message: mode === 'selfie'
+      ? 'Foto berhasil terkirim, tetapi server menolak absensi karena alasan berikut:'
+      : 'QR berhasil dipindai, tetapi server menolak absensi karena alasan berikut:',
+    reasons: formattedReasons,
+    mode,
+  };
+};
+
+const toSelfieUpload = (photo: CameraCapturedPicture, photoCode: string) => ({
+  uri: photo.uri,
+  name: `${photoCode}.${photo.format === 'png' ? 'png' : 'jpg'}`,
+  type: photo.format === 'png' ? 'image/png' : 'image/jpeg',
+});
 
 export default function AttendanceScanScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const cameraRef = useRef<React.ElementRef<typeof CameraView> | null>(null);
   const { user } = useAuthStore();
   const [status, setStatus] = useState<LocationStatus>('loading');
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>('loading');
@@ -32,71 +119,74 @@ export default function AttendanceScanScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [coords, setCoords] = useState<{ lat: number; long: number } | null>(null);
+  const [address, setAddress] = useState<string | null>(null);
   const [isMocked, setIsMocked] = useState(false);
   const [todayRecord, setTodayRecord] = useState<any | null>(null);
   const [isSelfieMode, setIsSelfieMode] = useState(false);
-  const viewShotRef = useRef<ViewShot>(null);
+  const [scanFailure, setScanFailure] = useState<ScanFailure | null>(null);
   const { width, height } = useWindowDimensions();
 
-  const capturePhoto = async () => {
-    if (viewShotRef.current && viewShotRef.current.capture && coords) {
-      setSubmitting(true);
-      setCheckinMessage(null);
-      setErrorMessage(null);
-      
-      try {
-        const uri = await viewShotRef.current.capture();
-        const hasCheckin = !!todayRecord?.checkin_time || !!todayRecord?.checkin_at;
-        const hasCheckout = !!todayRecord?.checkout_time || !!todayRecord?.checkout_at;
+  const submitSelfieAttendance = async () => {
+    if (!coords) return;
+    setSubmitting(true);
+    setCheckinMessage(null);
+    setErrorMessage(null);
+    setScanFailure(null);
 
-        if (hasCheckin && hasCheckout) {
-          setErrorMessage('Anda sudah check-in dan check-out hari ini.');
-          setSubmitting(false);
-          return;
-        }
-
-        const challenge = await attendanceService.getPhotoChallenge();
-        const formData = new FormData();
-        
-        formData.append('photo', {
-          uri,
-          name: `attendance_${Date.now()}.jpg`,
-          type: 'image/jpeg',
-        } as any);
-
-        formData.append('gps_lat', String(coords.lat));
-        formData.append('gps_long', String(coords.long));
-        formData.append('challenge', challenge);
-        
-        const deviceFingerprint = await getStableDeviceFingerprint();
-        formData.append('device_fingerprint', deviceFingerprint);
-        formData.append('device_model', Device.modelName || Device.deviceName || 'unknown');
-        formData.append('device_os', Device.osName || 'unknown');
-        formData.append('is_mock_location', String(isMocked));
-
-        if (!hasCheckin) {
-          const result = await attendanceService.checkinWithPhoto(formData);
-          setCheckinMessage(result?.message ?? 'Check-in dengan foto berhasil');
-        } else {
-          const result = await attendanceService.checkoutWithPhoto(formData);
-          setCheckinMessage(result?.message ?? 'Check-out dengan foto berhasil');
-        }
-
-        const latest = await attendanceService.getTodayRecord();
-        setTodayRecord(latest ?? null);
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryRoot() }),
-          queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryFullRoot() }),
-          queryClient.invalidateQueries({ queryKey: qk.homeApprovals(user?.id) }),
-          queryClient.invalidateQueries({ queryKey: qk.activityAttendanceFeed(user?.id, null, null) }),
-          queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryInfiniteRoot() }),
-        ]);
-
-      } catch (error: any) {
-        setErrorMessage(error?.response?.data?.message ?? error?.message ?? 'Gagal mengirim foto absensi');
-      } finally {
-        setSubmitting(false);
+    try {
+      const camera = cameraRef.current;
+      if (!camera) {
+        throw new Error('Kamera selfie belum siap');
       }
+
+      const hasCheckin = !!todayRecord?.checkin_time || !!todayRecord?.checkin_at;
+      const hasCheckout = !!todayRecord?.checkout_time || !!todayRecord?.checkout_at;
+
+      if (hasCheckin && hasCheckout) {
+        setErrorMessage('Anda sudah check-in dan check-out hari ini.');
+        return;
+      }
+
+      const photoCode = createSelfiePhotoCode();
+      const selfiePhoto = await camera.takePictureAsync({ quality: 0.85, skipProcessing: false });
+      if (!selfiePhoto?.uri) {
+        throw new Error('Gagal mengambil foto selfie');
+      }
+
+      const deviceFingerprint = await getStableDeviceFingerprint();
+      const payload = {
+        photoCode,
+        lat: coords.lat,
+        lng: coords.long,
+        address: address || '',
+        deviceID: deviceFingerprint,
+        deviceModel: Device.modelName || Device.deviceName || 'unknown',
+        timezoneID: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        timestamp: Math.floor(Date.now() / 1000),
+      };
+      const upload = toSelfieUpload(selfiePhoto, photoCode);
+
+      if (!hasCheckin) {
+        const result = await attendanceService.checkinSelfie(payload, upload);
+        setCheckinMessage(result?.message ?? 'Check-in selfie berhasil');
+      } else {
+        const result = await attendanceService.checkoutSelfie(payload, upload);
+        setCheckinMessage(result?.message ?? 'Check-out selfie berhasil');
+      }
+
+      const latest = await attendanceService.getTodayRecord();
+      setTodayRecord(latest ?? null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryRoot() }),
+        queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryFullRoot() }),
+        queryClient.invalidateQueries({ queryKey: qk.homeApprovals(user?.id) }),
+        queryClient.invalidateQueries({ queryKey: qk.activityAttendanceFeed(user?.id, null, null) }),
+        queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryInfiniteRoot() }),
+      ]);
+    } catch (error: any) {
+      setScanFailure(formatScanFailure(error, isSelfieMode ? 'selfie' : 'qr'));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -152,6 +242,31 @@ export default function AttendanceScanScreen() {
   }, [requestLocationPermission]);
 
   useEffect(() => {
+    if (coords) {
+      Location.reverseGeocodeAsync({
+        latitude: coords.lat,
+        longitude: coords.long
+      }).then(results => {
+        if (results && results.length > 0) {
+          const geocode = results[0];
+          const parts = [
+            geocode.name,
+            geocode.street,
+            geocode.streetNumber,
+            geocode.district,
+            geocode.city || geocode.subregion,
+            geocode.region,
+            geocode.postalCode
+          ].filter(Boolean);
+          
+          const uniqueParts = parts.filter((item, pos) => parts.indexOf(item) === pos);
+          setAddress(uniqueParts.join(', '));
+        }
+      }).catch(err => console.log('Reverse geocode failed', err));
+    }
+  }, [coords]);
+
+  useEffect(() => {
     const loadTodayRecord = async () => {
       try {
         const record = await attendanceService.getTodayRecord();
@@ -182,7 +297,12 @@ export default function AttendanceScanScreen() {
       const hasCheckout = !!todayRecord?.checkout_time || !!todayRecord?.checkout_at;
 
       if (hasCheckin && hasCheckout) {
-        setErrorMessage('Anda sudah check-in dan check-out hari ini.');
+        setScanFailure({
+          title: 'Absensi sudah selesai',
+          message: 'Anda sudah check-in dan check-out hari ini.',
+          reasons: [],
+          mode: 'qr',
+        });
         return;
       }
 
@@ -194,6 +314,7 @@ export default function AttendanceScanScreen() {
           branch_id: branchId,
           gps_lat: coords.lat,
           gps_long: coords.long,
+          location_address: address || '',
           device_fingerprint: deviceFingerprint,
           user_agent: `HRIS/${Device.modelName || 'device'}`,
           device_os: Device.osName || 'unknown',
@@ -213,6 +334,7 @@ export default function AttendanceScanScreen() {
           qr_token: qrToken,
           gps_lat: coords.lat,
           gps_long: coords.long,
+          location_address: address || '',
           checkout_photo_url: '',
         });
         setCheckinMessage(result.message ?? 'Check-out berhasil');
@@ -228,28 +350,37 @@ export default function AttendanceScanScreen() {
         queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryInfiniteRoot() }),
       ]);
     } catch (error: any) {
-      setErrorMessage(error?.response?.data?.message ?? error?.message ?? 'Gagal memproses absensi');
+      setScanFailure(formatScanFailure(error, 'qr'));
     } finally {
       setSubmitting(false);
     }
-  }, [coords, height, isMocked, parseQrPayload, queryClient, todayRecord, user?.id, width]);
+  }, [address, coords, height, isMocked, parseQrPayload, queryClient, todayRecord, user?.id, width]);
 
   const handleRetryScanner = () => {
     setScanned(false);
     setErrorMessage(null);
     setCheckinMessage(null);
+    setScanFailure(null);
+  };
+
+  const handleModeChange = (mode: ScanMode) => {
+    setIsSelfieMode(mode === 'selfie');
+    setScanned(false);
+    setCheckinMessage(null);
+    setErrorMessage(null);
+    setScanFailure(null);
   };
 
   const isScannerVisible =
     status === 'granted' &&
     cameraStatus === 'granted' &&
     !scanned &&
-    !submitting &&
     !checkinMessage &&
-    !errorMessage;
+    !errorMessage &&
+    !scanFailure;
 
   const hasSuccessState = !!checkinMessage && !errorMessage;
-  const hasFailureState = !!errorMessage;
+  const hasFailureState = !!errorMessage || !!scanFailure;
 
   const hasCheckin = !!todayRecord?.checkin_time || !!todayRecord?.checkin_at;
   const hasCheckout = !!todayRecord?.checkout_time || !!todayRecord?.checkout_at;
@@ -312,6 +443,17 @@ export default function AttendanceScanScreen() {
 
         {status === 'granted' && cameraStatus === 'granted' && (
           <View className="items-center w-full gap-5">
+            <View className="w-full max-w-[320px] rounded-2xl bg-white/80 px-4 py-3 border border-white/90 shadow-sm">
+              <Text className="font-manrope-bold text-sm text-primary">
+                Mode aktif: {isSelfieMode ? 'Selfie' : 'Scan QR'}
+              </Text>
+              <Text className="font-inter text-xs text-text-muted mt-1">
+                {isSelfieMode
+                  ? 'Ambil foto selfie untuk absensi selfie anti-fraud.'
+                  : 'Arahkan kamera ke QR code cabang untuk check-in atau check-out.'}
+              </Text>
+            </View>
+
             <View className="bg-white/80 rounded-2xl px-4 py-2.5 border border-white/90 shadow-sm flex-row items-center gap-2 mb-2">
               <View className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
               <Text className="font-inter-semibold text-xs text-on-surface-variant">
@@ -337,21 +479,20 @@ export default function AttendanceScanScreen() {
                     </View>
                   </View>
                 ) : (
-                  <View className="w-full max-w-[320px] aspect-square rounded-3xl overflow-hidden border-[4px] border-primary-container/20 shadow-2xl relative bg-black">
-                    <ViewShot ref={viewShotRef} options={{ format: 'jpg', quality: 0.8 }} style={{ flex: 1 }}>
-                      <CameraView
-                        style={{ flex: 1 }}
-                        facing="front"
-                      />
-                      <View className="absolute bottom-4 left-4 right-4 bg-black/50 p-3 rounded-xl border border-white/20">
-                        <Text className="font-inter-bold text-xs text-white">
-                          {new Date().toLocaleString('id-ID')}
-                        </Text>
-                        <Text className="font-inter text-[10px] text-white/80 mt-1">
-                          Lat: {coords?.lat.toFixed(6)}, Long: {coords?.long.toFixed(6)}
-                        </Text>
-                      </View>
-                    </ViewShot>
+                  <View className="w-full aspect-[3/4] rounded-3xl overflow-hidden border-[4px] border-primary-container/20 shadow-2xl relative bg-black">
+                    <CameraView
+                      ref={cameraRef}
+                      style={{ flex: 1 }}
+                      facing="front"
+                    />
+                    <View className="absolute bottom-4 left-4 right-4 bg-black/60 p-4 rounded-xl border border-white/30">
+                      <Text className="font-inter-bold text-base text-white">
+                        {new Date().toLocaleString('id-ID')}
+                      </Text>
+                      <Text className="font-inter text-xs text-white/90 mt-1.5 leading-relaxed">
+                        {address ? `${address}\n` : ''}Lat: {coords?.lat.toFixed(6)}, Long: {coords?.long.toFixed(6)}
+                      </Text>
+                    </View>
                   </View>
                 )}
 
@@ -363,13 +504,13 @@ export default function AttendanceScanScreen() {
 
                 <View className="flex-row items-center justify-center mt-2 gap-4 w-full">
                   <Pressable 
-                    onPress={() => setIsSelfieMode(false)}
+                    onPress={() => handleModeChange('qr')}
                     className={`flex-1 py-3 rounded-xl border items-center ${!isSelfieMode ? 'bg-primary border-primary' : 'bg-transparent border-primary/20'}`}
                   >
                     <Text className={`font-inter-bold text-sm ${!isSelfieMode ? 'text-white' : 'text-primary'}`}>Scan QR</Text>
                   </Pressable>
                   <Pressable 
-                    onPress={() => setIsSelfieMode(true)}
+                    onPress={() => handleModeChange('selfie')}
                     className={`flex-1 py-3 rounded-xl border items-center ${isSelfieMode ? 'bg-primary border-primary' : 'bg-transparent border-primary/20'}`}
                   >
                     <Text className={`font-inter-bold text-sm ${isSelfieMode ? 'text-white' : 'text-primary'}`}>Foto Selfie</Text>
@@ -378,8 +519,9 @@ export default function AttendanceScanScreen() {
 
                 {isSelfieMode && (
                   <Pressable
-                    onPress={capturePhoto}
-                    className="w-16 h-16 rounded-full bg-primary items-center justify-center shadow-lg mt-2"
+                    disabled={submitting}
+                    onPress={submitSelfieAttendance}
+                    className={`w-16 h-16 rounded-full items-center justify-center shadow-lg mt-2 ${submitting ? 'bg-primary/50' : 'bg-primary'}`}
                   >
                     <MaterialIcons name="camera-alt" size={28} color="white" />
                   </Pressable>
@@ -391,10 +533,10 @@ export default function AttendanceScanScreen() {
               <View className="w-full max-w-[320px] rounded-3xl bg-white border border-white/80 shadow-sm p-6 items-center gap-3">
                 <ActivityIndicator size="large" color={Tokens.colors.primary} />
                 <Text className="font-inter-bold text-lg text-primary text-center">
-                  Memproses absensi
+                  Mengirim payload selfie
                 </Text>
                 <Text className="font-inter text-sm text-text-muted text-center">
-                  Kamera dimatikan sementara sampai proses selesai.
+                  Data selfie sedang diproses oleh server.
                 </Text>
               </View>
             )}
@@ -433,11 +575,22 @@ export default function AttendanceScanScreen() {
                   <MaterialIcons name="error" size={34} color={Tokens.colors.error} />
                 </View>
                 <Text className="font-manrope-extrabold text-2xl text-error text-center">
-                  Gagal memproses absensi
+                  {scanFailure?.title ?? 'Gagal memproses absensi'}
                 </Text>
                 <Text className="font-inter text-sm text-text-muted text-center">
-                  {errorMessage}
+                  {scanFailure?.message ?? errorMessage}
                 </Text>
+                {!!scanFailure?.reasons.length && (
+                  <View className="w-full gap-2 mt-1">
+                    {scanFailure.reasons.map((reason) => (
+                      <View key={reason} className="w-full rounded-2xl bg-red-50 border border-red-100 px-4 py-3">
+                        <Text className="font-inter-semibold text-sm text-error text-center">
+                          {reason}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
                 <Button
                   title="Coba Lagi"
                   onPress={handleRetryScanner}

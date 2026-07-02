@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import { api } from '../core/api/client';
 import { unwrapData } from '../core/api/envelope';
-import { AttendanceActionResponse, AttendanceItem, AttendanceListQuery, AttendancePeriodQuery, CheckinRequest, CheckoutRequest, VisitItem, VisitListQuery, VisitRequest } from '../types/attendance';
+import { AttendanceActionResponse, AttendanceItem, AttendanceListQuery, AttendancePeriodQuery, CheckinRequest, CheckoutRequest, SelfieTimemarkPayload, SelfieTimemarkRequest, SelfieUploadFile, VisitItem, VisitListQuery, VisitRequest } from '../types/attendance';
 import { AttendanceCorrection, CorrectionListQuery, CorrectionRequest } from '../types/correction';
 
 const devLog = (...args: unknown[]) => {
@@ -44,6 +44,42 @@ const extractArray = <T>(raw: any): T[] => {
   return [];
 };
 
+export const createSelfiePhotoCode = () => {
+  const prefix = Date.now().toString(36).toUpperCase();
+  const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
+  return `${prefix}${suffix}`.replace(/[^A-Z0-9]/g, '').slice(0, 14);
+};
+
+export const buildSelfieAttendancePayload = (input: SelfieTimemarkRequest): SelfieTimemarkPayload => ({
+  photoCode: input.photoCode?.trim() || createSelfiePhotoCode(),
+  timestamp: input.timestamp ?? Math.floor(Date.now() / 1000),
+  timezoneID: input.timezoneID?.trim() || Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Jakarta',
+  lat: input.lat,
+  lng: input.lng,
+  address: input.address?.trim() || '',
+  deviceID: input.deviceID,
+  deviceModel: input.deviceModel,
+});
+
+const buildSelfieFormData = (input: SelfieTimemarkRequest, selfiePhoto: SelfieUploadFile) => {
+  const payload = buildSelfieAttendancePayload(input);
+  const formData = new FormData();
+  formData.append('selfie_photo', {
+    uri: selfiePhoto.uri,
+    name: selfiePhoto.name?.trim() || `${payload.photoCode}.jpg`,
+    type: selfiePhoto.type || 'image/jpeg',
+  } as any);
+  formData.append('photoCode', payload.photoCode);
+  formData.append('timestamp', String(payload.timestamp));
+  formData.append('timezoneID', payload.timezoneID);
+  formData.append('lat', String(payload.lat));
+  formData.append('lng', String(payload.lng));
+  formData.append('address', payload.address);
+  formData.append('deviceID', payload.deviceID);
+  formData.append('deviceModel', payload.deviceModel);
+  return formData;
+};
+
 export const attendanceService = {
   async getEmployeeAttendancePeriod(employeeId: string, query?: AttendancePeriodQuery): Promise<AttendanceItem[]> {
     const response = await api.get(`/attendance/employee/${employeeId}/period`, {
@@ -69,28 +105,22 @@ export const attendanceService = {
     return unwrapData<AttendanceActionResponse>(response.data);
   },
 
-  async getPhotoChallenge(): Promise<string> {
-    try {
-      const response = await api.get('/attendance/photo/challenge');
-      return response.data?.challenge || response.data?.data?.challenge || '';
-    } catch (e) {
-      // Return empty string if the endpoint doesn't exist yet so it doesn't crash the UI prototype
-      return '';
-    }
+  async checkinSelfie(payload: SelfieTimemarkRequest, selfiePhoto: SelfieUploadFile): Promise<AttendanceActionResponse> {
+    const response = await api.post('/attendance/selfie/checkin', buildSelfieFormData(payload, selfiePhoto), {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return unwrapData<AttendanceActionResponse>(response.data);
   },
 
-  async checkinWithPhoto(formData: FormData): Promise<any> {
-    const response = await api.post('/attendance/photo/checkin', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+  async checkoutSelfie(payload: SelfieTimemarkRequest, selfiePhoto: SelfieUploadFile): Promise<AttendanceActionResponse> {
+    const response = await api.post('/attendance/selfie/checkout', buildSelfieFormData(payload, selfiePhoto), {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
     });
-    return unwrapData<any>(response.data);
-  },
-
-  async checkoutWithPhoto(formData: FormData): Promise<any> {
-    const response = await api.post('/attendance/photo/checkout', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    return unwrapData<any>(response.data);
+    return unwrapData<AttendanceActionResponse>(response.data);
   },
   async getTodayRecord() {
     const today = new Date();
@@ -99,7 +129,12 @@ export const attendanceService = {
       params: { date_from: todayString, date_to: todayString, limit: 1, page: 1 },
     });
     const data = unwrapData<AttendanceItem[]>(response.data);
-    return Array.isArray(data) ? data[0] : undefined;
+    if (!Array.isArray(data) || data.length === 0) return undefined;
+    return [...data].sort((a, b) => {
+      const dateA = toLocalDateTimeMillis(a.checkin_at || a.checkout_at || a.attendance_date || a.date || (a as any).created_at);
+      const dateB = toLocalDateTimeMillis(b.checkin_at || b.checkout_at || b.attendance_date || b.date || (b as any).created_at);
+      return dateB - dateA;
+    })[0];
   },
   async getAttendanceHistory(query?: AttendanceListQuery): Promise<AttendanceItem[]> {
     try {
