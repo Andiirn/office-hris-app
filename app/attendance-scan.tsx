@@ -13,6 +13,7 @@ import { Skeleton, SkeletonCard } from '../src/components/ui/Skeleton';
 import { getStableDeviceFingerprint } from '../src/core/auth/device-fingerprint';
 import { qk } from '../src/core/query/query-keys';
 import { Tokens } from '../src/core/theme/tokens';
+import { parseAttendanceQrPayload } from '../src/features/attendance/qr';
 import { attendanceService, createSelfiePhotoCode } from '../src/services/attendance.service';
 import { useAuthStore } from '../src/stores/auth.store';
 
@@ -190,16 +191,6 @@ export default function AttendanceScanScreen() {
     }
   };
 
-  const parseQrPayload = useCallback((raw: string) => {
-    try {
-      const json = JSON.parse(raw) as { qr_token?: string; branch_id?: string };
-      if (json.qr_token && json.branch_id) return { qrToken: json.qr_token, branchId: json.branch_id };
-    } catch { }
-    const parts = raw.split(':');
-    if (parts.length >= 2) return { qrToken: raw.trim(), branchId: parts[0].trim() };
-    throw new Error('Format QR tidak valid');
-  }, []);
-
   const requestLocationPermission = useCallback(async () => {
     setStatus('loading');
     setErrorMessage(null);
@@ -305,12 +296,11 @@ export default function AttendanceScanScreen() {
         return;
       }
 
-      const { qrToken, branchId } = parseQrPayload(rawQrData);
+      const { qrToken, branchId } = parseAttendanceQrPayload(rawQrData);
       if (!hasCheckin) {
         const deviceFingerprint = await getStableDeviceFingerprint();
         const payload = {
           qr_token: qrToken,
-          branch_id: branchId,
           gps_lat: coords.lat,
           gps_long: coords.long,
           location_address: address || '',
@@ -325,6 +315,7 @@ export default function AttendanceScanScreen() {
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           device_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           checkin_photo_url: '',
+          ...(branchId ? { branch_id: branchId } : {}),
         };
         const result = await attendanceService.checkin(payload);
         setCheckinMessage(result.message ?? 'Check-in berhasil');
@@ -353,7 +344,7 @@ export default function AttendanceScanScreen() {
     } finally {
       setSubmitting(false);
     }
-  }, [address, coords, height, isMocked, parseQrPayload, queryClient, todayRecord, user?.id, width]);
+  }, [address, coords, height, isMocked, queryClient, todayRecord, user?.id, width]);
 
   const handleRetryScanner = () => {
     setScanned(false);

@@ -1,6 +1,6 @@
 export interface CheckinRequest {
   qr_token: string;
-  branch_id: string;
+  branch_id?: string;
   gps_lat: number;
   gps_long: number;
   device_fingerprint: string;
