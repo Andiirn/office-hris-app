@@ -33,13 +33,6 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 export default function LoginScreen() {
   const router = useRouter();
   const setAuth = useAuthStore((state) => state.setAuth);
-  const [loginDebugError, setLoginDebugError] = React.useState<{
-    status?: number;
-    method?: string;
-    url?: string;
-    message: string;
-    responseData?: unknown;
-  } | null>(null);
 
   const {
     control,
@@ -57,7 +50,6 @@ export default function LoginScreen() {
     mutationFn: (values: LoginFormValues) =>
       authService.login(values.nik, values.password),
     onSuccess: async (data) => {
-      setLoginDebugError(null);
       const { access_token, refresh_token } = data;
 
       // Save tokens first so they can be used by the API interceptor for getProfile
@@ -85,16 +77,6 @@ export default function LoginScreen() {
       }
     },
     onError: (error: any) => {
-      setLoginDebugError({
-        status: error?.response?.status,
-        method: error?.config?.method?.toUpperCase(),
-        url: error?.config?.baseURL && error?.config?.url
-          ? `${error.config.baseURL}${error.config.url}`
-          : error?.config?.url,
-        message: error?.response?.data?.message || error.message || 'Login failed',
-        responseData: error?.response?.data,
-      });
-
       const errorMessage = error.response?.data?.message || error.message || 'Login failed';
       Alert.alert('Error', errorMessage);
     },
@@ -213,32 +195,6 @@ export default function LoginScreen() {
                     loading={mutation.isPending}
                     style={styles.button}
                   />
-
-                  {loginDebugError ? (
-                    <View style={styles.debugCard}>
-                      <Text style={styles.debugTitle}>Debug login error</Text>
-                      <Text style={styles.debugText}>
-                        Status: {loginDebugError.status ?? 'n/a'}
-                      </Text>
-                      <Text style={styles.debugText}>
-                        Method: {loginDebugError.method ?? 'n/a'}
-                      </Text>
-                      <Text style={styles.debugText}>
-                        URL: {loginDebugError.url ?? 'n/a'}
-                      </Text>
-                      <Text style={styles.debugText}>
-                        Message: {loginDebugError.message}
-                      </Text>
-                      <Text style={styles.debugJson}>
-                        {JSON.stringify(loginDebugError.responseData, null, 2)}
-                      </Text>
-                    </View>
-                  ) : null}
-
-                  {/* Debug: Menampilkan API URL yang sedang aktif */}
-                  <Text style={{ textAlign: 'center', marginTop: 16, fontSize: 10, color: Tokens.colors.onSurfaceVariant }}>
-                    API: {process.env.EXPO_PUBLIC_API_URL}
-                  </Text>
                 </MotiView>
               </View>
             </View>
@@ -366,32 +322,5 @@ const styles = StyleSheet.create({
   },
   button: {
     marginTop: 4,
-  },
-  debugCard: {
-    marginTop: 16,
-    borderRadius: 16,
-    padding: 14,
-    backgroundColor: 'rgba(186, 26, 26, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(186, 26, 26, 0.25)',
-  },
-  debugTitle: {
-    color: Tokens.colors.error,
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  debugText: {
-    color: Tokens.colors.onSurface,
-    fontSize: 12,
-    lineHeight: 18,
-    marginBottom: 2,
-  },
-  debugJson: {
-    color: Tokens.colors.onSurfaceVariant,
-    fontSize: 11,
-    lineHeight: 16,
-    marginTop: 8,
-    fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }),
   },
 });
