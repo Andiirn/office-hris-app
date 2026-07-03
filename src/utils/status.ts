@@ -35,6 +35,9 @@ export const getAttendanceBadgeProps = (status?: string): BadgeProps => {
       label = 'CUTI KHUSUS'; type = 'primary'; break;
     case 'HOLIDAY':
       label = 'LIBUR'; type = 'muted'; break;
+    case 'WORKDAY':
+    case 'WORK_DAY':
+      label = 'HARI KERJA'; type = 'secondary'; break;
     case 'WEEKEND':
       label = 'AKHIR PEKAN'; type = 'muted'; break;
     default:

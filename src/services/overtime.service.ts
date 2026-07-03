@@ -7,6 +7,12 @@ import {
   OvertimeSummary 
 } from '../types/overtime';
 
+function stripNullishFields<T extends object>(payload: T): T {
+  return Object.fromEntries(
+    Object.entries(payload).filter(([, value]) => value !== null && value !== undefined),
+  ) as T;
+}
+
 export const overtimeService = {
   async getSummary(employeeId: string, params: { year: number; month: number }): Promise<OvertimeSummary> {
     const response = await api.get(`/overtime/summary/${employeeId}`, {
@@ -33,7 +39,7 @@ export const overtimeService = {
   },
 
   async createRecord(payload: CreateOvertimeRequest): Promise<OvertimeRecord> {
-    const response = await api.post('/overtime/records', payload);
+    const response = await api.post('/overtime/records', stripNullishFields(payload));
     return unwrapData<OvertimeRecord>(response.data);
   },
 

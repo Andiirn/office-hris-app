@@ -1,5 +1,5 @@
 export type OvertimeStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
-export type OvertimeType = 'REGULAR' | 'HOLIDAY' | 'OFF_DAY';
+export type OvertimeType = 'REGULAR' | 'SATURDAY' | 'HOLIDAY';
 
 export interface OvertimeRecord {
   id: string;

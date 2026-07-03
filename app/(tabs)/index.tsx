@@ -68,6 +68,55 @@ type MenuItem = {
 
 type MenuSlot = MenuItem | null;
 
+const MARQUEE_GAP = 32;
+
+function MarqueeName({ text }: { text: string }) {
+  const [containerWidth, setContainerWidth] = React.useState(0);
+  const [textWidth, setTextWidth] = React.useState(0);
+  const shouldScroll = text.length > 16 || (containerWidth > 0 && textWidth > containerWidth);
+  const travel = shouldScroll ? textWidth + MARQUEE_GAP : 0;
+
+  return (
+    <View
+      className="w-full overflow-hidden"
+      style={{ height: 36, justifyContent: 'center' }}
+      onLayout={(event) => setContainerWidth(event.nativeEvent.layout.width)}
+    >
+      <Text
+        className="absolute opacity-0 font-manrope-extrabold text-2xl text-white leading-8"
+        pointerEvents="none"
+        numberOfLines={1}
+        onLayout={(event) => setTextWidth(event.nativeEvent.layout.width)}
+      >
+        {text}
+      </Text>
+
+      {shouldScroll ? (
+        <MotiView
+          key={text}
+          className="flex-row items-center self-start"
+          style={{ minWidth: textWidth + MARQUEE_GAP, flexWrap: 'nowrap' }}
+          animate={{ translateX: -travel }}
+          from={{ translateX: 0 }}
+          transition={{ type: 'timing', duration: Math.max(3000, text.length * 220), loop: true }}
+        >
+          <Text className="font-manrope-extrabold text-2xl text-white leading-8 flex-shrink-0" numberOfLines={1} ellipsizeMode="clip">
+            {text}
+          </Text>
+          <View style={{ width: MARQUEE_GAP }} />
+          <Text className="font-manrope-extrabold text-2xl text-white leading-8 flex-shrink-0" numberOfLines={1} ellipsizeMode="clip">
+            {text}
+          </Text>
+        </MotiView>
+      ) : (
+        <Text className="font-manrope-extrabold text-2xl text-white leading-8" numberOfLines={1} ellipsizeMode="clip">
+          {text}
+        </Text>
+      )}
+    </View>
+  );
+}
+
 export default function HomeScreen() {
   const { user, isLoggedIn } = useAuthStore();
   const { width: windowWidth } = useWindowDimensions();
@@ -539,9 +588,7 @@ export default function HomeScreen() {
               <Text className="font-inter-bold text-[10px] text-white/70 uppercase tracking-[0.2em] mb-1">
                 Halo, Selamat Datang
               </Text>
-              <Text className="font-manrope-extrabold text-2xl text-white leading-8" numberOfLines={1}>
-                {name}
-              </Text>
+              <MarqueeName text={name} />
             </View>
             <View className="bg-white/20 px-3 py-1.5 rounded-full border border-white/30 items-center justify-center">
               <View className="flex-row items-center gap-1.5">

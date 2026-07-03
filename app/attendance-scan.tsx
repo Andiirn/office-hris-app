@@ -4,7 +4,7 @@ import { CameraView, useCameraPermissions, type CameraCapturedPicture } from 'ex
 import * as Device from 'expo-device';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
-import LottieView from 'lottie-react-native';
+import { MotiView } from 'moti';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -107,10 +107,161 @@ const toSelfieUpload = (photo: CameraCapturedPicture, photoCode: string) => ({
   type: photo.format === 'png' ? 'image/png' : 'image/jpeg',
 });
 
+function SuccessResultScreen({
+  message,
+  onDone,
+}: {
+  message: string;
+  onDone: () => void;
+}) {
+  const bubbles = [
+    { left: 28, top: 28, delay: 0 },
+    { left: 260, top: 40, delay: 120 },
+    { left: 48, bottom: 80, delay: 240 },
+    { right: 40, bottom: 92, delay: 360 },
+  ];
+
+  return (
+    <View className="flex-1 bg-background px-5">
+      <View className="absolute top-20 -right-16 w-72 h-72 rounded-full bg-primary/10" />
+      <View className="absolute bottom-12 -left-20 w-80 h-80 rounded-full bg-secondary-container/40" />
+
+      {bubbles.map((bubble, index) => (
+        <MotiView
+          key={`${bubble.left || bubble.right}-${index}`}
+          from={{ opacity: 0, scale: 0.2, translateY: 12 }}
+          animate={{ opacity: 1, scale: 1, translateY: 0 }}
+          transition={{ type: 'spring', damping: 12, stiffness: 120, delay: bubble.delay }}
+          style={[
+            { position: 'absolute', width: 14, height: 14, borderRadius: 999, backgroundColor: Tokens.colors.primary },
+            bubble,
+          ]}
+        />
+      ))}
+
+      <View className="flex-1 items-center justify-center">
+        <MotiView
+          from={{ opacity: 0, scale: 0.6, translateY: 18 }}
+          animate={{ opacity: 1, scale: 1, translateY: 0 }}
+          transition={{ type: 'spring', damping: 12, stiffness: 160 }}
+          className="items-center"
+        >
+          <MotiView
+            from={{ scale: 0.8, opacity: 0.55 }}
+            animate={{ scale: 1.7, opacity: 0 }}
+            transition={{ loop: true, type: 'timing', duration: 1200 }}
+            className="absolute w-36 h-36 rounded-full bg-emerald-400/20"
+          />
+          <MotiView
+            from={{ scale: 0.9 }}
+            animate={{ scale: 1 }}
+            transition={{ loop: true, repeatReverse: true, type: 'timing', duration: 1400 }}
+            className="w-24 h-24 rounded-full bg-emerald-500 items-center justify-center shadow-lg mb-6"
+          >
+            <MaterialIcons name="check" size={54} color="#fff" />
+          </MotiView>
+
+          <Text className="font-manrope-extrabold text-3xl text-primary text-center">
+            Berhasil!
+          </Text>
+          <Text className="font-inter text-base text-on-surface-variant text-center mt-3 px-6 leading-6">
+            {message}
+          </Text>
+        </MotiView>
+
+        <MotiView
+          from={{ opacity: 0, translateY: 14 }}
+          animate={{ opacity: 1, translateY: 0 }}
+          transition={{ delay: 250 }}
+          className="w-full max-w-[320px] mt-10"
+        >
+          <Button
+            title="Kembali ke Home"
+            onPress={onDone}
+            className="w-full h-14 rounded-2xl bg-primary"
+            textStyle={{ color: '#ffffff', fontSize: 16 }}
+          />
+        </MotiView>
+      </View>
+    </View>
+  );
+}
+
+function FailureResultScreen({
+  title,
+  message,
+  reasons,
+  onRetry,
+}: {
+  title: string;
+  message: string;
+  reasons: string[];
+  onRetry: () => void;
+}) {
+  return (
+    <View className="flex-1 bg-background px-5">
+      <View className="absolute top-20 -right-16 w-72 h-72 rounded-full bg-error/10" />
+      <View className="absolute bottom-12 -left-20 w-80 h-80 rounded-full bg-primary/10" />
+
+      <View className="flex-1 items-center justify-center">
+        <MotiView
+          from={{ opacity: 0, scale: 0.7, translateY: 18 }}
+          animate={{ opacity: 1, scale: 1, translateY: 0 }}
+          transition={{ type: 'spring', damping: 14, stiffness: 150 }}
+          className="items-center w-full max-w-[340px]"
+        >
+          <MotiView
+            from={{ scale: 0.95 }}
+            animate={{ scale: 1.05 }}
+            transition={{ loop: true, repeatReverse: true, type: 'timing', duration: 900 }}
+            className="w-24 h-24 rounded-full bg-error/10 items-center justify-center mb-6"
+          >
+            <MaterialIcons name="error" size={56} color={Tokens.colors.error} />
+          </MotiView>
+
+          <Text className="font-manrope-extrabold text-3xl text-error text-center">
+            {title}
+          </Text>
+          <Text className="font-inter text-base text-on-surface-variant text-center mt-3 leading-6 px-4">
+            {message}
+          </Text>
+
+          {!!reasons.length && (
+            <View className="w-full mt-6 gap-3">
+              {reasons.map((reason) => (
+                <View key={reason} className="w-full rounded-2xl bg-white/80 px-4 py-3 border border-red-100">
+                  <Text className="font-inter-semibold text-sm text-error text-center">
+                    {reason}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          <MotiView
+            from={{ opacity: 0, translateY: 14 }}
+            animate={{ opacity: 1, translateY: 0 }}
+            transition={{ delay: 250 }}
+            className="w-full mt-8"
+          >
+            <Button
+              title="Coba Lagi"
+              onPress={onRetry}
+              className="w-full h-14 rounded-2xl bg-primary"
+              textStyle={{ color: '#ffffff', fontSize: 16 }}
+            />
+          </MotiView>
+        </MotiView>
+      </View>
+    </View>
+  );
+}
+
 export default function AttendanceScanScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const cameraRef = useRef<React.ElementRef<typeof CameraView> | null>(null);
+  const mockAlertShownRef = useRef(false);
   const { user } = useAuthStore();
   const [status, setStatus] = useState<LocationStatus>('loading');
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>('loading');
@@ -194,6 +345,10 @@ export default function AttendanceScanScreen() {
   const requestLocationPermission = useCallback(async () => {
     setStatus('loading');
     setErrorMessage(null);
+    setCoords(null);
+    setAddress(null);
+    setIsMocked(false);
+    mockAlertShownRef.current = false;
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
       if (permission.status !== 'granted') {
@@ -227,6 +382,20 @@ export default function AttendanceScanScreen() {
       setErrorMessage('Gagal mengakses lokasi. Coba lagi atau buka pengaturan lokasi.');
     }
   }, []);
+
+  // useEffect(() => {
+  //   if (status !== 'granted' || !isMocked || mockAlertShownRef.current) return;
+
+  //   mockAlertShownRef.current = true;
+  //   Alert.alert(
+  //     'Mock location terdeteksi',
+  //     'Matikan fake GPS atau developer mock location terlebih dahulu, lalu coba lagi untuk melanjutkan absensi.',
+  //     [
+  //       { text: 'Coba Lagi', onPress: requestLocationPermission },
+  //       { text: 'OK', style: 'cancel' },
+  //     ]
+  //   );
+  // }, [isMocked, requestLocationPermission, status]);
 
   useEffect(() => {
     requestLocationPermission();
@@ -365,6 +534,7 @@ export default function AttendanceScanScreen() {
   const isScannerVisible =
     status === 'granted' &&
     cameraStatus === 'granted' &&
+    !isMocked &&
     !scanned &&
     !checkinMessage &&
     !errorMessage &&
@@ -372,9 +542,34 @@ export default function AttendanceScanScreen() {
 
   const hasSuccessState = !!checkinMessage && !errorMessage;
   const hasFailureState = !!errorMessage || !!scanFailure;
+  const hasMockLocationState = status === 'granted' && isMocked;
+  const failureTitle = scanFailure?.title ?? 'Gagal memproses absensi';
+  const failureMessage = scanFailure?.message ?? errorMessage ?? 'Coba lagi untuk memproses absensi.';
+  const failureReasons = scanFailure?.reasons ?? [];
 
   const hasCheckin = !!todayRecord?.checkin_time || !!todayRecord?.checkin_at;
   const hasCheckout = !!todayRecord?.checkout_time || !!todayRecord?.checkout_at;
+
+  if (hasSuccessState) {
+    return (
+      <SafeAreaView className="flex-1 bg-background">
+        <SuccessResultScreen message={checkinMessage || 'Check-in berhasil'} onDone={() => router.replace('/(tabs)')} />
+      </SafeAreaView>
+    );
+  }
+
+  if (hasFailureState) {
+    return (
+      <SafeAreaView className="flex-1 bg-background">
+        <FailureResultScreen
+          title={failureTitle}
+          message={failureMessage}
+          reasons={failureReasons}
+          onRetry={handleRetryScanner}
+        />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-background">
@@ -389,7 +584,7 @@ export default function AttendanceScanScreen() {
           <MaterialIcons name="arrow-back" size={24} color={Tokens.colors.primary} />
         </Pressable>
         <Text className="font-manrope-extrabold text-xl text-primary flex-1 text-center mr-10">
-          Attendance Scan
+          Silahkan Scan QR Code / Wajah Anda
         </Text>
       </View>
 
@@ -415,6 +610,19 @@ export default function AttendanceScanScreen() {
               {errorMessage || 'Aplikasi memerlukan izin lokasi untuk melakukan absensi.'}
             </Text>
             <Button title="Buka Pengaturan" onPress={() => Linking.openSettings()} className="w-full mt-2" />
+          </View>
+        )}
+
+        {hasMockLocationState && (
+          <View className="items-center gap-4 w-full bg-white rounded-3xl p-6 shadow-sm border border-red-200">
+            <View className="w-16 h-16 rounded-full bg-red-50 items-center justify-center mb-2">
+              <MaterialIcons name="gps-not-fixed" size={32} color={Tokens.colors.error} />
+            </View>
+            <Text className="font-manrope-bold text-lg text-error text-center">Jangan Curang</Text>
+            <Text className="font-inter text-sm text-on-surface-variant text-center px-2">
+              Matikan fake GPS atau lokasi palsu, lalu ulangi sebelum scan QR atau selfie.
+            </Text>
+            <Button title="Coba Lagi" onPress={requestLocationPermission} className="w-full mt-2" />
           </View>
         )}
 
@@ -528,65 +736,6 @@ export default function AttendanceScanScreen() {
                 <Text className="font-inter text-sm text-text-muted text-center">
                   Data selfie sedang diproses oleh server.
                 </Text>
-              </View>
-            )}
-
-            {hasSuccessState && (
-              <View className="w-full max-w-[320px] rounded-3xl bg-white border border-emerald-100 shadow-sm p-8 items-center justify-center mt-4">
-                <View className="bg-emerald-100 px-6 py-2 rounded-full mb-2">
-                  <Text className="font-manrope-extrabold text-lg text-emerald-700 tracking-wide">
-                    Scan Berhasil!
-                  </Text>
-                </View>
-
-                <LottieView
-                  source={require('../assets/Clap.json')}
-                  autoPlay
-                  loop={false}
-                  style={{ width: 200, height: 200 }}
-                />
-
-                <Text className="font-inter-semibold text-base text-text-muted mt-2 mb-8 text-center">
-                  {checkinMessage}
-                </Text>
-
-                <Button
-                  title="Kembali ke Home"
-                  onPress={() => router.replace('/(tabs)')}
-                  className="w-full h-14 rounded-2xl bg-primary"
-                  textStyle={{ color: '#ffffff', fontSize: 16 }}
-                />
-              </View>
-            )}
-
-            {hasFailureState && (
-              <View className="w-full max-w-[320px] rounded-3xl bg-white border border-red-200 shadow-sm p-6 items-center gap-3">
-                <View className="w-14 h-14 rounded-full bg-red-50 items-center justify-center">
-                  <MaterialIcons name="error" size={34} color={Tokens.colors.error} />
-                </View>
-                <Text className="font-manrope-extrabold text-2xl text-error text-center">
-                  {scanFailure?.title ?? 'Gagal memproses absensi'}
-                </Text>
-                <Text className="font-inter text-sm text-text-muted text-center">
-                  {scanFailure?.message ?? errorMessage}
-                </Text>
-                {!!scanFailure?.reasons.length && (
-                  <View className="w-full gap-2 mt-1">
-                    {scanFailure.reasons.map((reason) => (
-                      <View key={reason} className="w-full rounded-2xl bg-red-50 border border-red-100 px-4 py-3">
-                        <Text className="font-inter-semibold text-sm text-error text-center">
-                          {reason}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
-                <Button
-                  title="Coba Lagi"
-                  onPress={handleRetryScanner}
-                  className="w-full mt-2 h-13 rounded-2xl bg-primary"
-                  textStyle={{ color: '#ffffff' }}
-                />
               </View>
             )}
 

@@ -19,6 +19,7 @@ import { Input } from '../src/components/ui/Input';
 import { SuccessAnimation } from '../src/components/ui/SuccessAnimation';
 import { StatusBadge } from '../src/components/ui/StatusBadge';
 import { Tokens } from '../src/core/theme/tokens';
+import { formatOvertimeTime, toLocalDateTimeString } from '../src/features/overtime/time';
 import { getAttendanceBadgeProps } from '../src/utils/status';
 import { attendanceService } from '../src/services/attendance.service';
 import { overtimeService } from '../src/services/overtime.service';
@@ -35,14 +36,14 @@ const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
   return `${String(hours).padStart(2, '0')}:${minutes}`;
 });
 
-function toIsoDateTime(date: string, time: string) {
-  return new Date(`${date}T${time}:00`).toISOString();
-}
+const OVERTIME_TYPE_LABELS: Record<OvertimeType, string> = {
+  REGULAR: 'Hari Kerja',
+  SATURDAY: 'Weekend',
+  HOLIDAY: 'Hari Libur',
+};
 
-function formatTime(timeStr?: string | null) {
-  if (!timeStr) return '--:--';
-  if (timeStr.includes('T')) return timeStr.split('T')[1].slice(0, 5);
-  return timeStr.slice(0, 5);
+function formatLocalDate(value: Date) {
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
 }
 
 function getOvertimeStatus(item: any) {
@@ -51,6 +52,27 @@ function getOvertimeStatus(item: any) {
   if (rawStatus === 'REJECTED' || rawStatus === 'DECLINED') return 'REJECTED';
   if (rawStatus === 'CANCELLED') return 'CANCELLED';
   return 'PENDING';
+}
+
+function getSubmissionErrorMessage(error: any) {
+  const response = error?.response?.data;
+  if (Array.isArray(response?.errors) && response.errors.length > 0) {
+    const first = response.errors[0];
+    if (typeof first === 'string' && first.trim()) return first;
+    if (first && typeof first === 'object') {
+      const field = typeof first.field === 'string' ? first.field : '';
+      const message = typeof first.message === 'string' ? first.message : '';
+      if (field && message) return `${field}: ${message}`;
+      if (message) return message;
+    }
+  }
+  if (typeof response?.message === 'string' && response.message.trim()) {
+    return response.message;
+  }
+  if (typeof error?.message === 'string' && error.message.trim()) {
+    return error.message;
+  }
+  return 'Failed to submit overtime';
 }
 
 export default function OvertimeScreen() {
@@ -78,7 +100,7 @@ export default function OvertimeScreen() {
     month: new Date().getMonth() + 1,
   }), []);
 
-  const overtimeTypes: OvertimeType[] = ['REGULAR', 'HOLIDAY', 'OFF_DAY'];
+  const overtimeTypes: OvertimeType[] = ['REGULAR', 'SATURDAY', 'HOLIDAY'];
 
   const { data: summary } = useQuery({
     queryKey: ['overtime-summary', user?.id],
@@ -98,7 +120,7 @@ export default function OvertimeScreen() {
     staleTime: 1000 * 60 * 5,
   });
 
-  const { data: attendanceHistory = [], isLoading: isLoadingAttendance } = useQuery({
+  const { data: attendanceHistory = [], isLoading: isLoadingAttendance, refetch: refetchAttendanceHistory } = useQuery({
     queryKey: ['attendance-history-pick', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -107,16 +129,16 @@ export default function OvertimeScreen() {
       dateFrom.setDate(dateFrom.getDate() - 30);
       return attendanceService.getAttendanceHistory({
         employee_id: user.id,
-        date_from: dateFrom.toISOString().split('T')[0],
-        date_to: dateTo.toISOString().split('T')[0],
-        limit: 50,
+        date_from: formatLocalDate(dateFrom),
+        date_to: formatLocalDate(dateTo),
+        limit: 1000,
       });
     },
     enabled: attendancePickerVisible && !!user?.id,
   });
 
   const selectableAttendanceHistory = useMemo(
-    () => attendanceHistory.filter((item) => !!(item.checkout_at || item.checkout_time)),
+    () => attendanceHistory.filter((item) => !!(item.checkin_at || item.checkin_time || item.checkout_at || item.checkout_time)),
     [attendanceHistory],
   );
 
@@ -137,7 +159,7 @@ export default function OvertimeScreen() {
       setShowSuccessAnim(true);
     },
     onError: (error: any) => {
-      Alert.alert('Error', error?.response?.data?.message || 'Failed to submit overtime');
+      Alert.alert('Error', getSubmissionErrorMessage(error));
     },
   });
 
@@ -200,8 +222,8 @@ export default function OvertimeScreen() {
       ...form,
       attendance_id: mode === 'attendance' ? form.attendance_id : null,
       overtime_date: form.overtime_date,
-      start_time: toIsoDateTime(form.overtime_date, formatTime(form.start_time)),
-      end_time: toIsoDateTime(form.overtime_date, formatTime(form.end_time)),
+      start_time: toLocalDateTimeString(form.overtime_date, form.start_time),
+      end_time: toLocalDateTimeString(form.overtime_date, form.end_time),
     });
   };
 
@@ -234,8 +256,8 @@ export default function OvertimeScreen() {
   const attendanceLabel = useMemo(() => {
     if (!form.attendance_id) return 'Pilih attendance';
     const attendance = selectableAttendanceHistory.find(item => item.id === form.attendance_id);
-    return attendance
-      ? `${attendance.attendance_date || attendance.date || '-'} · ${formatTime(attendance.checkin_at || attendance.checkin_time)}`
+      return attendance
+      ? `${attendance.attendance_date || attendance.date || '-'} · ${formatOvertimeTime(attendance.checkin_at || attendance.checkin_time)}`
       : 'Attendance terpilih';
   }, [form.attendance_id, selectableAttendanceHistory]);
 
@@ -350,14 +372,14 @@ export default function OvertimeScreen() {
                       </View>
                       <View className="w-1 h-1 rounded-full bg-outline/30" />
                       <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-tighter">
-                        {item.overtime_type?.replace('_', ' ')}
+                        {OVERTIME_TYPE_LABELS[item.overtime_type as OvertimeType] || item.overtime_type?.replace('_', ' ')}
                       </Text>
                     </View>
                     {(item.start_time || item.end_time) && (
                       <View className="flex-row items-center gap-1 mt-1.5">
                         <MaterialIcons name="schedule" size={12} color={Tokens.colors.textMuted} />
                         <Text className="font-inter text-xs text-text-muted">
-                          {formatTime(item.start_time)} - {formatTime(item.end_time)}
+                          {formatOvertimeTime(item.start_time)} - {formatOvertimeTime(item.end_time)}
                         </Text>
                       </View>
                     )}
@@ -431,8 +453,11 @@ export default function OvertimeScreen() {
                   <Text className="font-inter-bold text-sm text-primary mb-3 ml-1">Pilih Kehadiran</Text>
                   <Pressable
                     className="flex-row items-center justify-between px-4 py-3 rounded-xl bg-[#f8f8f8]"
-                    onPress={() => setAttendancePickerVisible(true)}
-                  >
+                  onPress={async () => {
+                    setAttendancePickerVisible(true);
+                    await refetchAttendanceHistory();
+                  }}
+                >
                     <View className="flex-1 pr-3">
                       <Text className="font-inter-bold text-sm text-on-surface" numberOfLines={1}>{attendanceLabel}</Text>
                       <Text className="font-inter-medium text-[10px] text-text-muted mt-1">Tap untuk pilih dari daftar kehadiran</Text>
@@ -478,7 +503,9 @@ export default function OvertimeScreen() {
                     onPress={() => setForm(prev => ({ ...prev, overtime_type: type }))}
                     className={`flex-1 py-3 rounded-xl border items-center ${form.overtime_type === type ? 'bg-primary border-primary' : 'bg-[#f8f8f8] border-transparent'}`}
                   >
-                    <Text className={`font-inter-bold text-[10px] ${form.overtime_type === type ? 'text-white' : 'text-text-muted'}`}>{type}</Text>
+                    <Text className={`font-inter-bold text-[10px] ${form.overtime_type === type ? 'text-white' : 'text-text-muted'}`}>
+                      {OVERTIME_TYPE_LABELS[type]}
+                    </Text>
                   </Pressable>
                 ))}
               </View>
@@ -552,7 +579,7 @@ export default function OvertimeScreen() {
                     <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                       {isLoadingAttendance ? (
                         <Text className="font-inter text-sm text-text-muted py-6 text-center">Memuat attendance...</Text>
-                      ) : attendanceHistory.length === 0 ? (
+                      ) : selectableAttendanceHistory.length === 0 ? (
                         <View className="p-4 bg-black/5 rounded-xl border border-dashed border-outline">
                           <Text className="font-inter text-xs text-text-muted text-center">Tidak ada data kehadiran terbaru</Text>
                         </View>
@@ -587,7 +614,7 @@ export default function OvertimeScreen() {
                                       })()}
                                     </View>
                                     <Text className="font-inter-medium text-[10px] text-text-muted">
-                                      {formatTime(att.checkin_at || att.checkin_time)} - {formatTime(att.checkout_at || att.checkout_time)}
+                                      {formatOvertimeTime(att.checkin_at || att.checkin_time)} - {formatOvertimeTime(att.checkout_at || att.checkout_time)}
                                     </Text>
                                   </View>
                                 </View>

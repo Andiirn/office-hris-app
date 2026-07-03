@@ -3,10 +3,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Image,
   Linking,
   Modal,
@@ -25,7 +26,7 @@ import { StatusBadge } from '../src/components/ui/StatusBadge';
 import { Tokens } from '../src/core/theme/tokens';
 import { attendanceService } from '../src/services/attendance.service';
 import { useAuthStore } from '../src/stores/auth.store';
-import { VisitRequest } from '../src/types/attendance';
+import { VisitRequest, VisitItem } from '../src/types/attendance';
 
 export default function VisitScreen() {
   const { user } = useAuthStore();
@@ -36,18 +37,44 @@ export default function VisitScreen() {
   const [locationName, setLocationName] = useState('');
   const [reason, setReason] = useState('');
   const [photoFile, setPhotoFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
+  
+  // Tab State
+  const [activeTab, setActiveTab] = useState<'me' | 'team'>('me');
+
+  // Preview Image State
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   // GPS State
   const [coords, setCoords] = useState<{ lat: number; long: number } | null>(null);
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
 
+  const isManager = ["MANAGER", "MANAGER_HR_ADMIN", "MANAGER_HR_PAYROLL", "HEAD_DIVISION", "CEO", "DIRECTOR"]
+    .includes((user?.role || "").toUpperCase());
+
   // 1. Fetch Visit History
-  const { data: history = [], isLoading, refetch, isFetching } = useQuery({
-    queryKey: ['visit-history', user?.id],
+  const { data: history = [], isLoading: isLoadingMe, refetch: refetchMe, isFetching: isFetchingMe } = useQuery({
+    queryKey: ['visit-history', 'me', user?.id],
     queryFn: () => attendanceService.listVisits({ employee_id: user?.id, limit: 50 }),
     enabled: !!user?.id,
   });
+
+  // Fetch Team Visits
+  const { data: teamVisitsRaw, isLoading: isLoadingTeam, refetch: refetchTeam, isFetching: isFetchingTeam } = useQuery({
+    queryKey: ['visit-history', 'team'],
+    queryFn: () => attendanceService.listVisits({ limit: 50 }),
+    enabled: isManager && activeTab === 'team',
+  });
+
+  const teamVisits = useMemo(() => {
+    if (!teamVisitsRaw) return [];
+    return teamVisitsRaw.filter((v: VisitItem) => v.employee_id !== user?.id);
+  }, [teamVisitsRaw, user?.id]);
+
+  const currentData = activeTab === 'me' ? history : teamVisits;
+  const isLoading = activeTab === 'me' ? isLoadingMe : isLoadingTeam;
+  const isFetching = activeTab === 'me' ? isFetchingMe : isFetchingTeam;
 
   // GPS fetch function
   const fetchGps = async () => {
@@ -107,8 +134,8 @@ export default function VisitScreen() {
     mutationFn: (payload: VisitRequest) => attendanceService.requestVisit(payload),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['visit-history', user?.id] }),
-        queryClient.refetchQueries({ queryKey: ['visit-history', user?.id], type: 'active' }),
+        queryClient.invalidateQueries({ queryKey: ['visit-history', 'me', user?.id] }),
+        queryClient.refetchQueries({ queryKey: ['visit-history', 'me', user?.id], type: 'active' }),
       ]);
       setModalVisible(false);
       setLocationName('');
@@ -124,7 +151,11 @@ export default function VisitScreen() {
   });
 
   const onRefresh = () => {
-    refetch();
+    if (activeTab === 'me') {
+      refetchMe();
+    } else {
+      refetchTeam();
+    }
   };
 
   const getStatusType = (status: string) => {
@@ -140,11 +171,73 @@ export default function VisitScreen() {
 
   const isFormValid = locationName.trim().length >= 2 && reason.trim().length >= 5 && !!coords;
 
+  const renderVisitCard = ({ item }: { item: VisitItem }) => (
+    <GlassCard style={{ padding: 16, marginBottom: 16 }}>
+      {activeTab === 'team' && item.employee && (
+        <View className="mb-3 flex-row items-center gap-2 border-b border-black/5 pb-2">
+          <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center">
+            <Text className="font-manrope-bold text-primary text-xs">
+              {(item.employee?.name || item.employee?.full_name || '?').charAt(0).toUpperCase()}
+            </Text>
+          </View>
+          <View className="flex-1">
+            <Text className="font-inter-bold text-sm text-black">{item.employee.name || item.employee.full_name || 'Tanpa Nama'}</Text>
+            <Text className="font-inter text-[10px] text-text-muted">{item.employee.nik || '-'}</Text>
+          </View>
+        </View>
+      )}
+
+      <View className="flex-row justify-between items-start mb-3">
+        <View className="flex-1 mr-2">
+          <Text className="font-inter-bold text-base text-black" numberOfLines={1}>
+            {item.location_name}
+          </Text>
+          <View className="flex-row items-center mt-1.5 gap-1.5">
+            <MaterialIcons name="event" size={12} color={Tokens.colors.textMuted} />
+            <Text className="font-inter-medium text-xs text-text-muted">
+              {item.visit_date} · {item.visit_time.substring(0, 5)}
+            </Text>
+          </View>
+        </View>
+        <StatusBadge label={item.status} type={getStatusType(item.status)} />
+      </View>
+
+      <View className="bg-black/5 p-3 rounded-xl mb-2">
+        <Text className="font-inter text-sm text-black leading-5">{item.reason}</Text>
+      </View>
+
+      <View className="flex-row items-center justify-between mt-2">
+        <View className="flex-row items-center gap-1.5">
+          <MaterialIcons name="map" size={12} color={Tokens.colors.textMuted} />
+          <Text className="font-inter text-[10px] text-text-muted tabular-nums">
+            GPS: {Number(item.gps_lat).toFixed(6)}, {Number(item.gps_long).toFixed(6)}
+          </Text>
+        </View>
+        {item.visit_photo_url ? (
+          <Pressable 
+            className="flex-row items-center gap-1 bg-primary/10 px-2 py-1 rounded-md active:opacity-60"
+            onPress={() => {
+              setPreviewUrl(item.visit_photo_url!);
+              setPreviewVisible(true);
+            }}
+          >
+            <MaterialIcons name="photo" size={12} color={Tokens.colors.primary} />
+            <Text className="font-inter-bold text-[10px] text-primary">Lihat Foto</Text>
+          </Pressable>
+        ) : (
+          <View className="flex-row items-center gap-1 px-2 py-1 rounded-md">
+            <MaterialIcons name="photo-camera" size={12} color={Tokens.colors.outline} />
+            <Text className="font-inter-medium text-[10px] text-text-muted">Tanpa Foto</Text>
+          </View>
+        )}
+      </View>
+    </GlassCard>
+  );
+
   return (
     <SafeAreaView className="flex-1 bg-background">
       <View className="absolute top-16 -right-20 w-72 h-72 rounded-full bg-primary/5" />
       <View className="absolute bottom-10 -left-24 w-80 h-80 rounded-full bg-secondary-container/10" />
-
 
       <View className="flex-row justify-between items-center px-5 pt-2 pb-5 z-10">
         <View className="flex-row items-center gap-3 flex-1">
@@ -169,81 +262,69 @@ export default function VisitScreen() {
         </Pressable>
       </View>
 
-      <ScrollView
-        className="flex-1"
+      <FlatList
+        data={currentData}
+        keyExtractor={(item) => item.id}
+        renderItem={renderVisitCard}
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={isFetching} onRefresh={onRefresh} tintColor={Tokens.colors.primary} />
         }
-      >
-        <GlassCard style={{ padding: 20, marginBottom: 24, borderLeftWidth: 4, borderLeftColor: Tokens.colors.primary }}>
-          <Text className="font-inter-bold text-sm text-black mb-2">Informasi Visit</Text>
-          <Text className="font-inter text-xs text-text-muted leading-5">
-            Gunakan fitur ini untuk melaporkan kehadiran saat bertugas atau melakukan kunjungan ke luar kantor/klien. Laporan Anda akan menyertakan koordinat lokasi saat pengiriman.
-          </Text>
-        </GlassCard>
+        ListHeaderComponent={() => (
+          <View>
+            <GlassCard style={{ padding: 20, marginBottom: 24, borderLeftWidth: 4, borderLeftColor: Tokens.colors.primary }}>
+              <Text className="font-inter-bold text-sm text-black mb-2">Informasi Visit</Text>
+              <Text className="font-inter text-xs text-text-muted leading-5">
+                Gunakan fitur ini untuk melaporkan kehadiran saat bertugas atau melakukan kunjungan ke luar kantor/klien. Laporan Anda akan menyertakan koordinat lokasi saat pengiriman.
+              </Text>
+            </GlassCard>
 
-        <Text className="font-manrope-bold text-lg text-primary mb-4">Riwayat Kunjungan</Text>
+            {isManager && (
+              <View className="flex-row bg-black/5 p-1 rounded-xl mb-6">
+                <Pressable
+                  onPress={() => setActiveTab('me')}
+                  className={`flex-1 items-center py-2.5 rounded-lg ${activeTab === 'me' ? 'bg-white shadow-sm' : ''}`}
+                >
+                  <Text className={`font-inter-bold text-sm ${activeTab === 'me' ? 'text-primary' : 'text-text-muted'}`}>Riwayat Saya</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setActiveTab('team')}
+                  className={`flex-1 items-center py-2.5 rounded-lg ${activeTab === 'team' ? 'bg-white shadow-sm' : ''}`}
+                >
+                  <Text className={`font-inter-bold text-sm ${activeTab === 'team' ? 'text-primary' : 'text-text-muted'}`}>Riwayat Tim</Text>
+                </Pressable>
+              </View>
+            )}
 
-        {isLoading ? (
-          <View className="mt-2">
-            <SkeletonCard />
-            <SkeletonCard />
-          </View>
-        ) : history.length === 0 ? (
-          <GlassCard style={{ alignItems: 'center', padding: 40, marginTop: 8 }}>
-            <MaterialIcons name="location-off" size={64} color={Tokens.colors.outline} />
-            <Text className="font-manrope-bold text-lg text-primary mt-4 text-center">
-              Belum Ada Visit
+            <Text className="font-manrope-bold text-lg text-primary mb-4">
+              {activeTab === 'team' ? 'Riwayat Kunjungan Tim' : 'Riwayat Kunjungan Saya'}
             </Text>
-            <Text className="font-inter-medium text-sm text-text-muted mt-2 text-center">
-              Belum ada riwayat kunjungan dinas (visit).
-            </Text>
-            <Button title="Laporkan Visit Baru" onPress={() => setModalVisible(true)} style={{ marginTop: 16 }} />
-          </GlassCard>
-        ) : (
-          <View className="gap-4">
-            {history.map((item) => (
-              <GlassCard key={item.id} style={{ padding: 16 }}>
-                <View className="flex-row justify-between items-start mb-3">
-                  <View className="flex-1 mr-2">
-                    <Text className="font-inter-bold text-base text-black" numberOfLines={1}>
-                      {item.location_name}
-                    </Text>
-                    <View className="flex-row items-center mt-1.5 gap-1.5">
-                      <MaterialIcons name="event" size={12} color={Tokens.colors.textMuted} />
-                      <Text className="font-inter-medium text-xs text-text-muted">
-                        {item.visit_date} · {item.visit_time.substring(0, 5)}
-                      </Text>
-                    </View>
-                  </View>
-                  <StatusBadge label={item.status} type={getStatusType(item.status)} />
-                </View>
 
-                <View className="bg-black/5 p-3 rounded-xl mb-2">
-                  <Text className="font-inter text-sm text-black leading-5">{item.reason}</Text>
-                </View>
+            {isLoading && (
+              <View className="mt-2">
+                <SkeletonCard />
+                <SkeletonCard />
+              </View>
+            )}
 
-                <View className="flex-row items-center justify-between mt-2">
-                  <View className="flex-row items-center gap-1.5">
-                    <MaterialIcons name="map" size={12} color={Tokens.colors.textMuted} />
-                    <Text className="font-inter text-[10px] text-text-muted tabular-nums">
-                      GPS: {Number(item.gps_lat).toFixed(6)}, {Number(item.gps_long).toFixed(6)}
-                    </Text>
-                  </View>
-                  {item.visit_photo_url ? (
-                    <View className="flex-row items-center gap-1">
-                      <MaterialIcons name="photo" size={12} color={Tokens.colors.primary} />
-                      <Text className="font-inter-bold text-[10px] text-primary">Foto Terlampir</Text>
-                    </View>
-                  ) : null}
-                </View>
+            {!isLoading && currentData.length === 0 && (
+              <GlassCard style={{ alignItems: 'center', padding: 40, marginTop: 8 }}>
+                <MaterialIcons name="location-off" size={64} color={Tokens.colors.outline} />
+                <Text className="font-manrope-bold text-lg text-primary mt-4 text-center">
+                  Belum Ada Visit
+                </Text>
+                <Text className="font-inter-medium text-sm text-text-muted mt-2 text-center">
+                  {activeTab === 'team' ? 'Belum ada riwayat kunjungan dari bawahan Anda.' : 'Belum ada riwayat kunjungan dinas (visit).'}
+                </Text>
+                {activeTab === 'me' && (
+                  <Button title="Laporkan Visit Baru" onPress={() => setModalVisible(true)} style={{ marginTop: 16 }} />
+                )}
               </GlassCard>
-            ))}
+            )}
           </View>
         )}
-      </ScrollView>
+      />
 
       {/* Submit Visit Modal */}
       <Modal
@@ -268,122 +349,148 @@ export default function VisitScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
-              <Input
-                label="Nama Lokasi"
-                value={locationName}
-                onChangeText={setLocationName}
-                placeholder="Misal: Kantor PT Maju Jaya, Jaksel"
-              />
+              <View>
+                <Input
+                    label="Nama Lokasi"
+                    value={locationName}
+                    onChangeText={setLocationName}
+                    placeholder="Misal: Kantor PT Maju Jaya, Jaksel"
+                  />
 
-              <Input
-                label="Keterangan / Alasan Kunjungan"
-                value={reason}
-                onChangeText={setReason}
-                placeholder="Tujuan kunjungan (minimal 5 karakter)..."
-                multiline
-                numberOfLines={3}
-                style={{ height: 90, textAlignVertical: 'top', paddingTop: 12 }}
-              />
+                  <Input
+                    label="Keterangan / Alasan Kunjungan"
+                    value={reason}
+                    onChangeText={setReason}
+                    placeholder="Tujuan kunjungan (minimal 5 karakter)..."
+                    multiline
+                    numberOfLines={3}
+                    style={{ height: 90, textAlignVertical: 'top', paddingTop: 12 }}
+                  />
 
-              {/* GPS coordinates locking box */}
-              <View className="mb-6">
-                <Text className="font-inter-bold text-[12px] text-text mb-2 ml-1">Kunci Lokasi GPS</Text>
-                <View className="bg-black/5 rounded-2xl p-4 flex-row items-center justify-between border border-black/5">
-                  <View className="flex-row items-center gap-3 flex-1 mr-2">
-                    <MaterialIcons
-                      name={coords ? "location-on" : "location-searching"}
-                      size={22}
-                      color={coords ? Tokens.colors.primary : Tokens.colors.textMuted}
-                    />
-                    {gpsLoading ? (
-                      <Text className="font-inter-medium text-sm text-text-muted">Mencari lokasi GPS...</Text>
-                    ) : coords ? (
-                      <View>
-                        <Text className="font-inter-bold text-sm text-black tabular-nums">
-                          {coords.lat.toFixed(6)}, {coords.long.toFixed(6)}
-                        </Text>
-                        <Text className="font-inter text-[10px] text-text-muted mt-0.5">GPS terkunci</Text>
+                  {/* GPS coordinates locking box */}
+                  <View className="mb-6">
+                    <Text className="font-inter-bold text-[12px] text-text mb-2 ml-1">Kunci Lokasi GPS</Text>
+                    <View className="bg-black/5 rounded-2xl p-4 flex-row items-center justify-between border border-black/5">
+                      <View className="flex-row items-center gap-3 flex-1 mr-2">
+                        <MaterialIcons
+                          name={coords ? "location-on" : "location-searching"}
+                          size={22}
+                          color={coords ? Tokens.colors.primary : Tokens.colors.textMuted}
+                        />
+                        {gpsLoading ? (
+                          <Text className="font-inter-medium text-sm text-text-muted">Mencari lokasi GPS...</Text>
+                        ) : coords ? (
+                          <View>
+                            <Text className="font-inter-bold text-sm text-black tabular-nums">
+                              {coords.lat.toFixed(6)}, {coords.long.toFixed(6)}
+                            </Text>
+                            <Text className="font-inter text-[10px] text-text-muted mt-0.5">GPS terkunci</Text>
+                          </View>
+                        ) : (
+                          <View className="flex-1">
+                            <Text className="font-inter-bold text-sm text-error" numberOfLines={2}>
+                              {gpsError || 'Lokasi GPS belum didapatkan'}
+                            </Text>
+                            {gpsError?.includes('dinyalakan') || gpsError?.includes('ditolak') ? (
+                              <Pressable onPress={handleOpenSettings} className="mt-1">
+                                <Text className="font-inter-bold text-xs text-primary underline">Buka Pengaturan</Text>
+                              </Pressable>
+                            ) : null}
+                          </View>
+                        )}
+                      </View>
+
+                      {!gpsLoading && (
+                        <Pressable
+                          onPress={fetchGps}
+                          className="w-9 h-9 rounded-full bg-white items-center justify-center border border-black/5 shadow-sm active:opacity-60"
+                        >
+                          <MaterialIcons name="refresh" size={18} color={Tokens.colors.primary} />
+                        </Pressable>
+                      )}
+                      {gpsLoading && (
+                        <ActivityIndicator size="small" color={Tokens.colors.primary} />
+                      )}
+                    </View>
+                  </View>
+
+                  {/* Photo Upload Section */}
+                  <View className="mb-6">
+                    <Text className="font-inter-bold text-[12px] text-text mb-2 ml-1">Foto Kunjungan (Opsional)</Text>
+
+                    {photoFile ? (
+                      <View className="rounded-2xl overflow-hidden border border-black/10 relative">
+                        <Image source={{ uri: photoFile.uri }} style={{ width: '100%', height: 160 }} />
+                        <Pressable
+                          className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-black/60 items-center justify-center border border-white/20 active:opacity-60"
+                          onPress={() => setPhotoFile(null)}
+                        >
+                          <MaterialIcons name="close" size={18} color="#ffffff" />
+                        </Pressable>
                       </View>
                     ) : (
-                      <View className="flex-1">
-                        <Text className="font-inter-bold text-sm text-error" numberOfLines={2}>
-                          {gpsError || 'Lokasi GPS belum didapatkan'}
-                        </Text>
-                        {gpsError?.includes('dinyalakan') || gpsError?.includes('ditolak') ? (
-                          <Pressable onPress={handleOpenSettings} className="mt-1">
-                            <Text className="font-inter-bold text-xs text-primary underline">Buka Pengaturan</Text>
-                          </Pressable>
-                        ) : null}
-                      </View>
+                      <Pressable
+                        onPress={pickPhoto}
+                        className="border border-dashed border-black/20 bg-black/5 rounded-2xl p-6 items-center justify-center flex-row gap-2 active:opacity-60"
+                      >
+                        <MaterialIcons name="photo-camera" size={20} color={Tokens.colors.primary} />
+                        <Text className="font-inter-bold text-sm text-primary">Ambil Foto / Pilih Gambar</Text>
+                      </Pressable>
                     )}
                   </View>
 
-                  {!gpsLoading && (
-                    <Pressable
-                      onPress={fetchGps}
-                      className="w-9 h-9 rounded-full bg-white items-center justify-center border border-black/5 shadow-sm active:opacity-60"
-                    >
-                      <MaterialIcons name="refresh" size={18} color={Tokens.colors.primary} />
-                    </Pressable>
-                  )}
-                  {gpsLoading && (
-                    <ActivityIndicator size="small" color={Tokens.colors.primary} />
-                  )}
+                  <Button
+                    title="Kirim Laporan Visit"
+                    onPress={() => {
+                      if (!isFormValid) {
+                        return;
+                      }
+
+                      const today = new Date().toISOString().slice(0, 10);
+                      const currentTime = new Date().toTimeString().slice(0, 8);
+
+                      submitMutation.mutate({
+                        gps_lat: coords!.lat,
+                        gps_long: coords!.long,
+                        visit_date: today,
+                        visit_time: currentTime,
+                        reason: reason.trim(),
+                        location_name: locationName.trim(),
+                        visit_photo_url: photoFile ? `https://hris.javasuperfood.com/uploads/visits/visit_${user?.id}_${Date.now()}.jpg` : null
+                      });
+                    }}
+                    loading={submitMutation.isPending}
+                    disabled={!isFormValid}
+                    className="bg-primary h-14 rounded-2xl"
+                  />
+                  <View className="h-10" />
                 </View>
-              </View>
-
-              {/* Photo Upload Section */}
-              <View className="mb-6">
-                <Text className="font-inter-bold text-[12px] text-text mb-2 ml-1">Foto Kunjungan (Opsional)</Text>
-
-                {photoFile ? (
-                  <View className="rounded-2xl overflow-hidden border border-black/10 relative">
-                    <Image source={{ uri: photoFile.uri }} style={{ width: '100%', height: 160 }} />
-                    <Pressable
-                      className="absolute top-2.5 right-2.5 w-8 h-8 rounded-full bg-black/60 items-center justify-center border border-white/20 active:opacity-60"
-                      onPress={() => setPhotoFile(null)}
-                    >
-                      <MaterialIcons name="close" size={18} color="#ffffff" />
-                    </Pressable>
-                  </View>
-                ) : (
-                  <Pressable
-                    onPress={pickPhoto}
-                    className="border border-dashed border-black/20 bg-black/5 rounded-2xl p-6 items-center justify-center flex-row gap-2 active:opacity-60"
-                  >
-                    <MaterialIcons name="photo-camera" size={20} color={Tokens.colors.primary} />
-                    <Text className="font-inter-bold text-sm text-primary">Ambil Foto / Pilih Gambar</Text>
-                  </Pressable>
-                )}
-              </View>
-
-              <Button
-                title="Kirim Laporan Visit"
-                onPress={() => {
-                  if (!isFormValid) {
-                    return;
-                  }
-
-                  const today = new Date().toISOString().slice(0, 10);
-                  const currentTime = new Date().toTimeString().slice(0, 8);
-
-                  submitMutation.mutate({
-                    gps_lat: coords!.lat,
-                    gps_long: coords!.long,
-                    visit_date: today,
-                    visit_time: currentTime,
-                    reason: reason.trim(),
-                    location_name: locationName.trim(),
-                    visit_photo_url: photoFile ? `https://hris.javasuperfood.com/uploads/visits/visit_${user?.id}_${Date.now()}.jpg` : null
-                  });
-                }}
-                loading={submitMutation.isPending}
-                disabled={!isFormValid}
-                className="bg-primary h-14 rounded-2xl"
-              />
-              <View className="h-10" />
             </ScrollView>
           </View>
+        </View>
+      </Modal>
+
+      {/* Photo Preview Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={previewVisible}
+        onRequestClose={() => setPreviewVisible(false)}
+      >
+        <View className="flex-1 bg-black/95 justify-center items-center">
+          <Pressable 
+            className="absolute top-12 right-6 w-10 h-10 rounded-full bg-white/10 items-center justify-center z-10"
+            onPress={() => setPreviewVisible(false)}
+          >
+            <MaterialIcons name="close" size={24} color="#ffffff" />
+          </Pressable>
+          {previewUrl && (
+            <Image 
+              source={{ uri: previewUrl }} 
+              style={{ width: '100%', height: '80%' }}
+              resizeMode="contain"
+            />
+          )}
         </View>
       </Modal>
     </SafeAreaView>

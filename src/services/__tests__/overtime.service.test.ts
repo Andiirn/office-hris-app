@@ -30,8 +30,33 @@ describe('overtimeService', () => {
 
     const result = await overtimeService.createRecord(payload);
 
-    expect(api.post).toHaveBeenCalledWith('/overtime/records', payload);
+    expect(api.post).toHaveBeenCalledWith('/overtime/records', {
+      overtime_date: '2026-06-05',
+      start_time: '2026-06-05T04:00:00.000Z',
+      end_time: '2026-06-05T06:00:00.000Z',
+      overtime_type: 'REGULAR',
+      reason: 'Need to finish monthly report',
+    });
     expect(result).toMatchObject({ id: 'overtime-1', ...payload });
+  });
+
+  it('createRecord keeps attendance_id when provided', async () => {
+    const payload = {
+      attendance_id: 'att-1',
+      overtime_date: '2026-06-05',
+      start_time: '2026-06-05T04:00:00.000Z',
+      end_time: '2026-06-05T06:00:00.000Z',
+      overtime_type: 'REGULAR' as const,
+      reason: 'Need to finish monthly report',
+    };
+
+    (api.post as jest.Mock).mockResolvedValue({
+      data: { data: { id: 'overtime-2', ...payload } },
+    });
+
+    await overtimeService.createRecord(payload);
+
+    expect(api.post).toHaveBeenCalledWith('/overtime/records', payload);
   });
 
   it('listRecords returns array data from wrapped responses', async () => {
