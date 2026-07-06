@@ -73,11 +73,11 @@ export default function LoginScreen() {
         router.replace('/(tabs)');
       } catch (err) {
         console.error('[Login] Failed to fetch profile after login:', err);
-        Alert.alert('Error', 'Failed to retrieve user profile');
+        Alert.alert('Error', 'Gagal mengambil profil pengguna');
       }
     },
     onError: (error: any) => {
-      const errorMessage = error.response?.data?.message || error.message || 'Login failed';
+      const errorMessage = error.response?.data?.message || error.message || 'Login gagal';
       Alert.alert('Error', errorMessage);
     },
   });

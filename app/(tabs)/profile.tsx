@@ -1,10 +1,10 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
+import { MotiView } from 'moti';
 import React, { useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MotiView } from 'moti';
 import { Button } from '../../src/components/ui/Button';
 import { GlassCard } from '../../src/components/ui/GlassCard';
 import { Input } from '../../src/components/ui/Input';
@@ -14,7 +14,7 @@ import { useAuthStore } from '../../src/stores/auth.store';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuthStore();
-  
+
   const [modalVisible, setModalVisible] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     old_password: '',
@@ -70,12 +70,12 @@ export default function ProfileScreen() {
 
   const handleLogout = () => {
     Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
+      'Keluar',
+      'Yakin ingin keluar?',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Tidak', style: 'cancel' },
         {
-          text: 'Logout',
+          text: 'Ya',
           onPress: async () => {
             await logout();
             router.replace('/(auth)/login');
@@ -107,9 +107,9 @@ export default function ProfileScreen() {
         <GlassCard style={{ padding: 0, marginBottom: 24 }}>
           {[
             { icon: 'email', label: 'Email', value: displayEmail },
-            { icon: 'phone', label: 'Phone', value: displayPhone },
-            { icon: 'location-on', label: 'Branch', value: displayBranch },
-            { icon: 'work', label: 'Department', value: displayDepartment },
+            { icon: 'phone', label: 'Telepon', value: displayPhone },
+            { icon: 'location-on', label: 'Cabang', value: displayBranch },
+            { icon: 'work', label: 'Divisi', value: displayDepartment },
           ].map((item, idx, arr) => (
             <View key={item.label} className={`flex-row items-center p-4 ${idx !== arr.length - 1 ? 'border-b border-black/5' : ''}`}>
               <View className="w-9 h-9 rounded-lg bg-primary/5 items-center justify-center mr-4">
@@ -125,7 +125,7 @@ export default function ProfileScreen() {
 
         <Text className="font-manrope-bold text-lg text-primary mb-4 ml-1">Keamanan</Text>
         <GlassCard style={{ padding: 0, marginBottom: 24 }}>
-          <Pressable 
+          <Pressable
             className="flex-row items-center justify-between p-4"
             onPress={() => setModalVisible(true)}
           >
@@ -161,7 +161,7 @@ export default function ProfileScreen() {
         }}
       >
         <View className="flex-1 bg-black/40 justify-end">
-          <MotiView 
+          <MotiView
             from={{ translateY: 400 }}
             animate={{ translateY: 0 }}
             transition={{ type: 'spring', damping: 22, stiffness: 200 }}

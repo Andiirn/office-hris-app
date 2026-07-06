@@ -159,7 +159,7 @@ export default function LeaveScreen() {
     },
     onError: (error: any) => {
       const response = error?.response?.data;
-      const message = response?.message || 'Failed to submit leave request';
+      const message = response?.message || 'Gagal mengajukan cuti';
       const fieldErrors = Array.isArray(response?.errors) ? response.errors : [];
 
       if (fieldErrors.length > 0) {
@@ -183,10 +183,10 @@ export default function LeaveScreen() {
         queryClient.invalidateQueries({ queryKey: ['calendar-leaves'] }),
         queryClient.refetchQueries({ queryKey: historyQueryKey, type: 'active' }),
       ]);
-      Alert.alert('Success', 'Leave request cancelled');
+      Alert.alert('Berhasil', 'Pengajuan berhasil dibatalkan');
     },
     onError: (error: any) => {
-      Alert.alert('Error', error?.response?.data?.message || 'Failed to cancel request');
+      Alert.alert('Error', error?.response?.data?.message || 'Gagal membatalkan pengajuan');
     }
   });
 
@@ -385,11 +385,11 @@ export default function LeaveScreen() {
 
   const handleCancel = (id: string) => {
     Alert.alert(
-      'Cancel Request',
-      'Are you sure you want to cancel this leave request?',
+      'Batalkan Pengajuan',
+      'Apakah Anda yakin ingin membatalkan pengajuan ini?',
       [
-        { text: 'No', style: 'cancel' },
-        { text: 'Yes', onPress: () => cancelMutation.mutate(id), style: 'destructive' }
+        { text: 'Tidak', style: 'cancel' },
+        { text: 'Ya', onPress: () => cancelMutation.mutate(id), style: 'destructive' }
       ]
     );
   };

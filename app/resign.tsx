@@ -50,10 +50,10 @@ export default function ResignScreen() {
         reason: '',
         handover_notes: '',
       });
-      Alert.alert('Success', 'Resignation request submitted');
+      Alert.alert('Berhasil', 'Pengajuan pengunduran diri berhasil dikirim');
     },
     onError: (error: any) => {
-      Alert.alert('Error', error?.response?.data?.message || 'Failed to submit request');
+      Alert.alert('Error', error?.response?.data?.message || 'Gagal mengirim pengajuan');
     }
   });
 
@@ -197,7 +197,7 @@ export default function ResignScreen() {
                 label="Handover Notes (Optional)"
                 value={form.handover_notes || ''}
                 onChangeText={(text) => setForm({ ...form, handover_notes: text })}
-                placeholder="Brief notes on your responsibilities"
+                placeholder="Catatan singkat tentang tanggung jawab Anda"
                 multiline
                 numberOfLines={2}
                 style={{ height: 80, textAlignVertical: 'top', paddingTop: 12 }}
@@ -205,15 +205,15 @@ export default function ResignScreen() {
 
               <View className="bg-error/5 p-4 rounded-xl mb-6">
                 <Text className="font-inter-medium text-xs text-error text-center">
-                  This action is permanent once approved by HR.
+                  Tindakan ini bersifat permanen setelah disetujui oleh HR.
                 </Text>
               </View>
 
               <Button
-                title="Confirm Submission"
+                title="Konfirmasi Pengajuan"
                 onPress={() => {
                   if (!form.reason || !form.resign_date) {
-                    Alert.alert('Error', 'Please fill in the date and reason');
+                    Alert.alert('Error', 'Harap isi tanggal dan alasan');
                     return;
                   }
                   submitMutation.mutate(form);
