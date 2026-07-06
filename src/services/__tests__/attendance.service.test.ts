@@ -55,6 +55,72 @@ describe('attendanceService', () => {
     });
   });
 
+  describe('listCorrections', () => {
+    it('sends the selected month as a date range', async () => {
+      (api.get as jest.Mock).mockResolvedValue({
+        data: {
+          data: [
+            { id: 'corr-1', attendance_date: '2026-06-10' },
+            { id: 'corr-2', attendance_date: '2026-05-10' },
+          ],
+        },
+      });
+
+      const result = await attendanceService.listCorrections({
+        employee_id: 'EMP001',
+        year: 2026,
+        month: 6,
+        limit: 20,
+      } as any);
+
+      expect(api.get).toHaveBeenCalledWith('/attendance/corrections', {
+        params: {
+          employee_id: 'EMP001',
+          date_from: '2026-06-01',
+          date_to: '2026-06-30',
+          limit: 20,
+        },
+      });
+      expect(result).toEqual([
+        { id: 'corr-1', attendance_date: '2026-06-10' },
+        { id: 'corr-2', attendance_date: '2026-05-10' },
+      ]);
+    });
+  });
+
+  describe('listVisits', () => {
+    it('sends the selected month as a date range', async () => {
+      (api.get as jest.Mock).mockResolvedValue({
+        data: {
+          data: [
+            { id: 'visit-1', visit_date: '2026-06-10', visit_time: '09:00:00' },
+            { id: 'visit-2', visit_date: '2026-05-10', visit_time: '09:00:00' },
+          ],
+        },
+      });
+
+      const result = await attendanceService.listVisits({
+        employee_id: 'EMP001',
+        year: 2026,
+        month: 6,
+        limit: 20,
+      } as any);
+
+      expect(api.get).toHaveBeenCalledWith('/attendance/visit', {
+        params: {
+          employee_id: 'EMP001',
+          date_from: '2026-06-01',
+          date_to: '2026-06-30',
+          limit: 20,
+        },
+      });
+      expect(result).toEqual([
+        { id: 'visit-1', visit_date: '2026-06-10', visit_time: '09:00:00' },
+        { id: 'visit-2', visit_date: '2026-05-10', visit_time: '09:00:00' },
+      ]);
+    });
+  });
+
   describe('getTodayRecord', () => {
     it('should return the newest record for today', async () => {
       (api.get as jest.Mock).mockResolvedValue({

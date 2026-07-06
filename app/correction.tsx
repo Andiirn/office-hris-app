@@ -5,6 +5,7 @@ import React, { useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MotiView } from 'moti';
+import { PeriodSelector } from '../src/components/common/PeriodSelector';
 import { Button } from '../src/components/ui/Button';
 import { GlassCard } from '../src/components/ui/GlassCard';
 import { Input } from '../src/components/ui/Input';
@@ -82,6 +83,8 @@ export default function CorrectionScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   const [modalVisible, setModalVisible] = useState(false);
   const [attendancePickerVisible, setAttendancePickerVisible] = useState(false);
@@ -97,11 +100,12 @@ export default function CorrectionScreen() {
   const [correctedCheckoutMin, setCorrectedCheckoutMin] = useState('00');
   // Success Animation State
   const [showSuccessAnim, setShowSuccessAnim] = useState(false);
+  const historyQueryKey = ['attendance-corrections', user?.id, selectedYear, selectedMonth] as const;
 
   // Fetch correction history
   const { data: corrections = [], isLoading: isLoadingHistory, refetch: refetchHistory, isFetching: isFetchingHistory, isError: isErrorHistory } = useQuery({
-    queryKey: ['attendance-corrections', user?.id],
-    queryFn: () => attendanceService.listCorrections({ employee_id: user?.id, limit: 100 }),
+    queryKey: historyQueryKey,
+    queryFn: () => attendanceService.listCorrections({ employee_id: user?.id, year: selectedYear, month: selectedMonth, limit: 100 }),
     enabled: !!user?.id,
   });
 
@@ -127,7 +131,7 @@ export default function CorrectionScreen() {
     mutationFn: (payload: CorrectionRequest) => attendanceService.createCorrection(payload),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['attendance-corrections'] }),
+        queryClient.invalidateQueries({ queryKey: historyQueryKey }),
         queryClient.invalidateQueries({ queryKey: ['attendance-history-full'] }),
       ]);
       setModalVisible(false);
@@ -154,7 +158,7 @@ export default function CorrectionScreen() {
 
   const handlePickAttendance = (att: AttendanceItem) => {
     setSelectedAttendance(att);
-    
+
     const checkin = getCheckIn(att);
     if (checkin) {
       const timeStr = formatTime(checkin);
@@ -195,7 +199,7 @@ export default function CorrectionScreen() {
       Alert.alert('Error', 'Alasan minimal 5 karakter');
       return;
     }
-    
+
     const dateStr = getAttendanceDate(selectedAttendance);
     const corrected_checkin = checkinExists
       ? toDateTimeString(dateStr, correctedCheckinHour, correctedCheckinMin)
@@ -270,6 +274,17 @@ export default function CorrectionScreen() {
           <RefreshControl refreshing={isFetchingHistory} onRefresh={onRefresh} tintColor={Tokens.colors.primary} />
         }
       >
+        <View className="mb-6">
+          <PeriodSelector
+            month={selectedMonth}
+            year={selectedYear}
+            onMonthChange={setSelectedMonth}
+            onYearChange={setSelectedYear}
+            title="Periode Riwayat"
+            subtitle="Filter koreksi berdasarkan bulan dan tahun"
+          />
+        </View>
+
         <View className="flex-row justify-between items-center mt-2 mb-4">
           <Text className="font-manrope-bold text-lg text-primary">Riwayat Koreksi</Text>
           <View className="bg-primary/10 px-3 py-1 rounded-full">
@@ -308,7 +323,7 @@ export default function CorrectionScreen() {
               </MotiView>
               <Text className="font-manrope-bold text-lg text-primary mt-4">Belum Ada Pengajuan</Text>
               <Text className="font-inter text-sm text-text-muted text-center mt-2 mb-5">
-                Anda belum pernah mengajukan koreksi kehadiran atau data kosong.
+                Anda belum pernah mengajukan koreksi kehadiran.
               </Text>
               <Button title="Ajukan Koreksi Baru" onPress={() => setModalVisible(true)} />
             </GlassCard>

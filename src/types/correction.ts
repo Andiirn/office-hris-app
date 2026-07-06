@@ -31,6 +31,8 @@ export interface CorrectionListQuery {
   status?: CorrectionStatus | string | null;
   date_from?: string | null;
   date_to?: string | null;
+  year?: number;
+  month?: number;
   page?: number;
   limit?: number;
 }

@@ -2,6 +2,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
+import { MotiView } from 'moti';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
@@ -14,7 +15,7 @@ import {
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MotiView, AnimatePresence } from 'moti';
+import { PeriodSelector } from '../src/components/common/PeriodSelector';
 import { Button } from '../src/components/ui/Button';
 import { GlassCard } from '../src/components/ui/GlassCard';
 import { Input } from '../src/components/ui/Input';
@@ -53,15 +54,12 @@ function formatLeaveTypeName(name?: string | null) {
   return name.replace(/^Cuti\s+/i, '');
 }
 
-function isAnnualLeaveType(type?: { code?: string | null; name?: string | null; category?: string | null } | null) {
-  const haystack = `${type?.code || ''} ${type?.name || ''} ${type?.category || ''}`.toLowerCase();
-  return /annual|tahunan|cuti\s*tahunan/.test(haystack);
-}
-
 export default function LeaveScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [modalVisible, setModalVisible] = useState(false);
   const [replacementModalVisible, setReplacementModalVisible] = useState(false);
   const [timePickerVisible, setTimePickerVisible] = useState(false);
@@ -82,6 +80,7 @@ export default function LeaveScreen() {
 
   const [colleagueSearch, setColleagueSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const historyQueryKey = ['leave-history', user?.id, selectedYear, selectedMonth] as const;
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -98,8 +97,8 @@ export default function LeaveScreen() {
 
   // 1. Fetch History
   const { data: history = [], isLoading: isLoadingHistory, refetch: refetchHistory, isFetching: isFetchingHistory } = useQuery({
-    queryKey: ['leave-history', user?.id],
-    queryFn: () => leaveService.getRequests({ employee_id: user?.id, limit: 50 }),
+    queryKey: historyQueryKey,
+    queryFn: () => leaveService.getRequests({ employee_id: user?.id, year: selectedYear, month: selectedMonth, limit: 100 }),
     enabled: !!user?.id,
   });
 
@@ -114,7 +113,6 @@ export default function LeaveScreen() {
     [form.leave_type_id, leaveTypes],
   );
   const isHourlyLeave = isHourlyLeaveType(selectedLeaveType);
-  const isAnnualLeave = isAnnualLeaveType(selectedLeaveType);
 
   const { data: colleagues = [], isLoading: isLoadingColleagues } = useQuery({
     queryKey: ['colleagues', profile?.division_id, debouncedSearch],
@@ -145,9 +143,9 @@ export default function LeaveScreen() {
       console.log('[Leave] Request submitted successfully, refreshing data...');
 
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['leave-history', user?.id] }),
+        queryClient.invalidateQueries({ queryKey: historyQueryKey }),
         queryClient.invalidateQueries({ queryKey: ['calendar-leaves'] }),
-        queryClient.refetchQueries({ queryKey: ['leave-history', user?.id], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: historyQueryKey, type: 'active' }),
       ]);
 
       setModalVisible(false);
@@ -181,9 +179,9 @@ export default function LeaveScreen() {
     mutationFn: (id: string) => leaveService.cancelRequest(id),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['leave-history', user?.id] }),
+        queryClient.invalidateQueries({ queryKey: historyQueryKey }),
         queryClient.invalidateQueries({ queryKey: ['calendar-leaves'] }),
-        queryClient.refetchQueries({ queryKey: ['leave-history', user?.id], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: historyQueryKey, type: 'active' }),
       ]);
       Alert.alert('Success', 'Leave request cancelled');
     },
@@ -299,7 +297,7 @@ export default function LeaveScreen() {
 
     if (isHourlyLeave) {
       if (!payload.start_time || !payload.end_time) {
-        Alert.alert('Error', 'Pilih start time dan end time');
+        Alert.alert('Error', 'Pilih jam mulai dan jam selesai');
         return;
       }
     } else if (!payload.start_date || !payload.end_date) {
@@ -469,9 +467,20 @@ export default function LeaveScreen() {
           )}
         </GlassCard>
 
+        <View className="mb-6">
+          <PeriodSelector
+            month={selectedMonth}
+            year={selectedYear}
+            onMonthChange={setSelectedMonth}
+            onYearChange={setSelectedYear}
+            title="Periode Riwayat"
+            subtitle="Riwayat pengajuan berdasarkan bulan dan tahun"
+          />
+        </View>
+
         <View className="flex-row justify-between items-center mt-6 mb-4">
-          <Text className="font-manrope-bold text-lg text-primary ">History</Text>
-          <Text className="font-inter-semibold text-xs text-text-muted">{history.length} Requests</Text>
+          <Text className="font-manrope-bold text-lg text-primary ">Riwayat Pengajuan</Text>
+          <Text className="font-inter-semibold text-xs text-text-muted">{history.length} Pengajuan</Text>
         </View>
 
         {isLoadingHistory ? (
@@ -493,47 +502,47 @@ export default function LeaveScreen() {
             {history.map((item, index) => {
               const typeName = item.leave_type_name || leaveTypes.find(t => t.id === item.leave_type_id)?.name;
               const displayTitle = typeName ? `Pengajuan cuti ${formatLeaveTypeName(typeName)}` : 'Pengajuan Izin/Cuti';
-              
+
               const isSameDate = item.start_date === item.end_date || !item.end_date;
               const timeString = item.start_time && item.end_time ? ` (${formatTime(item.start_time)} - ${formatTime(item.end_time)})` : '';
               const dateDisplay = isSameDate ? `${item.start_date}${timeString}` : `${item.start_date} - ${item.end_date}`;
 
               return (
-              <MotiView
-                key={item.id}
-                from={{ opacity: 0, translateY: 20 }}
-                animate={{ opacity: 1, translateY: 0 }}
-                transition={{ type: 'spring', delay: Math.min(index, 10) * 100 }}
-                className="bg-white/80 rounded-[20px] px-4 py-4 border border-white/90 mb-3 shadow-sm"
-              >
-                <View className="flex-row justify-between items-start mb-2.5">
-                  <View className="flex-1 pr-2">
-                    <Text className="font-inter-bold text-base text-on-surface">{displayTitle}</Text>
-                    <View className="flex-row items-center mt-1 gap-1.5">
-                      <MaterialIcons name="calendar-today" size={12} color={Tokens.colors.textMuted} />
-                      <Text className="font-inter-medium text-xs text-text-muted">
-                        {dateDisplay}
-                      </Text>
+                <MotiView
+                  key={item.id}
+                  from={{ opacity: 0, translateY: 20 }}
+                  animate={{ opacity: 1, translateY: 0 }}
+                  transition={{ type: 'spring', delay: Math.min(index, 10) * 100 }}
+                  className="bg-white/80 rounded-[20px] px-4 py-4 border border-white/90 mb-3 shadow-sm"
+                >
+                  <View className="flex-row justify-between items-start mb-2.5">
+                    <View className="flex-1 pr-2">
+                      <Text className="font-inter-bold text-base text-on-surface">{displayTitle}</Text>
+                      <View className="flex-row items-center mt-1 gap-1.5">
+                        <MaterialIcons name="calendar-today" size={12} color={Tokens.colors.textMuted} />
+                        <Text className="font-inter-medium text-xs text-text-muted">
+                          {dateDisplay}
+                        </Text>
+                      </View>
                     </View>
+                    <StatusBadge label={item.status} type={getStatusType(item.status) as any} />
                   </View>
-                  <StatusBadge label={item.status} type={getStatusType(item.status) as any} />
-                </View>
-                <Text className="font-inter text-[13px] text-text-muted leading-5 mt-1" numberOfLines={2}>
-                  {item.reason}
-                </Text>
+                  <Text className="font-inter text-[13px] text-text-muted leading-5 mt-1" numberOfLines={2}>
+                    {item.reason}
+                  </Text>
 
-                {item.status === 'PENDING' && (
-                  <Pressable
-                    onPress={() => handleCancel(item.id)}
-                    className="mt-4 flex-row items-center justify-center gap-1.5 bg-error/10 px-4 py-2 rounded-full self-start"
-                  >
-                    <MaterialIcons name="close" size={14} color={Tokens.colors.error} />
-                    <Text className="font-inter-bold text-[11px] text-error uppercase tracking-wider">Batalkan</Text>
-                  </Pressable>
-                )}
-              </MotiView>
-            );
-          })}
+                  {item.status === 'PENDING' && (
+                    <Pressable
+                      onPress={() => handleCancel(item.id)}
+                      className="mt-4 flex-row items-center justify-center gap-1.5 bg-error/10 px-4 py-2 rounded-full self-start"
+                    >
+                      <MaterialIcons name="close" size={14} color={Tokens.colors.error} />
+                      <Text className="font-inter-bold text-[11px] text-error uppercase tracking-wider">Batalkan</Text>
+                    </Pressable>
+                  )}
+                </MotiView>
+              );
+            })}
           </View>
         )}
       </ScrollView>
@@ -551,7 +560,7 @@ export default function LeaveScreen() {
         }}
       >
         <View className="flex-1 bg-black/40 justify-end">
-          <MotiView 
+          <MotiView
             from={{ translateY: 800 }}
             animate={{ translateY: 0 }}
             transition={{ type: 'spring', damping: 22, stiffness: 200 }}
@@ -620,7 +629,7 @@ export default function LeaveScreen() {
                         setTimePickerVisible(true);
                       }}
                     >
-                      <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Start</Text>
+                      <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Mulai</Text>
                       <Text className="font-inter-bold text-sm text-on-surface mt-1">{selectedTimeLabel('start_time')}</Text>
                     </Pressable>
                     <Pressable
@@ -630,7 +639,7 @@ export default function LeaveScreen() {
                         setTimePickerVisible(true);
                       }}
                     >
-                      <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">End</Text>
+                      <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Selesai</Text>
                       <Text className="font-inter-bold text-sm text-on-surface mt-1">{selectedTimeLabel('end_time')}</Text>
                     </Pressable>
                   </View>
@@ -672,7 +681,7 @@ export default function LeaveScreen() {
               )}
 
               <Input
-                label="Reason"
+                label="Alasan"
                 value={form.reason}
                 onChangeText={(text) => setForm({ ...form, reason: text })}
                 placeholder="Masukkan Alasan Cuti?"
@@ -820,7 +829,7 @@ export default function LeaveScreen() {
                     );
                   })
                 ) : debouncedSearch ? (
-                  <Text className="font-inter text-center text-sm text-text-muted mt-4">Tidak ada hasil untuk "{debouncedSearch}"</Text>
+                  <Text className="font-inter text-center text-sm text-text-muted mt-4">Tidak ada hasil untuk &quot;{debouncedSearch}&quot;</Text>
                 ) : (
                   <Text className="font-inter text-center text-sm text-text-muted mt-4">Ketik nama untuk mencari</Text>
                 )}

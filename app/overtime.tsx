@@ -13,19 +13,20 @@ import {
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { PeriodSelector } from '../src/components/common/PeriodSelector';
 import { Button } from '../src/components/ui/Button';
 import { GlassCard } from '../src/components/ui/GlassCard';
 import { Input } from '../src/components/ui/Input';
-import { SuccessAnimation } from '../src/components/ui/SuccessAnimation';
 import { StatusBadge } from '../src/components/ui/StatusBadge';
+import { SuccessAnimation } from '../src/components/ui/SuccessAnimation';
 import { Tokens } from '../src/core/theme/tokens';
 import { formatOvertimeTime, toLocalDateTimeString } from '../src/features/overtime/time';
-import { getAttendanceBadgeProps } from '../src/utils/status';
 import { attendanceService } from '../src/services/attendance.service';
 import { overtimeService } from '../src/services/overtime.service';
 import { useAuthStore } from '../src/stores/auth.store';
 import { AttendanceItem } from '../src/types/attendance';
 import { CreateOvertimeRequest, OvertimeType } from '../src/types/overtime';
+import { getAttendanceBadgeProps } from '../src/utils/status';
 
 type OvertimeMode = 'attendance' | 'pre_submit';
 type TimeField = 'start_time' | 'end_time';
@@ -38,7 +39,7 @@ const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
 
 const OVERTIME_TYPE_LABELS: Record<OvertimeType, string> = {
   REGULAR: 'Hari Kerja',
-  SATURDAY: 'Weekend',
+  SATURDAY: 'Akhir Pekan',
   HOLIDAY: 'Hari Libur',
 };
 
@@ -86,6 +87,8 @@ export default function OvertimeScreen() {
   const [timeField, setTimeField] = useState<TimeField>('start_time');
   const [mode, setMode] = useState<OvertimeMode>('attendance');
   const [showSuccessAnim, setShowSuccessAnim] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [form, setForm] = useState<CreateOvertimeRequest>({
     attendance_id: null,
     overtime_date: new Date().toISOString().slice(0, 10),
@@ -95,25 +98,21 @@ export default function OvertimeScreen() {
     reason: '',
   });
 
-  const currentMonthParams = useMemo(() => ({
-    year: new Date().getFullYear(),
-    month: new Date().getMonth() + 1,
-  }), []);
-
   const overtimeTypes: OvertimeType[] = ['REGULAR', 'SATURDAY', 'HOLIDAY'];
 
   const { data: summary } = useQuery({
-    queryKey: ['overtime-summary', user?.id],
-    queryFn: () => overtimeService.getSummary(user?.id || '', currentMonthParams),
+    queryKey: ['overtime-summary', user?.id, selectedYear, selectedMonth],
+    queryFn: () => overtimeService.getSummary(user?.id || '', { year: selectedYear, month: selectedMonth }),
     enabled: !!user?.id,
     staleTime: 1000 * 60 * 5,
   });
 
   const { data: history = [], refetch: refetchHistory, isFetching: isFetchingHistory, isLoading: isLoadingHistory } = useQuery({
-    queryKey: ['overtime-history', user?.id],
+    queryKey: ['overtime-history', user?.id, selectedYear, selectedMonth],
     queryFn: () => overtimeService.listRecords({
       employee_id: user?.id,
-      ...currentMonthParams,
+      year: selectedYear,
+      month: selectedMonth,
       limit: 50,
     }),
     enabled: !!user?.id,
@@ -146,12 +145,12 @@ export default function OvertimeScreen() {
     mutationFn: (payload: CreateOvertimeRequest) => overtimeService.createRecord(payload),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['overtime-history', user?.id] }),
-        queryClient.invalidateQueries({ queryKey: ['overtime-summary', user?.id] }),
+        queryClient.invalidateQueries({ queryKey: ['overtime-history', user?.id, selectedYear, selectedMonth] }),
+        queryClient.invalidateQueries({ queryKey: ['overtime-summary', user?.id, selectedYear, selectedMonth] }),
         queryClient.invalidateQueries({ queryKey: ['home-overtime-feed'] }),
         queryClient.invalidateQueries({ queryKey: ['activity-overtime-feed'] }),
-        queryClient.refetchQueries({ queryKey: ['overtime-history', user?.id], type: 'active' }),
-        queryClient.refetchQueries({ queryKey: ['overtime-summary', user?.id], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: ['overtime-history', user?.id, selectedYear, selectedMonth], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: ['overtime-summary', user?.id, selectedYear, selectedMonth], type: 'active' }),
       ]);
       setModalVisible(false);
       setAttendancePickerVisible(false);
@@ -210,7 +209,7 @@ export default function OvertimeScreen() {
       return;
     }
     if (mode === 'pre_submit' && !form.overtime_date) {
-      Alert.alert('Error', 'Pilih tanggal overtime');
+      Alert.alert('Error', 'Pilih tanggal lembur');
       return;
     }
     if (!form.start_time || !form.end_time) {
@@ -254,9 +253,9 @@ export default function OvertimeScreen() {
   };
 
   const attendanceLabel = useMemo(() => {
-    if (!form.attendance_id) return 'Pilih attendance';
+    if (!form.attendance_id) return 'Pilih Kehadiran';
     const attendance = selectableAttendanceHistory.find(item => item.id === form.attendance_id);
-      return attendance
+    return attendance
       ? `${attendance.attendance_date || attendance.date || '-'} · ${formatOvertimeTime(attendance.checkin_at || attendance.checkin_time)}`
       : 'Attendance terpilih';
   }, [form.attendance_id, selectableAttendanceHistory]);
@@ -283,8 +282,8 @@ export default function OvertimeScreen() {
             <MaterialIcons name="arrow-back" size={22} color={Tokens.colors.primary} />
           </Pressable>
           <View className="flex-1">
-            <Text className="font-manrope-extrabold text-3xl text-primary">Overtime</Text>
-            <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Ajukan lembur dari attendance atau pre-submit</Text>
+            <Text className="font-manrope-extrabold text-3xl text-primary">Pengajuan Lembur</Text>
+            <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Ajukan lembur dari kehadiran atau manual</Text>
           </View>
         </View>
         <Pressable
@@ -303,8 +302,10 @@ export default function OvertimeScreen() {
           <RefreshControl refreshing={isFetchingHistory} onRefresh={onRefresh} tintColor={Tokens.colors.primary} />
         }
       >
+
+
         <View className="mb-6">
-          <Text className="font-manrope-bold text-base text-primary mb-3">Bulan Ini</Text>
+          <Text className="font-manrope-bold text-base text-primary mb-3">Ringkasan Penghasilan Lembur</Text>
           <View className="flex-row gap-3">
             <GlassCard style={{ flex: 1, padding: 16 }}>
               <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center mb-3">
@@ -333,10 +334,21 @@ export default function OvertimeScreen() {
           </View>
         </View>
 
+        <View className="mb-6">
+          <PeriodSelector
+            month={selectedMonth}
+            year={selectedYear}
+            onMonthChange={setSelectedMonth}
+            onYearChange={setSelectedYear}
+            title="Periode Riwayat"
+            subtitle="Pilih bulan dan tahun untuk melihat riwayat lembur"
+          />
+        </View>
+
         <View className="flex-row justify-between items-center mb-4">
           <Text className="font-manrope-bold text-lg text-primary">Riwayat Lembur</Text>
           <View className="bg-primary/10 px-3 py-1 rounded-full">
-            <Text className="font-inter-bold text-[10px] text-primary">{history.length} Records</Text>
+            <Text className="font-inter-bold text-[10px] text-primary">{history.length} Tercatat</Text>
           </View>
         </View>
 
@@ -437,13 +449,13 @@ export default function OvertimeScreen() {
                 onPress={() => setMode('attendance')}
                 className={`flex-1 py-3 rounded-xl border items-center ${mode === 'attendance' ? 'bg-primary border-primary' : 'bg-[#f8f8f8] border-transparent'}`}
               >
-                <Text className={`font-inter-bold text-[10px] ${mode === 'attendance' ? 'text-white' : 'text-text-muted'}`}>From Attendance</Text>
+                <Text className={`font-inter-bold text-[10px] ${mode === 'attendance' ? 'text-white' : 'text-text-muted'}`}>Dari Kehadiran</Text>
               </Pressable>
               <Pressable
                 onPress={() => setMode('pre_submit')}
                 className={`flex-1 py-3 rounded-xl border items-center ${mode === 'pre_submit' ? 'bg-primary border-primary' : 'bg-[#f8f8f8] border-transparent'}`}
               >
-                <Text className={`font-inter-bold text-[10px] ${mode === 'pre_submit' ? 'text-white' : 'text-text-muted'}`}>Pre Submit</Text>
+                <Text className={`font-inter-bold text-[10px] ${mode === 'pre_submit' ? 'text-white' : 'text-text-muted'}`}>Manual</Text>
               </Pressable>
             </View>
 
@@ -453,11 +465,11 @@ export default function OvertimeScreen() {
                   <Text className="font-inter-bold text-sm text-primary mb-3 ml-1">Pilih Kehadiran</Text>
                   <Pressable
                     className="flex-row items-center justify-between px-4 py-3 rounded-xl bg-[#f8f8f8]"
-                  onPress={async () => {
-                    setAttendancePickerVisible(true);
-                    await refetchAttendanceHistory();
-                  }}
-                >
+                    onPress={async () => {
+                      setAttendancePickerVisible(true);
+                      await refetchAttendanceHistory();
+                    }}
+                  >
                     <View className="flex-1 pr-3">
                       <Text className="font-inter-bold text-sm text-on-surface" numberOfLines={1}>{attendanceLabel}</Text>
                       <Text className="font-inter-medium text-[10px] text-text-muted mt-1">Tap untuk pilih dari daftar kehadiran</Text>
@@ -467,7 +479,7 @@ export default function OvertimeScreen() {
                 </View>
               ) : (
                 <View className="mb-4">
-                  <Text className="font-inter-bold text-sm text-primary mb-3 ml-1">Tanggal Overtime</Text>
+                  <Text className="font-inter-bold text-sm text-primary mb-3 ml-1">Pilih Tanggal Lembur</Text>
                   <GlassCard style={{ padding: 10 }}>
                     <Calendar
                       current={form.overtime_date}
@@ -519,7 +531,7 @@ export default function OvertimeScreen() {
                     setTimePickerVisible(true);
                   }}
                 >
-                  <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Start</Text>
+                  <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Mulai</Text>
                   <Text className="font-inter-bold text-sm text-on-surface mt-1">{selectedTimeLabel('start_time')}</Text>
                 </Pressable>
                 <Pressable
@@ -529,7 +541,7 @@ export default function OvertimeScreen() {
                     setTimePickerVisible(true);
                   }}
                 >
-                  <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">End</Text>
+                  <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Selesai</Text>
                   <Text className="font-inter-bold text-sm text-on-surface mt-1">{selectedTimeLabel('end_time')}</Text>
                 </Pressable>
               </View>

@@ -47,6 +47,8 @@ export interface CreateLeaveRequest {
 export interface LeaveHistoryQuery {
   employee_id?: string;
   status?: LeaveStatus;
+  year?: number;
+  month?: number;
   page?: number;
   limit?: number;
 }

@@ -21,16 +21,30 @@ export const leaveService = {
   },
 
   async getRequests(query: LeaveHistoryQuery): Promise<LeaveRequest[]> {
+    const { year, month, ...apiQuery } = query;
     const response = await api.get('/leave/requests', {
-      params: query,
+      params: year ? { ...apiQuery, year } : apiQuery,
     });
     const data = unwrapData<any>(response.data);
-    
-    if (Array.isArray(data)) return data;
-    if (data && Array.isArray(data.items)) return data.items;
-    if (data && Array.isArray(data.data)) return data.data;
-    
-    return [];
+
+    const items = Array.isArray(data)
+      ? data
+      : Array.isArray(data?.items)
+        ? data.items
+        : Array.isArray(data?.data)
+          ? data.data
+          : [];
+
+    if (!year || !month) return items;
+
+    return items.filter((item: LeaveRequest) => {
+      const source = item.start_date || item.created_at;
+      if (!source) return false;
+      const parsed = new Date(source.includes('T') ? source : source.replace(' ', 'T'));
+      return !Number.isNaN(parsed.getTime())
+        && parsed.getFullYear() === year
+        && parsed.getMonth() + 1 === month;
+    });
   },
 
   async createRequest(payload: CreateLeaveRequest): Promise<LeaveRequest> {

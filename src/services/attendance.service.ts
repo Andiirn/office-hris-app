@@ -171,8 +171,19 @@ export const attendanceService = {
   async listVisits(query?: VisitListQuery): Promise<VisitItem[]> {
     try {
       devLog('[AttendanceService] Fetching visits with query:', JSON.stringify(query));
+      const { year, month, ...apiQuery } = query || {};
+      const resolvedQuery = year && month ? (() => {
+        const start = new Date(year, month - 1, 1);
+        const end = new Date(year, month, 0);
+        const pad = (value: number) => String(value).padStart(2, '0');
+        return {
+          ...apiQuery,
+          date_from: `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`,
+          date_to: `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}`,
+        };
+      })() : apiQuery;
       const response = await api.get('/attendance/visit', {
-        params: query,
+        params: resolvedQuery,
       });
       const data = unwrapData<any>(response.data);
       
@@ -195,8 +206,19 @@ export const attendanceService = {
   async listCorrections(query?: CorrectionListQuery): Promise<AttendanceCorrection[]> {
     try {
       devLog('[AttendanceService] Fetching corrections with query:', JSON.stringify(query));
+      const { year, month, ...apiQuery } = query || {};
+      const resolvedQuery = year && month ? (() => {
+        const start = new Date(year, month - 1, 1);
+        const end = new Date(year, month, 0);
+        const pad = (value: number) => String(value).padStart(2, '0');
+        return {
+          ...apiQuery,
+          date_from: `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`,
+          date_to: `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}`,
+        };
+      })() : apiQuery;
       const response = await api.get('/attendance/corrections', {
-        params: query,
+        params: resolvedQuery,
       });
       const data = unwrapData<any>(response.data);
       

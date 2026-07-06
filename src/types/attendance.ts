@@ -137,6 +137,8 @@ export interface VisitListQuery {
   status?: string;
   date_from?: string;
   date_to?: string;
+  year?: number;
+  month?: number;
   page?: number;
   limit?: number;
 }

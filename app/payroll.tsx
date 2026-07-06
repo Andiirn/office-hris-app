@@ -1,8 +1,9 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, Platform, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { PeriodSelector } from '../src/components/common/PeriodSelector';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GlassCard } from '../src/components/ui/GlassCard';
 import { Skeleton, SkeletonCard } from '../src/components/ui/Skeleton';
@@ -14,7 +15,6 @@ import { useAuthStore } from '../src/stores/auth.store';
 
 export default function PayrollScreen() {
   const { user } = useAuthStore();
-  const queryClient = useQueryClient();
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
@@ -37,7 +37,6 @@ export default function PayrollScreen() {
   });
 
   const isServerError = (error as any)?.response?.status === 500;
-  const isNotFound = (error as any)?.response?.status === 404 || (!payroll && !isLoading && !isError);
 
   const readNumber = (value: unknown) =>
     typeof value === 'number' && Number.isFinite(value) ? value : 0;
@@ -92,22 +91,6 @@ export default function PayrollScreen() {
       console.log('[Payroll] Current Data:', JSON.stringify(payroll, null, 2));
     }
   }, [payroll]);
-
-  // 2. Generate Payroll Mutation
-  const generateMutation = useMutation({
-    mutationFn: () => payrollService.generatePreview(user?.id || '', { month: selectedMonth, year: selectedYear }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: qk.payrollPreview(user?.id, companyId, selectedYear, selectedMonth) });
-      Alert.alert('Success', 'Payslip generated for this month');
-    },
-    onError: (error: any) => {
-      const status = error?.response?.status;
-      const message = status === 500
-        ? 'Server sedang bermasalah. Silakan coba lagi nanti.'
-        : (error?.response?.data?.message || 'Gagal membuat slip gaji');
-      Alert.alert('Gagal', message);
-    }
-  });
 
   const handleDownload = async () => {
     try {
@@ -180,34 +163,17 @@ export default function PayrollScreen() {
             <Text className="font-inter-medium text-sm text-[#454652] mt-0.5">Slip Gaji Bulanan</Text>
           </View>
         </View>
-        <View className="bg-primary/10 px-4 py-2 rounded-2xl">
-          <Text className="font-manrope-bold text-xs text-[#000666]">{selectedYear}</Text>
-        </View>
       </View>
 
       <View className="px-5 mb-6">
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          className="flex-grow-0"
-          contentContainerStyle={{ gap: 8 }}
-        >
-          {monthNames.map((name, index) => (
-            <Pressable
-              key={name}
-              onPress={() => setSelectedMonth(index + 1)}
-              className={`px-5 py-2.5 rounded-xl border ${selectedMonth === index + 1
-                ? 'bg-[#000666] border-[#000666]'
-                : 'bg-white/80 border-white/90'
-                }`}
-            >
-              <Text className={`font-inter-bold text-xs ${selectedMonth === index + 1 ? 'text-white' : 'text-[#454652]'
-                }`}>
-                {name.substring(0, 3)}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
+        <PeriodSelector
+          month={selectedMonth}
+          year={selectedYear}
+          onMonthChange={setSelectedMonth}
+          onYearChange={setSelectedYear}
+          title="Periode Slip"
+          subtitle="Pilih bulan dan tahun slip gaji"
+        />
       </View>
 
       <ScrollView
