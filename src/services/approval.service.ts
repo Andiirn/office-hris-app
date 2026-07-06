@@ -1,6 +1,6 @@
 import { api } from '../core/api/client';
 import { unwrapData } from '../core/api/envelope';
-import { ApprovalItem, ApprovalRequestDetail } from '../types/approval';
+import { ApprovalFeedback, ApprovalItem, ApprovalRequestDetail } from '../types/approval';
 
 export const approvalService = {
   async getPending(params?: { page?: number; limit?: number }): Promise<ApprovalItem[]> {
@@ -38,6 +38,17 @@ export const approvalService = {
   async getRequestDetail(requestId: string): Promise<ApprovalRequestDetail> {
     const response = await api.get(`/approvals/${requestId}`);
     return unwrapData<ApprovalRequestDetail>(response.data);
+  },
+
+  async getFeedback(referenceId: string): Promise<{ success?: boolean; data: ApprovalFeedback[] }> {
+    const response = await api.get('/approvals/feedbacks', {
+      params: { reference_id: referenceId },
+    });
+    const data = unwrapData<ApprovalFeedback[]>(response.data) || [];
+    return {
+      success: response.data?.success,
+      data,
+    };
   },
 
   normalizeItem(item: any): ApprovalItem {

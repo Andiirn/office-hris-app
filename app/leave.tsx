@@ -1,11 +1,13 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
 import { useRouter } from 'expo-router';
-import { MotiView } from 'moti';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Image,
+  Linking,
   Modal,
   Pressable,
   RefreshControl,
@@ -23,6 +25,7 @@ import { SkeletonCard } from '../src/components/ui/Skeleton';
 import { StatusBadge } from '../src/components/ui/StatusBadge';
 import { SuccessAnimation } from '../src/components/ui/SuccessAnimation';
 import { Tokens } from '../src/core/theme/tokens';
+import { approvalService } from '../src/services/approval.service';
 import { authService } from '../src/services/auth.service';
 import { employeeService } from '../src/services/employee.service';
 import { leaveService } from '../src/services/leave.service';
@@ -54,6 +57,14 @@ function formatLeaveTypeName(name?: string | null) {
   return name.replace(/^Cuti\s+/i, '');
 }
 
+function getLeaveStatus(item: { status?: string | null; is_approved?: boolean; approved_at?: string | null }) {
+  const rawStatus = String(item?.status || '').toUpperCase();
+  if (rawStatus === 'APPROVED' || item?.is_approved || item?.approved_at) return 'APPROVED';
+  if (rawStatus === 'REJECTED' || rawStatus === 'DECLINED') return 'REJECTED';
+  if (rawStatus === 'CANCELLED') return 'CANCELLED';
+  return rawStatus || 'PENDING';
+}
+
 export default function LeaveScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
@@ -63,7 +74,9 @@ export default function LeaveScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [replacementModalVisible, setReplacementModalVisible] = useState(false);
   const [timePickerVisible, setTimePickerVisible] = useState(false);
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [timeField, setTimeField] = useState<TimeField>('start_time');
+  const [selectedDetailId, setSelectedDetailId] = useState<string | null>(null);
   const [selectedRange, setSelectedRange] = useState<{ start?: string, end?: string }>({});
   const [selectedHourlyDate, setSelectedHourlyDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [documentFile, setDocumentFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
@@ -100,6 +113,20 @@ export default function LeaveScreen() {
     queryKey: historyQueryKey,
     queryFn: () => leaveService.getRequests({ employee_id: user?.id, year: selectedYear, month: selectedMonth, limit: 100 }),
     enabled: !!user?.id,
+  });
+
+  const { data: selectedLeaveDetail, isLoading: isLoadingDetail, isError: isDetailError, refetch: refetchDetail } = useQuery({
+    queryKey: ['leave-detail', selectedDetailId],
+    queryFn: () => leaveService.getRequest(selectedDetailId as string),
+    enabled: !!selectedDetailId && detailModalVisible,
+    staleTime: 60_000,
+  });
+
+  const { data: selectedLeaveFeedback, isLoading: isLoadingFeedback } = useQuery({
+    queryKey: ['leave-feedback', selectedDetailId],
+    queryFn: () => approvalService.getFeedback(selectedDetailId as string),
+    enabled: !!selectedDetailId && detailModalVisible,
+    staleTime: 60_000,
   });
 
   // 2. Fetch Leave Types
@@ -194,6 +221,24 @@ export default function LeaveScreen() {
     refetchHistory();
   };
 
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user?.id) {
+        refetchHistory();
+      }
+    }, [refetchHistory, user?.id])
+  );
+
+  const openDetail = (id: string) => {
+    setSelectedDetailId(id);
+    setDetailModalVisible(true);
+  };
+
+  const closeDetail = () => {
+    setDetailModalVisible(false);
+    setSelectedDetailId(null);
+  };
+
   const onDayPress = (day: any) => {
     if (isHourlyLeave) return;
     const dateString = day.dateString;
@@ -218,9 +263,11 @@ export default function LeaveScreen() {
     const marks: any = {};
 
     history.forEach((req) => {
-      if (req.status === 'APPROVED' || req.status === 'PENDING') {
-        const color = req.status === 'APPROVED' ? '#d9e6da' : '#ffdbd0';
-        const textColor = req.status === 'APPROVED' ? '#5b675e' : '#e17c5a';
+      const status = getLeaveStatus(req);
+
+      if (status === 'APPROVED' || status === 'PENDING') {
+        const color = status === 'APPROVED' ? '#d9e6da' : '#ffdbd0';
+        const textColor = status === 'APPROVED' ? '#5b675e' : '#e17c5a';
 
         marks[req.start_date] = {
           startingDay: true,
@@ -404,6 +451,30 @@ export default function LeaveScreen() {
     }
   };
 
+  const formatDateLabel = (value?: string | null) => {
+    if (!value) return '-';
+    const date = value.includes('T') ? new Date(value) : new Date(`${value}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleDateString('id-ID', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  };
+
+  const formatDateTimeLabel = (value?: string | null) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleString('id-ID', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
   return (
     <SafeAreaView className="flex-1 bg-background">
 
@@ -506,41 +577,50 @@ export default function LeaveScreen() {
               const isSameDate = item.start_date === item.end_date || !item.end_date;
               const timeString = item.start_time && item.end_time ? ` (${formatTime(item.start_time)} - ${formatTime(item.end_time)})` : '';
               const dateDisplay = isSameDate ? `${item.start_date}${timeString}` : `${item.start_date} - ${item.end_date}`;
+              const status = getLeaveStatus(item);
 
               return (
-                <MotiView
+                <Pressable
                   key={item.id}
-                  from={{ opacity: 0, translateY: 20 }}
-                  animate={{ opacity: 1, translateY: 0 }}
-                  transition={{ type: 'spring', delay: Math.min(index, 10) * 100 }}
-                  className="bg-white/80 rounded-[20px] px-4 py-4 border border-white/90 mb-3 shadow-sm"
+                  onPress={() => openDetail(item.id)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Lihat detail ${displayTitle}`}
+                  className="mb-3"
                 >
-                  <View className="flex-row justify-between items-start mb-2.5">
-                    <View className="flex-1 pr-2">
-                      <Text className="font-inter-bold text-base text-on-surface">{displayTitle}</Text>
-                      <View className="flex-row items-center mt-1 gap-1.5">
-                        <MaterialIcons name="calendar-today" size={12} color={Tokens.colors.textMuted} />
-                        <Text className="font-inter-medium text-xs text-text-muted">
-                          {dateDisplay}
-                        </Text>
+                  <View className="bg-white/80 rounded-[20px] px-4 py-4 border border-white/90 shadow-sm">
+                    <View className="flex-row justify-between items-start mb-2.5">
+                      <View className="flex-1 pr-2">
+                        <View className="flex-row items-center gap-2">
+                          <Text className="font-inter-bold text-base text-on-surface">{displayTitle}</Text>
+                          <View className="flex-row items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5">
+                            <MaterialIcons name="visibility" size={11} color={Tokens.colors.primary} />
+                            <Text className="font-inter-bold text-[10px] text-primary uppercase tracking-wider">Detail</Text>
+                          </View>
+                        </View>
+                        <View className="flex-row items-center mt-1 gap-1.5">
+                          <MaterialIcons name="calendar-today" size={12} color={Tokens.colors.textMuted} />
+                          <Text className="font-inter-medium text-xs text-text-muted">
+                            {dateDisplay}
+                          </Text>
+                        </View>
                       </View>
+                      <StatusBadge label={status} type={getStatusType(status) as any} />
                     </View>
-                    <StatusBadge label={item.status} type={getStatusType(item.status) as any} />
-                  </View>
-                  <Text className="font-inter text-[13px] text-text-muted leading-5 mt-1" numberOfLines={2}>
-                    {item.reason}
-                  </Text>
+                    <Text className="font-inter text-[13px] text-text-muted leading-5 mt-1" numberOfLines={2}>
+                      {item.reason}
+                    </Text>
 
-                  {item.status === 'PENDING' && (
-                    <Pressable
-                      onPress={() => handleCancel(item.id)}
-                      className="mt-4 flex-row items-center justify-center gap-1.5 bg-error/10 px-4 py-2 rounded-full self-start"
-                    >
-                      <MaterialIcons name="close" size={14} color={Tokens.colors.error} />
-                      <Text className="font-inter-bold text-[11px] text-error uppercase tracking-wider">Batalkan</Text>
-                    </Pressable>
-                  )}
-                </MotiView>
+                    {status === 'PENDING' && (
+                      <Pressable
+                        onPress={() => handleCancel(item.id)}
+                        className="mt-4 flex-row items-center justify-center gap-1.5 bg-error/10 px-4 py-2 rounded-full self-start"
+                      >
+                        <MaterialIcons name="close" size={14} color={Tokens.colors.error} />
+                        <Text className="font-inter-bold text-[11px] text-error uppercase tracking-wider">Batalkan</Text>
+                      </Pressable>
+                    )}
+                  </View>
+                </Pressable>
               );
             })}
           </View>
@@ -560,12 +640,7 @@ export default function LeaveScreen() {
         }}
       >
         <View className="flex-1 bg-black/40 justify-end">
-          <MotiView
-            from={{ translateY: 800 }}
-            animate={{ translateY: 0 }}
-            transition={{ type: 'spring', damping: 22, stiffness: 200 }}
-            className="bg-background rounded-t-[32px] p-6 pb-12 max-h-[90%] shadow-2xl"
-          >
+          <View className="bg-background rounded-t-[32px] p-6 pb-12 max-h-[90%] shadow-2xl">
             <View className="flex-row justify-between items-start mb-6">
               <View>
                 <Text className="font-manrope-extrabold text-2xl text-primary">Pengajuan {formatLeaveTypeName(selectedLeaveType?.name)}</Text>
@@ -751,7 +826,7 @@ export default function LeaveScreen() {
               <View className="h-10" />
               <View className="h-6" />
             </ScrollView>
-          </MotiView>
+          </View>
         </View>
 
         {timePickerVisible && (
@@ -837,6 +912,197 @@ export default function LeaveScreen() {
             </View>
           </View>
         )}
+      </Modal>
+
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={detailModalVisible}
+        onRequestClose={closeDetail}
+      >
+        <View className="flex-1 bg-black/45 justify-end">
+          <View className="bg-background rounded-t-[32px] p-6 pb-10 max-h-[90%] shadow-2xl">
+            <View className="flex-row justify-between items-start mb-5">
+              <View className="flex-1 pr-4">
+                <Text className="font-manrope-extrabold text-2xl text-primary">Detail Pengajuan</Text>
+              </View>
+              <Pressable
+                className="w-9 h-9 rounded-full bg-black/5 items-center justify-center"
+                onPress={closeDetail}
+              >
+                <MaterialIcons name="close" size={20} color={Tokens.colors.text} />
+              </Pressable>
+            </View>
+
+            {isLoadingDetail ? (
+              <View className="gap-3">
+                <SkeletonCard />
+                <SkeletonCard />
+              </View>
+            ) : isDetailError || !selectedLeaveDetail ? (
+              <View className="items-center justify-center py-10">
+                <MaterialIcons name="error-outline" size={42} color={Tokens.colors.error} />
+                <Text className="font-inter-bold text-base text-on-surface mt-3 text-center">Gagal memuat detail cuti</Text>
+                <Text className="font-inter text-sm text-text-muted mt-1 text-center">Silakan coba lagi.</Text>
+                <Button
+                  title="Retry"
+                  onPress={() => refetchDetail()}
+                  className="mt-5 h-12 rounded-2xl"
+                />
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {selectedLeaveFeedback?.data?.length ? (
+                  <GlassCard style={{ padding: 14, marginBottom: 14 }}>
+                    <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Diproses Oleh</Text>
+                    <View className="mt-3 gap-3">
+                      {selectedLeaveFeedback.data.map((item) => (
+                        <View key={item.id} className="rounded-2xl bg-black/5 px-4 py-3">
+                          <View className="flex-row items-start justify-between gap-3">
+                            <View className="flex-1">
+                              <Text className="font-inter-bold text-sm text-on-surface">
+                                {item.hr_name || 'HR Admin'}
+                              </Text>
+                              <Text className="font-inter text-[11px] text-text-muted mt-1">
+                                {item.action === 'APPROVE' ? 'Disetujui' : item.action === 'REJECT' ? 'Ditolak' : 'Diproses'} • {formatDateTimeLabel(item.created_at)}
+                              </Text>
+                            </View>
+                            <StatusBadge
+                              label={item.action === 'APPROVE' ? 'APPROVED' : item.action === 'REJECT' ? 'REJECTED' : 'PENDING'}
+                              type={item.action === 'REJECT' ? 'error' : item.action === 'APPROVE' ? 'secondary' : 'warning'}
+                            />
+                          </View>
+                          {item.feedback ? (
+                            <Text className="font-inter text-sm text-on-surface mt-3 leading-6">
+                              {item.feedback}
+                            </Text>
+                          ) : null}
+                        </View>
+                      ))}
+                    </View>
+                  </GlassCard>
+                ) : null}
+
+                {isLoadingFeedback ? (
+                  <View className="mb-3">
+                    <SkeletonCard />
+                  </View>
+                ) : null}
+
+                <GlassCard style={{ padding: 16, marginBottom: 14 }}>
+                  <View className="flex-row items-center gap-3">
+                    <View className="w-16 h-16 rounded-2xl overflow-hidden bg-primary/10 items-center justify-center">
+                      {selectedLeaveDetail.employee?.photo_url ? (
+                        <Image
+                          source={{ uri: selectedLeaveDetail.employee.photo_url }}
+                          className="w-16 h-16"
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <Text className="font-manrope-extrabold text-lg text-primary">
+                          {(selectedLeaveDetail.employee?.full_name || selectedLeaveDetail.employee_id || '?').charAt(0).toUpperCase()}
+                        </Text>
+                      )}
+                    </View>
+                    <View className="flex-1">
+                      <Text className="font-manrope-bold text-lg text-on-surface" numberOfLines={1}>
+                        {selectedLeaveDetail.employee?.full_name || 'Karyawan'}
+                      </Text>
+                      <Text className="font-inter text-xs text-text-muted mt-0.5">
+                        {selectedLeaveDetail.employee?.nik || selectedLeaveDetail.employee_id || '-'}
+                      </Text>
+                      <View className="flex-row items-center gap-2 mt-2 flex-wrap">
+                        <StatusBadge label={getLeaveStatus(selectedLeaveDetail)} type={getStatusType(getLeaveStatus(selectedLeaveDetail)) as any} />
+                        {selectedLeaveDetail.document_url ? (
+                          <View className="bg-secondary-container px-2.5 py-1 rounded-full">
+                            <Text className="font-inter-bold text-[10px] text-on-surface uppercase tracking-wider">Ada dokumen</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    </View>
+                  </View>
+                </GlassCard>
+
+                <View className="flex-row flex-wrap -mx-1.5">
+                  <View className="w-1/2 px-1.5 mb-3">
+                    <GlassCard style={{ padding: 14, minHeight: 84 }}>
+                      <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Jenis Cuti</Text>
+                      <Text className="font-inter-bold text-sm text-on-surface mt-2">
+                        {selectedLeaveDetail.leave_type?.name || selectedLeaveDetail.leave_type_name || '-'}
+                      </Text>
+                    </GlassCard>
+                  </View>
+                  <View className="w-1/2 px-1.5 mb-3">
+                    <GlassCard style={{ padding: 14, minHeight: 84 }}>
+                      <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Total Hari</Text>
+                      <Text className="font-inter-bold text-sm text-on-surface mt-2">
+                        {typeof selectedLeaveDetail.total_days === 'number' ? `${selectedLeaveDetail.total_days} hari` : '-'}
+                      </Text>
+                    </GlassCard>
+                  </View>
+                  <View className="w-1/2 px-1.5 mb-3">
+                    <GlassCard style={{ padding: 14, minHeight: 84 }}>
+                      <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Mulai</Text>
+                      <Text className="font-inter-bold text-sm text-on-surface mt-2">
+                        {formatDateLabel(selectedLeaveDetail.start_date)}
+                      </Text>
+                    </GlassCard>
+                  </View>
+                  <View className="w-1/2 px-1.5 mb-3">
+                    <GlassCard style={{ padding: 14, minHeight: 84 }}>
+                      <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Selesai</Text>
+                      <Text className="font-inter-bold text-sm text-on-surface mt-2">
+                        {formatDateLabel(selectedLeaveDetail.end_date || selectedLeaveDetail.start_date)}
+                      </Text>
+                    </GlassCard>
+                  </View>
+                </View>
+
+                <GlassCard style={{ padding: 14, marginBottom: 14 }}>
+                  <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Alasan</Text>
+                  <Text className="font-inter text-sm text-on-surface mt-2 leading-6">
+                    {selectedLeaveDetail.reason || '-'}
+                  </Text>
+                </GlassCard>
+
+                {selectedLeaveDetail.replacement ? (
+                  <GlassCard style={{ padding: 14, marginBottom: 14 }}>
+                    <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Pengganti</Text>
+                    <Text className="font-inter-bold text-sm text-on-surface mt-2">
+                      {selectedLeaveDetail.replacement.full_name || selectedLeaveDetail.replacement_id || '-'}
+                    </Text>
+                  </GlassCard>
+                ) : null}
+
+                <GlassCard style={{ padding: 14, marginBottom: 14 }}>
+                  <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Dokumen Pendukung</Text>
+                  {selectedLeaveDetail.document_url ? (
+                    <Pressable
+                      onPress={async () => {
+                        try {
+                          await Linking.openURL(selectedLeaveDetail.document_url as string);
+                        } catch {
+                          Alert.alert('Error', 'Gagal membuka dokumen');
+                        }
+                      }}
+                      className="mt-3 flex-row items-center justify-between rounded-2xl bg-primary/5 px-4 py-3"
+                    >
+                      <View className="flex-row items-center gap-2 flex-1 pr-3">
+                        <MaterialIcons name="description" size={18} color={Tokens.colors.primary} />
+                        <Text className="font-inter-bold text-sm text-primary" numberOfLines={1}>
+                          Buka dokumen lampiran
+                        </Text>
+                      </View>
+                      <MaterialIcons name="chevron-right" size={18} color={Tokens.colors.primary} />
+                    </Pressable>
+                  ) : (
+                    <Text className="font-inter text-sm text-text-muted mt-2">Tidak ada dokumen lampiran.</Text>
+                  )}
+                </GlassCard>
+              </ScrollView>
+            )}
+          </View>
+        </View>
       </Modal>
 
       <SuccessAnimation

@@ -13,6 +13,7 @@ import { SkeletonCard } from '../src/components/ui/Skeleton';
 import { StatusBadge } from '../src/components/ui/StatusBadge';
 import { SuccessAnimation } from '../src/components/ui/SuccessAnimation';
 import { Tokens } from '../src/core/theme/tokens';
+import { approvalService } from '../src/services/approval.service';
 import { attendanceService } from '../src/services/attendance.service';
 import { useAuthStore } from '../src/stores/auth.store';
 import { AttendanceItem } from '../src/types/attendance';
@@ -87,7 +88,9 @@ export default function CorrectionScreen() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
   const [modalVisible, setModalVisible] = useState(false);
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [attendancePickerVisible, setAttendancePickerVisible] = useState(false);
+  const [selectedCorrectionId, setSelectedCorrectionId] = useState<string | null>(null);
   const [selectedAttendance, setSelectedAttendance] = useState<AttendanceItem | null>(null);
   const [reason, setReason] = useState('');
   const [checkinExists, setCheckinExists] = useState(true);
@@ -125,6 +128,20 @@ export default function CorrectionScreen() {
       });
     },
     enabled: attendancePickerVisible && !!user?.id,
+  });
+
+  const { data: selectedCorrectionDetail, isLoading: isLoadingDetail, isError: isDetailError, refetch: refetchDetail } = useQuery({
+    queryKey: ['attendance-correction-detail', selectedCorrectionId],
+    queryFn: () => attendanceService.getCorrectionDetail(selectedCorrectionId as string),
+    enabled: !!selectedCorrectionId && detailModalVisible,
+    staleTime: 60_000,
+  });
+
+  const { data: selectedCorrectionFeedback, isLoading: isLoadingFeedback } = useQuery({
+    queryKey: ['attendance-correction-feedback', selectedCorrectionId],
+    queryFn: () => approvalService.getFeedback(selectedCorrectionId as string),
+    enabled: !!selectedCorrectionId && detailModalVisible,
+    staleTime: 60_000,
   });
 
   const createMutation = useMutation({
@@ -229,6 +246,16 @@ export default function CorrectionScreen() {
 
   const onRefresh = () => {
     refetchHistory();
+  };
+
+  const openDetail = (correctionId: string) => {
+    setSelectedCorrectionId(correctionId);
+    setDetailModalVisible(true);
+  };
+
+  const closeDetail = () => {
+    setDetailModalVisible(false);
+    setSelectedCorrectionId(null);
   };
 
   const attendanceLabel = useMemo(() => {
@@ -337,52 +364,60 @@ export default function CorrectionScreen() {
                 animate={{ opacity: 1, translateY: 0 }}
                 transition={{ type: 'timing', duration: 400, delay: index * 100 }}
               >
-                <GlassCard style={{ padding: 16 }}>
-                  <View className="flex-row justify-between items-start mb-2.5">
-                    <View className="flex-1">
-                      <Text className="font-inter-bold text-[11px] text-text-muted uppercase mb-1 tracking-widest">
-                        Pengajuan Koreksi Kehadiran
-                      </Text>
-                      <View className="flex-row items-center gap-1.5">
-                        <MaterialIcons name="calendar-today" size={12} color={Tokens.colors.primary} />
-                        <Text className="font-inter-bold text-sm text-black">{getCorrectionDate(item)}</Text>
-                      </View>
-                    </View>
-                    <StatusBadge label={item.status || 'PENDING'} type={getStatusType(item.status) as any} />
-                  </View>
-
-                  <View className="bg-primary/5 border border-primary/10 p-3 rounded-xl mb-3 mt-1">
-                    <View className="flex-row justify-between mb-1">
+                <Pressable onPress={() => openDetail(item.id)}>
+                  <GlassCard style={{ padding: 16 }}>
+                    <View className="flex-row justify-between items-start mb-2.5">
                       <View className="flex-1">
-                        <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-0.5">Koreksi Masuk</Text>
-                        <Text className="font-manrope-extrabold text-base text-primary">
-                          {item.corrected_checkin ? formatTime(item.corrected_checkin) : '--:--'}
-                        </Text>
+                        <View className="flex-row items-center gap-2 mb-1">
+                          <Text className="font-inter-bold text-[11px] text-text-muted uppercase tracking-widest">
+                            Pengajuan Koreksi Kehadiran
+                          </Text>
+                          <View className="flex-row items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5">
+                            <MaterialIcons name="visibility" size={11} color={Tokens.colors.primary} />
+                            <Text className="font-inter-bold text-[10px] text-primary uppercase tracking-wider">Detail</Text>
+                          </View>
+                        </View>
+                        <View className="flex-row items-center gap-1.5">
+                          <MaterialIcons name="calendar-today" size={12} color={Tokens.colors.primary} />
+                          <Text className="font-inter-bold text-sm text-black">{getCorrectionDate(item)}</Text>
+                        </View>
                       </View>
-                      <View className="w-[1px] bg-primary/20 mx-3" />
-                      <View className="flex-1">
-                        <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-0.5">Koreksi Pulang</Text>
-                        <Text className="font-manrope-extrabold text-base text-primary">
-                          {item.corrected_checkout ? formatTime(item.corrected_checkout) : '--:--'}
-                        </Text>
+                      <StatusBadge label={item.status || 'PENDING'} type={getStatusType(item.status) as any} />
+                    </View>
+
+                    <View className="bg-primary/5 border border-primary/10 p-3 rounded-xl mb-3 mt-1">
+                      <View className="flex-row justify-between mb-1">
+                        <View className="flex-1">
+                          <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-0.5">Koreksi Masuk</Text>
+                          <Text className="font-manrope-extrabold text-base text-primary">
+                            {item.corrected_checkin ? formatTime(item.corrected_checkin) : '--:--'}
+                          </Text>
+                        </View>
+                        <View className="w-[1px] bg-primary/20 mx-3" />
+                        <View className="flex-1">
+                          <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-0.5">Koreksi Pulang</Text>
+                          <Text className="font-manrope-extrabold text-base text-primary">
+                            {item.corrected_checkout ? formatTime(item.corrected_checkout) : '--:--'}
+                          </Text>
+                        </View>
                       </View>
                     </View>
-                  </View>
 
-                  <View className="border-t border-black/5 pt-2.5">
-                    <View className="flex-row items-start gap-1.5">
-                      <MaterialIcons name="chat-bubble-outline" size={12} color={Tokens.colors.textMuted} style={{ marginTop: 2 }} />
-                      <Text className="font-inter text-xs text-on-surface flex-1">{item.reason}</Text>
+                    <View className="border-t border-black/5 pt-2.5">
+                      <View className="flex-row items-start gap-1.5">
+                        <MaterialIcons name="chat-bubble-outline" size={12} color={Tokens.colors.textMuted} style={{ marginTop: 2 }} />
+                        <Text className="font-inter text-xs text-on-surface flex-1">{item.reason}</Text>
+                      </View>
                     </View>
-                  </View>
 
-                  {item.notes ? (
-                    <View className="mt-2.5 border-t border-black/5 pt-2">
-                      <Text className="font-inter-semibold text-[10px] text-error uppercase mb-1">Catatan HRD</Text>
-                      <Text className="font-inter text-xs text-error italic">&quot;{item.notes}&quot;</Text>
-                    </View>
-                  ) : null}
-                </GlassCard>
+                    {item.notes ? (
+                      <View className="mt-2.5 border-t border-black/5 pt-2">
+                        <Text className="font-inter-semibold text-[10px] text-error uppercase mb-1">Catatan HRD</Text>
+                        <Text className="font-inter text-xs text-error italic">&quot;{item.notes}&quot;</Text>
+                      </View>
+                    ) : null}
+                  </GlassCard>
+                </Pressable>
               </MotiView>
             ))}
           </View>
@@ -624,6 +659,149 @@ export default function CorrectionScreen() {
               </View>
             )}
           </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={detailModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeDetail}
+      >
+        <View className="flex-1 bg-black/45 justify-end">
+          <View className="bg-background rounded-t-[32px] p-6 pb-10 max-h-[90%] shadow-2xl">
+            <View className="flex-row justify-between items-start mb-5">
+              <View className="flex-1 pr-4">
+                <Text className="font-manrope-extrabold text-2xl text-primary">Detail Koreksi</Text>
+              </View>
+              <Pressable className="w-9 h-9 rounded-full bg-black/5 items-center justify-center" onPress={closeDetail}>
+                <MaterialIcons name="close" size={20} color={Tokens.colors.text} />
+              </Pressable>
+            </View>
+
+            {isLoadingDetail ? (
+              <View className="mt-2">
+                <SkeletonCard />
+                <SkeletonCard />
+              </View>
+            ) : isDetailError || !selectedCorrectionDetail ? (
+              <View className="items-center justify-center py-10">
+                <MaterialIcons name="error-outline" size={42} color={Tokens.colors.error} />
+                <Text className="font-inter-bold text-base text-on-surface mt-3 text-center">Gagal memuat detail koreksi</Text>
+                <Text className="font-inter text-sm text-text-muted mt-1 text-center">Silakan coba lagi.</Text>
+                <Button title="Retry" onPress={() => refetchDetail()} className="mt-5 h-12 rounded-2xl" />
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <GlassCard style={{ padding: 16, marginBottom: 14 }}>
+                  <View className="flex-row items-start justify-between gap-3">
+                    <View className="flex-1">
+                      <Text className="font-manrope-bold text-lg text-on-surface">{getCorrectionDate(selectedCorrectionDetail)}</Text>
+                      <Text className="font-inter text-xs text-text-muted mt-1">
+                        Koreksi absensi untuk kehadiran yang tercatat
+                      </Text>
+                    </View>
+                    <StatusBadge
+                      label={selectedCorrectionDetail.status || 'PENDING'}
+                      type={getStatusType(selectedCorrectionDetail.status) as any}
+                    />
+                  </View>
+                </GlassCard>
+
+                <View className="flex-row flex-wrap -mx-1.5">
+                  <View className="w-1/2 px-1.5 mb-3">
+                    <GlassCard style={{ padding: 14, minHeight: 84 }}>
+                      <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Absen Masuk Awal</Text>
+                      <Text className="font-inter-bold text-sm text-on-surface mt-2">
+                        {formatTime(selectedCorrectionDetail.original_checkin)}
+                      </Text>
+                    </GlassCard>
+                  </View>
+                  <View className="w-1/2 px-1.5 mb-3">
+                    <GlassCard style={{ padding: 14, minHeight: 84 }}>
+                      <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Absen Pulang Awal</Text>
+                      <Text className="font-inter-bold text-sm text-on-surface mt-2">
+                        {formatTime(selectedCorrectionDetail.original_checkout)}
+                      </Text>
+                    </GlassCard>
+                  </View>
+                  <View className="w-1/2 px-1.5 mb-3">
+                    <GlassCard style={{ padding: 14, minHeight: 84 }}>
+                      <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Koreksi Masuk</Text>
+                      <Text className="font-inter-bold text-sm text-on-surface mt-2">
+                        {formatTime(selectedCorrectionDetail.corrected_checkin)}
+                      </Text>
+                    </GlassCard>
+                  </View>
+                  <View className="w-1/2 px-1.5 mb-3">
+                    <GlassCard style={{ padding: 14, minHeight: 84 }}>
+                      <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Koreksi Pulang</Text>
+                      <Text className="font-inter-bold text-sm text-on-surface mt-2">
+                        {formatTime(selectedCorrectionDetail.corrected_checkout)}
+                      </Text>
+                    </GlassCard>
+                  </View>
+                </View>
+
+                <GlassCard style={{ padding: 14, marginBottom: 14 }}>
+                  <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Alasan</Text>
+                  <Text className="font-inter text-sm text-on-surface mt-2 leading-6">
+                    {selectedCorrectionDetail.reason || '-'}
+                  </Text>
+                </GlassCard>
+
+                {selectedCorrectionDetail.notes ? (
+                  <GlassCard style={{ padding: 14, marginBottom: 14 }}>
+                    <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Catatan HRD</Text>
+                    <Text className="font-inter text-sm text-on-surface mt-2 leading-6">
+                      {selectedCorrectionDetail.notes}
+                    </Text>
+                  </GlassCard>
+                ) : null}
+
+                {selectedCorrectionFeedback?.data?.length ? (
+                  <GlassCard style={{ padding: 14, marginBottom: 14 }}>
+                    <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Diproses Oleh</Text>
+                    <View className="mt-3 gap-3">
+                      {selectedCorrectionFeedback.data.map((item) => (
+                        <View key={item.id} className="rounded-2xl bg-black/5 px-4 py-3">
+                          <View className="flex-row items-start justify-between gap-3">
+                            <View className="flex-1">
+                              <Text className="font-inter-bold text-sm text-on-surface">
+                                {item.hr_name || 'HR Admin'}
+                              </Text>
+                              <Text className="font-inter text-[11px] text-text-muted mt-1">
+                                {item.action === 'APPROVE' ? 'Disetujui' : item.action === 'REJECT' ? 'Ditolak' : 'Diproses'} • {new Date(item.created_at).toLocaleString('id-ID', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </Text>
+                            </View>
+                            <StatusBadge
+                              label={item.action === 'APPROVE' ? 'APPROVED' : item.action === 'REJECT' ? 'REJECTED' : 'PENDING'}
+                              type={item.action === 'REJECT' ? 'error' : item.action === 'APPROVE' ? 'secondary' : 'warning'}
+                            />
+                          </View>
+                          {item.feedback ? (
+                            <Text className="font-inter text-sm text-on-surface mt-3 leading-6">
+                              {item.feedback}
+                            </Text>
+                          ) : null}
+                        </View>
+                      ))}
+                    </View>
+                  </GlassCard>
+                ) : null}
+
+                {isLoadingFeedback ? (
+                  <Text className="font-inter text-sm text-text-muted mt-2">Memuat approver...</Text>
+                ) : null}
+              </ScrollView>
+            )}
+          </View>
         </View>
       </Modal>
 

@@ -233,4 +233,9 @@ export const attendanceService = {
     const response = await api.post('/attendance/corrections', payload);
     return unwrapData<AttendanceCorrection>(response.data);
   },
+
+  async getCorrectionDetail(correctionId: string): Promise<AttendanceCorrection> {
+    const response = await api.get(`/attendance/corrections/${correctionId}`);
+    return unwrapData<AttendanceCorrection>(response.data);
+  },
 };

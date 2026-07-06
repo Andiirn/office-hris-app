@@ -21,6 +21,7 @@ import { StatusBadge } from '../src/components/ui/StatusBadge';
 import { SuccessAnimation } from '../src/components/ui/SuccessAnimation';
 import { Tokens } from '../src/core/theme/tokens';
 import { formatOvertimeTime, toLocalDateTimeString } from '../src/features/overtime/time';
+import { approvalService } from '../src/services/approval.service';
 import { attendanceService } from '../src/services/attendance.service';
 import { overtimeService } from '../src/services/overtime.service';
 import { useAuthStore } from '../src/stores/auth.store';
@@ -84,9 +85,11 @@ export default function OvertimeScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [attendancePickerVisible, setAttendancePickerVisible] = useState(false);
   const [timePickerVisible, setTimePickerVisible] = useState(false);
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [timeField, setTimeField] = useState<TimeField>('start_time');
   const [mode, setMode] = useState<OvertimeMode>('attendance');
   const [showSuccessAnim, setShowSuccessAnim] = useState(false);
+  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [form, setForm] = useState<CreateOvertimeRequest>({
@@ -117,6 +120,20 @@ export default function OvertimeScreen() {
     }),
     enabled: !!user?.id,
     staleTime: 1000 * 60 * 5,
+  });
+
+  const { data: selectedRecordDetail, isLoading: isLoadingDetail, isError: isDetailError, refetch: refetchDetail } = useQuery({
+    queryKey: ['overtime-record-detail', selectedRecordId],
+    queryFn: () => overtimeService.getRecordDetail(selectedRecordId as string),
+    enabled: !!selectedRecordId && detailModalVisible,
+    staleTime: 60_000,
+  });
+
+  const { data: selectedRecordFeedback, isLoading: isLoadingFeedback } = useQuery({
+    queryKey: ['overtime-feedback', selectedRecordId],
+    queryFn: () => approvalService.getFeedback(selectedRecordId as string),
+    enabled: !!selectedRecordId && detailModalVisible,
+    staleTime: 60_000,
   });
 
   const { data: attendanceHistory = [], isLoading: isLoadingAttendance, refetch: refetchAttendanceHistory } = useQuery({
@@ -171,6 +188,16 @@ export default function OvertimeScreen() {
     setAttendancePickerVisible(false);
     setTimePickerVisible(false);
     setShowSuccessAnim(false);
+  };
+
+  const openDetail = (recordId: string) => {
+    setSelectedRecordId(recordId);
+    setDetailModalVisible(true);
+  };
+
+  const closeDetail = () => {
+    setDetailModalVisible(false);
+    setSelectedRecordId(null);
   };
 
   const handlePickAttendance = (attendance: AttendanceItem) => {
@@ -264,6 +291,30 @@ export default function OvertimeScreen() {
     const value = form[field];
     if (!value) return 'Pilih jam';
     return value.includes('T') ? value.slice(11, 16) : value.slice(0, 5);
+  };
+
+  const formatDateLabel = (value?: string | null) => {
+    if (!value) return '-';
+    const date = value.includes('T') ? new Date(value) : new Date(`${value}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleDateString('id-ID', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  };
+
+  const formatDateTimeLabel = (value?: string | null) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleString('id-ID', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   return (
@@ -363,64 +414,72 @@ export default function OvertimeScreen() {
           history.map((item) => {
             const status = getOvertimeStatus(item);
             return (
-              <GlassCard key={item.id} style={{ marginBottom: 12, padding: 16 }}>
-                <View className="flex-row justify-between items-start mb-2.5">
-                  <View className="flex-1">
-                    <Text className="font-inter-bold text-[11px] text-text-muted uppercase mb-1 tracking-widest">
-                      Pengajuan Lembur
-                    </Text>
-                    <View className="flex-row items-center gap-1.5 mb-1.5">
-                      <MaterialIcons name="calendar-today" size={12} color={Tokens.colors.primary} />
-                      <Text className="font-inter-bold text-sm text-black">
-                        {item.attendance_date || item.overtime_date || item.created_at?.split('T')[0] || '-'}
-                      </Text>
-                    </View>
-                    <View className="flex-row items-center gap-3">
-                      <View className="flex-row items-center gap-1">
-                        <MaterialIcons name="history" size={12} color={Tokens.colors.primary} />
-                        <Text className="font-inter-bold text-xs text-primary">
-                          {item.overtime_hours ? `${item.overtime_hours} Jam` : item.overtime_minutes ? `${item.overtime_minutes} Menit` : '-'}
+              <Pressable key={item.id} onPress={() => openDetail(item.id)} className="mb-3">
+                <GlassCard style={{ padding: 16 }}>
+                  <View className="flex-row justify-between items-start mb-2.5">
+                    <View className="flex-1">
+                      <View className="flex-row items-center gap-2 mb-1">
+                        <Text className="font-inter-bold text-[11px] text-text-muted uppercase tracking-widest">
+                          Pengajuan Lembur
+                        </Text>
+                        <View className="flex-row items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5">
+                          <MaterialIcons name="visibility" size={11} color={Tokens.colors.primary} />
+                          <Text className="font-inter-bold text-[10px] text-primary uppercase tracking-wider">Detail</Text>
+                        </View>
+                      </View>
+                      <View className="flex-row items-center gap-1.5 mb-1.5">
+                        <MaterialIcons name="calendar-today" size={12} color={Tokens.colors.primary} />
+                        <Text className="font-inter-bold text-sm text-black">
+                          {item.attendance_date || item.overtime_date || item.created_at?.split('T')[0] || '-'}
                         </Text>
                       </View>
-                      <View className="w-1 h-1 rounded-full bg-outline/30" />
-                      <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-tighter">
-                        {OVERTIME_TYPE_LABELS[item.overtime_type as OvertimeType] || item.overtime_type?.replace('_', ' ')}
-                      </Text>
-                    </View>
-                    {(item.start_time || item.end_time) && (
-                      <View className="flex-row items-center gap-1 mt-1.5">
-                        <MaterialIcons name="schedule" size={12} color={Tokens.colors.textMuted} />
-                        <Text className="font-inter text-xs text-text-muted">
-                          {formatOvertimeTime(item.start_time)} - {formatOvertimeTime(item.end_time)}
+                      <View className="flex-row items-center gap-3">
+                        <View className="flex-row items-center gap-1">
+                          <MaterialIcons name="history" size={12} color={Tokens.colors.primary} />
+                          <Text className="font-inter-bold text-xs text-primary">
+                            {item.overtime_hours ? `${item.overtime_hours} Jam` : item.overtime_minutes ? `${item.overtime_minutes} Menit` : '-'}
+                          </Text>
+                        </View>
+                        <View className="w-1 h-1 rounded-full bg-outline/30" />
+                        <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-tighter">
+                          {OVERTIME_TYPE_LABELS[item.overtime_type as OvertimeType] || item.overtime_type?.replace('_', ' ')}
                         </Text>
                       </View>
-                    )}
+                      {(item.start_time || item.end_time) && (
+                        <View className="flex-row items-center gap-1 mt-1.5">
+                          <MaterialIcons name="schedule" size={12} color={Tokens.colors.textMuted} />
+                          <Text className="font-inter text-xs text-text-muted">
+                            {formatOvertimeTime(item.start_time)} - {formatOvertimeTime(item.end_time)}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <View className="items-end">
+                      <StatusBadge
+                        label={status}
+                        type={getStatusType(status) as any}
+                      />
+                      {!!item.overtime_amount && item.overtime_amount > 0 && (
+                        <Text className="font-inter-bold text-[10px] text-secondary mt-1">
+                          +{new Intl.NumberFormat('id-ID', {
+                            style: 'currency',
+                            currency: 'IDR',
+                            minimumFractionDigits: 0,
+                          }).format(item.overtime_amount)}
+                        </Text>
+                      )}
+                    </View>
                   </View>
-                  <View className="items-end">
-                    <StatusBadge
-                      label={status}
-                      type={getStatusType(status) as any}
-                    />
-                    {!!item.overtime_amount && item.overtime_amount > 0 && (
-                      <Text className="font-inter-bold text-[10px] text-secondary mt-1">
-                        +{new Intl.NumberFormat('id-ID', {
-                          style: 'currency',
-                          currency: 'IDR',
-                          minimumFractionDigits: 0,
-                        }).format(item.overtime_amount)}
-                      </Text>
-                    )}
-                  </View>
-                </View>
 
-                {item.reason && (
-                  <View className="bg-black/5 px-3 py-2 rounded-lg mt-2">
-                    <Text className="font-inter text-xs text-text-muted italic" numberOfLines={2}>
-                      &quot;{item.reason}&quot;
-                    </Text>
-                  </View>
-                )}
-              </GlassCard>
+                  {item.reason && (
+                    <View className="bg-black/5 px-3 py-2 rounded-lg mt-2">
+                      <Text className="font-inter text-xs text-text-muted italic" numberOfLines={2}>
+                        &quot;{item.reason}&quot;
+                      </Text>
+                    </View>
+                  )}
+                </GlassCard>
+              </Pressable>
             );
           })
         )}
@@ -670,6 +729,140 @@ export default function OvertimeScreen() {
                 ) : null}
               </View>
             ) : null}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        animationType="fade"
+        transparent
+        visible={detailModalVisible}
+        onRequestClose={closeDetail}
+      >
+        <View className="flex-1 bg-black/45 justify-end">
+          <View className="bg-background rounded-t-[32px] p-6 pb-10 max-h-[90%] shadow-2xl">
+            <View className="flex-row justify-between items-start mb-5">
+              <View className="flex-1 pr-4">
+                <Text className="font-manrope-extrabold text-2xl text-primary">Detail Lembur</Text>
+              </View>
+              <Pressable
+                className="w-9 h-9 rounded-full bg-black/5 items-center justify-center"
+                onPress={closeDetail}
+              >
+                <MaterialIcons name="close" size={20} color={Tokens.colors.text} />
+              </Pressable>
+            </View>
+
+            {isLoadingDetail ? (
+              <Text className="font-inter text-sm text-text-muted mt-4">Memuat detail...</Text>
+            ) : isDetailError || !selectedRecordDetail ? (
+              <View className="items-center justify-center py-10">
+                <MaterialIcons name="error-outline" size={42} color={Tokens.colors.error} />
+                <Text className="font-inter-bold text-base text-on-surface mt-3 text-center">Gagal memuat detail lembur</Text>
+                <Text className="font-inter text-sm text-text-muted mt-1 text-center">Silakan coba lagi.</Text>
+                <Button title="Retry" onPress={() => refetchDetail()} className="mt-5 h-12 rounded-2xl" />
+              </View>
+            ) : (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <GlassCard style={{ padding: 16, marginBottom: 14 }}>
+                  <View className="flex-row items-start justify-between gap-3">
+                    <View className="flex-1">
+                      <Text className="font-manrope-bold text-lg text-on-surface">
+                        {formatDateLabel(selectedRecordDetail.overtime_date || selectedRecordDetail.attendance_date || selectedRecordDetail.created_at)}
+                      </Text>
+                      <Text className="font-inter text-xs text-text-muted mt-1">
+                        {OVERTIME_TYPE_LABELS[selectedRecordDetail.overtime_type as OvertimeType] || selectedRecordDetail.overtime_type}
+                      </Text>
+                    </View>
+                    <StatusBadge
+                      label={getOvertimeStatus(selectedRecordDetail)}
+                      type={getStatusType(getOvertimeStatus(selectedRecordDetail)) as any}
+                    />
+                  </View>
+                </GlassCard>
+
+                <View className="flex-row flex-wrap -mx-1.5">
+                  <View className="w-1/2 px-1.5 mb-3">
+                    <GlassCard style={{ padding: 14, minHeight: 84 }}>
+                      <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Durasi</Text>
+                      <Text className="font-inter-bold text-sm text-on-surface mt-2">
+                        {selectedRecordDetail.overtime_hours ? `${selectedRecordDetail.overtime_hours} jam` : selectedRecordDetail.overtime_minutes ? `${selectedRecordDetail.overtime_minutes} menit` : '-'}
+                      </Text>
+                    </GlassCard>
+                  </View>
+                  <View className="w-1/2 px-1.5 mb-3">
+                    <GlassCard style={{ padding: 14, minHeight: 84 }}>
+                      <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Waktu</Text>
+                      <Text className="font-inter-bold text-sm text-on-surface mt-2">
+                        {selectedRecordDetail.start_time || selectedRecordDetail.end_time
+                          ? `${formatOvertimeTime(selectedRecordDetail.start_time)} - ${formatOvertimeTime(selectedRecordDetail.end_time)}`
+                          : '-'}
+                      </Text>
+                    </GlassCard>
+                  </View>
+                  <View className="w-1/2 px-1.5 mb-3">
+                    <GlassCard style={{ padding: 14, minHeight: 84 }}>
+                      <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Nominal</Text>
+                      <Text className="font-inter-bold text-sm text-on-surface mt-2">
+                        {selectedRecordDetail.overtime_amount
+                          ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(selectedRecordDetail.overtime_amount)
+                          : '-'}
+                      </Text>
+                    </GlassCard>
+                  </View>
+                  <View className="w-1/2 px-1.5 mb-3">
+                    <GlassCard style={{ padding: 14, minHeight: 84 }}>
+                      <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Disetujui Pada</Text>
+                      <Text className="font-inter-bold text-sm text-on-surface mt-2">
+                        {formatDateTimeLabel(selectedRecordDetail.approved_at)}
+                      </Text>
+                    </GlassCard>
+                  </View>
+                </View>
+
+                <GlassCard style={{ padding: 14, marginBottom: 14 }}>
+                  <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Alasan</Text>
+                  <Text className="font-inter text-sm text-on-surface mt-2 leading-6">
+                    {selectedRecordDetail.reason || '-'}
+                  </Text>
+                </GlassCard>
+
+                {selectedRecordFeedback?.data?.length ? (
+                  <GlassCard style={{ padding: 14, marginBottom: 14 }}>
+                    <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Diproses Oleh</Text>
+                    <View className="mt-3 gap-3">
+                      {selectedRecordFeedback.data.map((item) => (
+                        <View key={item.id} className="rounded-2xl bg-black/5 px-4 py-3">
+                          <View className="flex-row items-start justify-between gap-3">
+                            <View className="flex-1">
+                              <Text className="font-inter-bold text-sm text-on-surface">
+                                {item.hr_name || 'HR Admin'}
+                              </Text>
+                              <Text className="font-inter text-[11px] text-text-muted mt-1">
+                                {item.action === 'APPROVE' ? 'Disetujui' : item.action === 'REJECT' ? 'Ditolak' : 'Diproses'} • {formatDateTimeLabel(item.created_at)}
+                              </Text>
+                            </View>
+                            <StatusBadge
+                              label={item.action === 'APPROVE' ? 'APPROVED' : item.action === 'REJECT' ? 'REJECTED' : 'PENDING'}
+                              type={item.action === 'REJECT' ? 'error' : item.action === 'APPROVE' ? 'secondary' : 'warning'}
+                            />
+                          </View>
+                          {item.feedback ? (
+                            <Text className="font-inter text-sm text-on-surface mt-3 leading-6">
+                              {item.feedback}
+                            </Text>
+                          ) : null}
+                        </View>
+                      ))}
+                    </View>
+                  </GlassCard>
+                ) : null}
+
+                {isLoadingFeedback ? (
+                  <Text className="font-inter text-sm text-text-muted mt-2">Memuat approver...</Text>
+                ) : null}
+              </ScrollView>
+            )}
           </View>
         </View>
       </Modal>

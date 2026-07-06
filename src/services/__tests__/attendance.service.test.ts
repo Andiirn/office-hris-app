@@ -86,6 +86,27 @@ describe('attendanceService', () => {
         { id: 'corr-2', attendance_date: '2026-05-10' },
       ]);
     });
+
+    it('unwraps correction detail responses', async () => {
+      (api.get as jest.Mock).mockResolvedValue({
+        data: {
+          data: {
+            id: 'corr-1',
+            status: 'APPROVED',
+            corrected_checkin: '2026-06-10T08:00:00',
+          },
+        },
+      });
+
+      const result = await attendanceService.getCorrectionDetail('corr-1');
+
+      expect(api.get).toHaveBeenCalledWith('/attendance/corrections/corr-1');
+      expect(result).toEqual({
+        id: 'corr-1',
+        status: 'APPROVED',
+        corrected_checkin: '2026-06-10T08:00:00',
+      });
+    });
   });
 
   describe('listVisits', () => {

@@ -52,6 +52,11 @@ export const leaveService = {
     return unwrapData<LeaveRequest>(response.data);
   },
 
+  async getRequest(requestId: string): Promise<LeaveRequest> {
+    const response = await api.get(`/leave/requests/${requestId}`);
+    return unwrapData<LeaveRequest>(response.data);
+  },
+
   async uploadDocument(requestId: string, file: { uri: string; name: string; type?: string | null }): Promise<void> {
     const formData = new FormData();
     formData.append('file', {

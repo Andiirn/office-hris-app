@@ -3,8 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { Alert, Platform, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
-import { PeriodSelector } from '../src/components/common/PeriodSelector';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { PeriodSelector } from '../src/components/common/PeriodSelector';
 import { GlassCard } from '../src/components/ui/GlassCard';
 import { Skeleton, SkeletonCard } from '../src/components/ui/Skeleton';
 import { qk } from '../src/core/query/query-keys';
@@ -63,25 +63,33 @@ export default function PayrollScreen() {
     (value ?? "").trim().toLowerCase();
 
   const allowances = React.useMemo(() => rawComponents
-    .filter((c: any) => normalizeComponentType(c.component_type || c.type) === "earning" || normalizeComponentType(c.component_type || c.type) === "allowance")
+    .filter((c: any) =>
+      (normalizeComponentType(c.component_type || c.type) === "earning" || normalizeComponentType(c.component_type || c.type) === "allowance") &&
+      c.name?.toLowerCase() !== 'gaji pokok'
+    )
     .map((c: any) => ({ name: c.name as string, amount: readNumber(c.amount), keterangan: c.keterangan })), [rawComponents]);
 
   const customDeductions = React.useMemo(() => rawComponents
-    .filter((c: any) => normalizeComponentType(c.component_type || c.type) === "deduction" && c.source !== 'bpjs')
+    .filter((c: any) =>
+      normalizeComponentType(c.component_type || c.type) === "deduction" &&
+      c.source !== 'bpjs' &&
+      !c.name?.toLowerCase().includes('tidak hadir')
+    )
     .map((c: any) => ({ name: c.name as string, amount: readNumber(c.amount), keterangan: c.keterangan })), [rawComponents]);
 
+  const sumAllowances = allowances.reduce((sum: number, item: any) => sum + item.amount, 0);
+  const displayCustomEarningVal = customEarningVal > 0 ? customEarningVal + sumAllowances : sumAllowances;
+
   const sumCustomDeductions = customDeductions.reduce((sum: number, item: any) => sum + item.amount, 0);
-  const displayCustomDeductionVal = customDeductionVal > 0 ? customDeductionVal : sumCustomDeductions;
+  const displayCustomDeductionVal = customDeductionVal > 0 ? customDeductionVal + sumCustomDeductions : sumCustomDeductions;
 
   // Calculate Absent Deduction if salary_original is used as baseSalary
   const originalSalary = readNumber(payroll?.salary_original);
   const actualBaseSalary = readNumber(payroll?.base_salary);
   const absentDeduction = originalSalary > actualBaseSalary ? originalSalary - actualBaseSalary : 0;
 
-  const totalAllowance = totalAllowanceVal || allowances.reduce((sum: number, item: any) => sum + item.amount, 0);
-
   // Recalculate Gross and Total Deductions manually to balance the inflated Base Salary
-  const grossIncome = baseSalary + totalAllowance + totalOvertimeVal + customEarningVal;
+  const grossIncome = baseSalary + displayCustomEarningVal + totalOvertimeVal;
   const totalDeduction = taxAmountVal + bpjsKesEmployeeVal + bpjsTkEmployeeVal + lateDeductionVal + leaveDeductionVal + displayCustomDeductionVal + absentDeduction;
 
   const netSalary = payroll?.take_home_pay || (grossIncome - totalDeduction);
@@ -159,7 +167,7 @@ export default function PayrollScreen() {
             <MaterialIcons name="arrow-back" size={22} color={Tokens.colors.primary} />
           </Pressable>
           <View className="flex-1">
-            <Text className="font-manrope-extrabold text-3xl text-[#000666]">Payroll</Text>
+            <Text className="font-manrope-extrabold text-3xl text-[#000666]">Slip Gaji</Text>
             <Text className="font-inter-medium text-sm text-[#454652] mt-0.5">Slip Gaji Bulanan</Text>
           </View>
         </View>
@@ -345,7 +353,7 @@ export default function PayrollScreen() {
                   </View>
                   <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
                     <Text className="font-inter text-sm text-[#454652]">Pendapatan Lain-lain</Text>
-                    <Text className="font-inter-semibold text-sm text-[#1b1c1c]">{formatCurrency(customEarningVal)}</Text>
+                    <Text className="font-inter-semibold text-sm text-[#1b1c1c]">{formatCurrency(displayCustomEarningVal)}</Text>
                   </View>
 
                   {/* Component Lines (Earnings) */}

@@ -37,4 +37,31 @@ describe('leaveService', () => {
       { id: 'leave-1', start_date: '2026-06-10', created_at: '2026-06-10T08:00:00Z' },
     ]);
   });
+
+  it('getRequest unwraps the detail response for a leave request', async () => {
+    (api.get as jest.Mock).mockResolvedValue({
+      data: {
+        data: {
+          id: 'leave-1',
+          status: 'APPROVED',
+          employee: {
+            full_name: 'Budi',
+            photo_url: 'https://example.com/photo.jpg',
+          },
+        },
+      },
+    });
+
+    const result = await leaveService.getRequest('leave-1');
+
+    expect(api.get).toHaveBeenCalledWith('/leave/requests/leave-1');
+    expect(result).toEqual({
+      id: 'leave-1',
+      status: 'APPROVED',
+      employee: {
+        full_name: 'Budi',
+        photo_url: 'https://example.com/photo.jpg',
+      },
+    });
+  });
 });

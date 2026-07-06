@@ -22,15 +22,37 @@ export interface LeaveBalance {
 export interface LeaveRequest {
   id: string;
   employee_id: string;
+  employee?: {
+    id?: string;
+    full_name?: string | null;
+    nik?: string | null;
+    photo_url?: string | null;
+  } | null;
   leave_type_id: string;
+  leave_type?: {
+    id?: string;
+    name?: string | null;
+    code?: string | null;
+    category?: string | null;
+  } | null;
   leave_type_name?: string;
   start_date: string;
   end_date: string | null;
   start_time?: string | null;
   end_time?: string | null;
+  total_days?: number;
   reason: string;
   status: LeaveStatus;
+  document_url?: string | null;
   created_at: string;
+  current_approval_level?: number;
+  replacement_id?: string | null;
+  replacement?: {
+    id?: string;
+    full_name?: string | null;
+    nik?: string | null;
+    photo_url?: string | null;
+  } | null;
 }
 
 export interface CreateLeaveRequest {

@@ -197,4 +197,41 @@ describe('approvalService', () => {
       comment: 'Looks good',
     });
   });
+
+  it('getFeedback fetches feedbacks by reference id', async () => {
+    (api.get as jest.Mock).mockResolvedValue({
+      data: {
+        success: true,
+        data: [
+          {
+            id: 'fb-1',
+            action: 'APPROVE',
+            feedback: 'Approved',
+            hr_id: 'hr-1',
+            hr_name: 'SITI FAIJAH',
+            created_at: '2026-06-25T08:00:00Z',
+          },
+        ],
+      },
+    });
+
+    const result = await approvalService.getFeedback('leave-1');
+
+    expect(api.get).toHaveBeenCalledWith('/approvals/feedbacks', {
+      params: { reference_id: 'leave-1' },
+    });
+    expect(result).toEqual({
+      success: true,
+      data: [
+        {
+          id: 'fb-1',
+          action: 'APPROVE',
+          feedback: 'Approved',
+          hr_id: 'hr-1',
+          hr_name: 'SITI FAIJAH',
+          created_at: '2026-06-25T08:00:00Z',
+        },
+      ],
+    });
+  });
 });

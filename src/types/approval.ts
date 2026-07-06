@@ -55,3 +55,12 @@ export interface ApprovalRequestDetail {
   }[];
   reference_detail?: Record<string, any> | null;
 }
+
+export interface ApprovalFeedback {
+  id: string;
+  action: 'APPROVE' | 'REJECT' | string;
+  feedback?: string | null;
+  hr_id: string;
+  hr_name?: string | null;
+  created_at: string;
+}
