@@ -657,14 +657,14 @@ export default function HomeScreen() {
               {/* The Text */}
               <View className="flex-1">
                 <Text className="font-inter-bold text-[11px] text-yellow-400 mb-1">
-                  {isClockedOut ? 'Check-out berhasil!' : isClockedIn ? 'Anda berhasil Check-in!' : 'Anda belum melakukan absensi!'}
+                  {isClockedOut ? 'Check-out berhasil!' : isClockedIn ? 'Check-in berhasil!' : 'Anda belum melakukan absensi!'}
                 </Text>
                 <Text className="font-inter-medium text-[10px] text-white/80 leading-4">
                   {isClockedOut
-                    ? 'Anda baru saja Check-out! Kerja hari ini selesai! Beristirahatlah!'
+                    ? 'Kerja hari ini telah selesai! Terima kasih! Selamat beristirahat!'
                     : isClockedIn
-                      ? 'Kerja hari ini telah dimulai!'
-                      : 'Belum ada catatan absen hari ini. Kalo mau mulai kerja, jangan lupa check-in ya!'}
+                      ? 'Kerja hari ini telah dimulai! Please, Do your best!'
+                      : 'Belum ada catatan absen hari ini. Ayo, jangan lupa check-in ya!'}
                 </Text>
               </View>
             </View>
