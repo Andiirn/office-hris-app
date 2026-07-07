@@ -1,6 +1,7 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
+import { MotiView } from 'moti';
 import React, { useMemo, useState } from 'react';
 import {
   Alert,
@@ -333,7 +334,7 @@ export default function OvertimeScreen() {
             <MaterialIcons name="arrow-back" size={22} color={Tokens.colors.primary} />
           </Pressable>
           <View className="flex-1">
-            <Text className="font-manrope-extrabold text-3xl text-primary">Pengajuan Lembur</Text>
+            <Text className="font-manrope-extrabold text-3xl text-primary">Lembur</Text>
             <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Ajukan lembur dari kehadiran atau manual</Text>
           </View>
         </View>
@@ -356,7 +357,7 @@ export default function OvertimeScreen() {
 
 
         <View className="mb-6">
-          <Text className="font-manrope-bold text-base text-primary mb-3">Ringkasan Penghasilan Lembur</Text>
+          <Text className="font-manrope-bold text-base text-primary mb-3">Ringkasan Penghasilan</Text>
           <View className="flex-row gap-3">
             <GlassCard style={{ flex: 1, padding: 16 }}>
               <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center mb-3">
@@ -373,7 +374,7 @@ export default function OvertimeScreen() {
               <View className="w-8 h-8 rounded-full bg-on-secondary-container/10 items-center justify-center mb-3">
                 <MaterialIcons name="payments" size={16} color={Tokens.colors.onSecondaryContainer} />
               </View>
-              <Text className="font-inter-semibold text-[10px] text-text-muted uppercase tracking-wider mb-1">Estimasi</Text>
+              <Text className="font-inter-semibold text-[10px] text-text-muted uppercase tracking-wider mb-1">Pendapatan</Text>
               <Text className="font-manrope-extrabold text-xl text-on-secondary-container" numberOfLines={1}>
                 {new Intl.NumberFormat('id-ID', {
                   style: 'currency',
@@ -391,7 +392,7 @@ export default function OvertimeScreen() {
             year={selectedYear}
             onMonthChange={setSelectedMonth}
             onYearChange={setSelectedYear}
-            title="Periode Riwayat"
+            title="FIlter Riwayat"
             subtitle="Pilih bulan dan tahun untuk melihat riwayat lembur"
           />
         </View>
@@ -406,10 +407,21 @@ export default function OvertimeScreen() {
         {isLoadingHistory ? (
           <Text className="font-inter text-sm text-text-muted mt-4">Memuat riwayat...</Text>
         ) : history.length === 0 ? (
-          <GlassCard style={{ alignItems: 'center', padding: 40, marginTop: 10 }}>
-            <MaterialIcons name="work-history" size={48} color={Tokens.colors.outline} />
-            <Text className="font-inter-medium text-sm text-text-muted mt-3 text-center">Belum ada riwayat lembur</Text>
-          </GlassCard>
+          <MotiView from={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: 'timing', duration: 400 }}>
+            <GlassCard style={{ alignItems: 'center', padding: 24, paddingVertical: 48, marginTop: 16 }}>
+              <MotiView
+                from={{ opacity: 0, translateY: 10 }}
+                animate={{ opacity: 1, translateY: 0 }}
+                transition={{ type: 'timing', duration: 500, delay: 200 }}
+              >
+                <MaterialIcons name="work-history" size={64} color={Tokens.colors.outline} />
+              </MotiView>
+              <Text className="font-manrope-bold text-lg text-primary mt-4">Belum Ada Pengajuan</Text>
+              <Text className="font-inter text-sm text-text-muted text-center mt-2 mb-5">
+                Belum ada riwayat lembur.
+              </Text>
+            </GlassCard>
+          </MotiView>
         ) : (
           history.map((item) => {
             const status = getOvertimeStatus(item);
@@ -424,42 +436,22 @@ export default function OvertimeScreen() {
                         </Text>
                         <View className="flex-row items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5">
                           <MaterialIcons name="visibility" size={11} color={Tokens.colors.primary} />
-                          <Text className="font-inter-bold text-[10px] text-primary uppercase tracking-wider">Detail</Text>
                         </View>
                       </View>
                       <View className="flex-row items-center gap-1.5 mb-1.5">
-                        <MaterialIcons name="calendar-today" size={12} color={Tokens.colors.primary} />
+                        <Text className='font-inter-medium text-xs text-text-muted mr-1'>Untuk Tanggal:</Text>
                         <Text className="font-inter-bold text-sm text-black">
                           {item.attendance_date || item.overtime_date || item.created_at?.split('T')[0] || '-'}
                         </Text>
                       </View>
-                      <View className="flex-row items-center gap-3">
-                        <View className="flex-row items-center gap-1">
-                          <MaterialIcons name="history" size={12} color={Tokens.colors.primary} />
-                          <Text className="font-inter-bold text-xs text-primary">
-                            {item.overtime_hours ? `${item.overtime_hours} Jam` : item.overtime_minutes ? `${item.overtime_minutes} Menit` : '-'}
-                          </Text>
-                        </View>
-                        <View className="w-1 h-1 rounded-full bg-outline/30" />
-                        <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-tighter">
-                          {OVERTIME_TYPE_LABELS[item.overtime_type as OvertimeType] || item.overtime_type?.replace('_', ' ')}
-                        </Text>
-                      </View>
-                      {(item.start_time || item.end_time) && (
-                        <View className="flex-row items-center gap-1 mt-1.5">
-                          <MaterialIcons name="schedule" size={12} color={Tokens.colors.textMuted} />
-                          <Text className="font-inter text-xs text-text-muted">
-                            {formatOvertimeTime(item.start_time)} - {formatOvertimeTime(item.end_time)}
-                          </Text>
-                        </View>
-                      )}
+
                     </View>
                     <View className="items-end">
                       <StatusBadge
                         label={status}
                         type={getStatusType(status) as any}
                       />
-                      {!!item.overtime_amount && item.overtime_amount > 0 && (
+                      {status !== 'PENDING' && !!item.overtime_amount && item.overtime_amount > 0 && (
                         <Text className="font-inter-bold text-[10px] text-secondary mt-1">
                           +{new Intl.NumberFormat('id-ID', {
                             style: 'currency',

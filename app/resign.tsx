@@ -134,7 +134,6 @@ export default function ResignScreen() {
             <Text className="font-inter-medium text-sm text-text-muted mt-2 text-center">
               Belum ada pengajuan resign yang dibuat untuk akun ini.
             </Text>
-            <Button title="Ajukan Resign Baru" onPress={() => setModalVisible(true)} style={{ marginTop: 16 }} />
           </GlassCard>
         ) : (
           <View className="gap-4">

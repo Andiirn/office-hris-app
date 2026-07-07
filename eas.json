@@ -29,6 +29,11 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "android": {
+        "serviceAccountKey": "./ServiceAccountHRIS.json",
+        "track": "internal"
+      }
+    }
   }
 }

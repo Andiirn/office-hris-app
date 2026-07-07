@@ -1,10 +1,10 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
+import { MotiView } from 'moti';
 import React, { useMemo, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MotiView } from 'moti';
 import { PeriodSelector } from '../src/components/common/PeriodSelector';
 import { Button } from '../src/components/ui/Button';
 import { GlassCard } from '../src/components/ui/GlassCard';
@@ -280,7 +280,7 @@ export default function CorrectionScreen() {
             <MaterialIcons name="arrow-back" size={22} color={Tokens.colors.primary} />
           </Pressable>
           <View className="flex-1">
-            <Text className="font-manrope-extrabold text-3xl text-primary">Koreksi Absen</Text>
+            <Text className="font-manrope-extrabold text-3xl text-primary">Koreksi Kehadiran</Text>
             <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Daftar pengajuan koreksi kehadiran</Text>
           </View>
         </View>
@@ -307,7 +307,7 @@ export default function CorrectionScreen() {
             year={selectedYear}
             onMonthChange={setSelectedMonth}
             onYearChange={setSelectedYear}
-            title="Periode Riwayat"
+            title="FIlter Riwayat"
             subtitle="Filter koreksi berdasarkan bulan dan tahun"
           />
         </View>
@@ -315,7 +315,7 @@ export default function CorrectionScreen() {
         <View className="flex-row justify-between items-center mt-2 mb-4">
           <Text className="font-manrope-bold text-lg text-primary">Riwayat Koreksi</Text>
           <View className="bg-primary/10 px-3 py-1 rounded-full">
-            <Text className="font-inter-bold text-[10px] text-primary">{corrections.length} Records</Text>
+            <Text className="font-inter-bold text-[10px] text-primary">{corrections.length} Tercatat</Text>
           </View>
         </View>
 
@@ -352,7 +352,6 @@ export default function CorrectionScreen() {
               <Text className="font-inter text-sm text-text-muted text-center mt-2 mb-5">
                 Anda belum pernah mengajukan koreksi kehadiran.
               </Text>
-              <Button title="Ajukan Koreksi Baru" onPress={() => setModalVisible(true)} />
             </GlassCard>
           </MotiView>
         ) : (
@@ -370,22 +369,21 @@ export default function CorrectionScreen() {
                       <View className="flex-1">
                         <View className="flex-row items-center gap-2 mb-1">
                           <Text className="font-inter-bold text-[11px] text-text-muted uppercase tracking-widest">
-                            Pengajuan Koreksi Kehadiran
+                            Pengajuan Koreksi
                           </Text>
                           <View className="flex-row items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5">
                             <MaterialIcons name="visibility" size={11} color={Tokens.colors.primary} />
-                            <Text className="font-inter-bold text-[10px] text-primary uppercase tracking-wider">Detail</Text>
                           </View>
                         </View>
-                        <View className="flex-row items-center gap-1.5">
-                          <MaterialIcons name="calendar-today" size={12} color={Tokens.colors.primary} />
+                        <View className="flex-row items-center gap-1.5 mt-1.5">
+                          <Text className='font-inter-medium text-xs text-text-muted mr-1'>Untuk tanggal absen:</Text>
                           <Text className="font-inter-bold text-sm text-black">{getCorrectionDate(item)}</Text>
                         </View>
                       </View>
                       <StatusBadge label={item.status || 'PENDING'} type={getStatusType(item.status) as any} />
                     </View>
 
-                    <View className="bg-primary/5 border border-primary/10 p-3 rounded-xl mb-3 mt-1">
+                    {/* <View className="bg-primary/5 border border-primary/10 p-3 rounded-xl mb-3 mt-1">
                       <View className="flex-row justify-between mb-1">
                         <View className="flex-1">
                           <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-0.5">Koreksi Masuk</Text>
@@ -401,14 +399,14 @@ export default function CorrectionScreen() {
                           </Text>
                         </View>
                       </View>
-                    </View>
-
+                    </View> */}
+                    {/* 
                     <View className="border-t border-black/5 pt-2.5">
                       <View className="flex-row items-start gap-1.5">
                         <MaterialIcons name="chat-bubble-outline" size={12} color={Tokens.colors.textMuted} style={{ marginTop: 2 }} />
                         <Text className="font-inter text-xs text-on-surface flex-1">{item.reason}</Text>
                       </View>
-                    </View>
+                    </View> */}
 
                     {item.notes ? (
                       <View className="mt-2.5 border-t border-black/5 pt-2">

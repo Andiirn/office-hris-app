@@ -5,7 +5,6 @@ import { MotiView } from 'moti';
 import React from 'react';
 import { Pressable, RefreshControl, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Skeleton } from '../../src/components/ui/Skeleton';
 import { qk } from '../../src/core/query/query-keys';
 import { Tokens } from '../../src/core/theme/tokens';
 import { buildApprovalActivityItems } from '../../src/features/activity/approval-activity';
@@ -657,14 +656,14 @@ export default function HomeScreen() {
 
               {/* The Text */}
               <View className="flex-1">
-                <Text className="font-inter-bold text-[11px] text-white/90 mb-1">
-                  {isClockedOut ? 'Kerja Selesai 🎉' : isClockedIn ? 'Semangat Kerjanya! 🚀' : 'Lagi Santai Nih? 🌙'}
+                <Text className="font-inter-bold text-[11px] text-yellow-400 mb-1">
+                  {isClockedOut ? 'Check-out berhasil!' : isClockedIn ? 'Anda berhasil Check-in!' : 'Anda belum melakukan absensi!'}
                 </Text>
-                <Text className="font-inter-medium text-[10px] text-white/70 leading-4">
+                <Text className="font-inter-medium text-[10px] text-white/80 leading-4">
                   {isClockedOut
-                    ? 'Kerja hari ini luar biasa! Beristirahat lah agar energimu kembali pulih!'
+                    ? 'Anda baru saja Check-out! Kerja hari ini selesai! Beristirahatlah!'
                     : isClockedIn
-                      ? 'Fokus dan kerjakan satu per satu. Kamu pasti bisa!'
+                      ? 'Kerja hari ini telah dimulai!'
                       : 'Belum ada catatan absen hari ini. Kalo mau mulai kerja, jangan lupa check-in ya!'}
                 </Text>
               </View>
@@ -803,7 +802,7 @@ export default function HomeScreen() {
                   <Text className="font-inter text-[13px] text-text-muted">No recent activities</Text>
                 </View>
               ) : (
-              <View className="gap-0 mt-2">
+                <View className="gap-0 mt-2">
                   {feedItems.map((item, index) => {
                     const pulse = item.origin === 'self' && item.status === 'PENDING';
                     return (

@@ -283,7 +283,7 @@ export default function VisitScreen() {
                 year={selectedYear}
                 onMonthChange={setSelectedMonth}
                 onYearChange={setSelectedYear}
-                title="Periode Riwayat"
+                title="FIlter Riwayat"
                 subtitle="Riwayat kunjungan berdasarkan bulan dan tahun"
               />
             </View>
@@ -325,9 +325,6 @@ export default function VisitScreen() {
                 <Text className="font-inter-medium text-sm text-text-muted mt-2 text-center">
                   {activeTab === 'team' ? 'Belum ada riwayat kunjungan dari bawahan Anda.' : 'Belum ada riwayat kunjungan dinas (visit).'}
                 </Text>
-                {activeTab === 'me' && (
-                  <Button title="Laporkan Visit Baru" onPress={() => setModalVisible(true)} style={{ marginTop: 16 }} />
-                )}
               </GlassCard>
             )}
           </View>

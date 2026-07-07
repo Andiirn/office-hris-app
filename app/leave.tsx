@@ -2,12 +2,13 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
+import { MotiView } from 'moti';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Image,
-  Linking,
   Modal,
   Pressable,
   RefreshControl,
@@ -79,7 +80,7 @@ export default function LeaveScreen() {
   const [selectedDetailId, setSelectedDetailId] = useState<string | null>(null);
   const [selectedRange, setSelectedRange] = useState<{ start?: string, end?: string }>({});
   const [selectedHourlyDate, setSelectedHourlyDate] = useState<string>(new Date().toISOString().slice(0, 10));
-  const [documentFile, setDocumentFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
+  const [documentFile, setDocumentFile] = useState<{ uri: string; name: string; mimeType?: string } | null>(null);
   const [showSuccessAnim, setShowSuccessAnim] = useState(false);
   const [form, setForm] = useState<CreateLeaveRequest>({
     leave_type_id: '',
@@ -151,7 +152,7 @@ export default function LeaveScreen() {
 
   // 3. Create Request Mutation
   const createMutation = useMutation({
-    mutationFn: async (payload: { request: CreateLeaveRequest; documentFile: DocumentPicker.DocumentPickerAsset | null }) => {
+    mutationFn: async (payload: { request: CreateLeaveRequest; documentFile: { uri: string; name: string; mimeType?: string } | null }) => {
       const request = await leaveService.createRequest(payload.request);
       if (payload.documentFile) {
         try {
@@ -236,7 +237,9 @@ export default function LeaveScreen() {
 
   const closeDetail = () => {
     setDetailModalVisible(false);
-    setSelectedDetailId(null);
+    setTimeout(() => {
+      setSelectedDetailId(null);
+    }, 400);
   };
 
   const onDayPress = (day: any) => {
@@ -380,19 +383,43 @@ export default function LeaveScreen() {
     setSelectedRange({});
     setSelectedHourlyDate(today);
     setTimePickerVisible(false);
-    setModalVisible(true);
+  };
+
+  const pickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.8,
+      });
+
+      if (result.canceled || !result.assets?.length) return;
+      const asset = result.assets[0];
+      setDocumentFile({
+        uri: asset.uri,
+        name: asset.fileName || `image_${Date.now()}.jpg`,
+        mimeType: asset.mimeType || 'image/jpeg',
+      });
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Gagal memilih gambar');
+    }
   };
 
   const pickDocument = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/pdf', 'image/*'],
+        type: '*/*',
         copyToCacheDirectory: true,
         multiple: false,
       });
 
       if (result.canceled || !result.assets?.length) return;
-      setDocumentFile(result.assets[0]);
+      const asset = result.assets[0];
+      setDocumentFile({
+        uri: asset.uri,
+        name: asset.name,
+        mimeType: asset.mimeType,
+      });
     } catch (error: any) {
       Alert.alert('Error', error?.message || 'Gagal memilih file');
     }
@@ -488,9 +515,15 @@ export default function LeaveScreen() {
           <MaterialIcons name="arrow-back" size={22} color={Tokens.colors.primary} />
         </Pressable>
         <View className="flex-1 ml-3">
-          <Text className="font-manrope-extrabold text-3xl text-primary">Pengajuan izin & cuti</Text>
+          <Text className="font-manrope-extrabold text-3xl text-primary">Izin & Cuti</Text>
           <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Ajukan dan pantau izin atau cuti</Text>
         </View>
+        <Pressable
+          className="w-12 h-12 rounded-2xl bg-primary items-center justify-center shadow-lg shadow-primary/30 elevation-8"
+          onPress={() => setModalVisible(true)}
+        >
+          <MaterialIcons name="add" size={24} color="#fff" />
+        </Pressable>
       </View>
 
       <ScrollView
@@ -501,57 +534,22 @@ export default function LeaveScreen() {
           <RefreshControl refreshing={isFetchingHistory} onRefresh={onRefresh} tintColor={Tokens.colors.primary} />
         }
       >
-        <GlassCard style={{ padding: 16, marginBottom: 20 }}>
-          <View className="flex-row items-center justify-between mb-3">
-            <View>
-              <Text className="font-manrope-bold text-lg text-primary">Pilih Tipe</Text>
-              <Text className="font-inter text-xs text-text-muted mt-1">Pilih dulu jenis pengajuan yang ingin dibuat</Text>
-            </View>
-            {selectedLeaveType ? (
-              <View className="bg-primary/10 px-3 py-1.5 rounded-full">
-                <Text className="font-inter-bold text-[10px] text-primary uppercase tracking-wider">
-                  {isHourlyLeave ? 'Izin per jam' : 'Cuti / Izin'}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-
-          {leaveTypes.length === 0 ? (
-            <Text className="font-inter text-sm text-text-muted">Memuat tipe pengajuan...</Text>
-          ) : (
-            <View className="flex-row flex-wrap gap-2.5">
-              {leaveTypes.map((type) => {
-                const active = form.leave_type_id === type.id;
-                return (
-                  <Pressable
-                    key={type.id}
-                    className={`px-4 py-2.5 rounded-full border ${active ? 'bg-primary border-primary' : 'bg-primary/5 border-primary/10'}`}
-                    onPress={() => handleSelectLeaveType(type.id)}
-                  >
-                    <Text className={`font-inter-bold text-[13px] ${active ? 'text-white' : 'text-primary'}`}>
-                      {formatLeaveTypeName(type.name)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
-        </GlassCard>
-
         <View className="mb-6">
           <PeriodSelector
             month={selectedMonth}
             year={selectedYear}
             onMonthChange={setSelectedMonth}
             onYearChange={setSelectedYear}
-            title="Periode Riwayat"
+            title="FIlter Riwayat"
             subtitle="Riwayat pengajuan berdasarkan bulan dan tahun"
           />
         </View>
 
-        <View className="flex-row justify-between items-center mt-6 mb-4">
-          <Text className="font-manrope-bold text-lg text-primary ">Riwayat Pengajuan</Text>
-          <Text className="font-inter-semibold text-xs text-text-muted">{history.length} Pengajuan</Text>
+        <View className="flex-row justify-between items-center mb-4">
+          <Text className="font-manrope-bold text-lg text-primary">Riwayat Izin & Cuti</Text>
+          <View className="bg-primary/10 px-3 py-1 rounded-full">
+            <Text className="font-inter-bold text-[10px] text-primary">{history.length} Tercatat</Text>
+          </View>
         </View>
 
         {isLoadingHistory ? (
@@ -560,14 +558,21 @@ export default function LeaveScreen() {
             <SkeletonCard />
           </View>
         ) : history.length === 0 ? (
-          <GlassCard style={{ padding: 0, marginTop: 10 }}>
-            <View className="items-center justify-center py-10 w-full">
-              <MaterialIcons name="history" size={48} color={Tokens.colors.outline} />
-              <Text className="font-inter-medium text-sm text-text-muted mt-3 text-center">
-                No history found
+          <MotiView from={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: 'timing', duration: 400 }}>
+            <GlassCard style={{ alignItems: 'center', padding: 24, paddingVertical: 48, marginTop: 16 }}>
+              <MotiView
+                from={{ opacity: 0, translateY: 10 }}
+                animate={{ opacity: 1, translateY: 0 }}
+                transition={{ type: 'timing', duration: 500, delay: 200 }}
+              >
+                <MaterialIcons name="event-busy" size={64} color={Tokens.colors.outline} />
+              </MotiView>
+              <Text className="font-manrope-bold text-lg text-primary mt-4">Belum Ada Pengajuan</Text>
+              <Text className="font-inter text-sm text-text-muted text-center mt-2 mb-5">
+                Anda belum pernah mengajukan izin / cuti.
               </Text>
-            </View>
-          </GlassCard>
+            </GlassCard>
+          </MotiView>
         ) : (
           <View className="gap-0">
             {history.map((item, index) => {
@@ -576,7 +581,7 @@ export default function LeaveScreen() {
 
               const isSameDate = item.start_date === item.end_date || !item.end_date;
               const timeString = item.start_time && item.end_time ? ` (${formatTime(item.start_time)} - ${formatTime(item.end_time)})` : '';
-              const dateDisplay = isSameDate ? `${item.start_date}${timeString}` : `${item.start_date} - ${item.end_date}`;
+              const dateDisplay = isSameDate ? `${item.start_date}${timeString}` : `${item.start_date} to ${item.end_date}`;
               const status = getLeaveStatus(item);
 
               return (
@@ -585,41 +590,28 @@ export default function LeaveScreen() {
                   onPress={() => openDetail(item.id)}
                   accessibilityRole="button"
                   accessibilityLabel={`Lihat detail ${displayTitle}`}
-                  className="mb-3"
                 >
-                  <View className="bg-white/80 rounded-[20px] px-4 py-4 border border-white/90 shadow-sm">
+                  <GlassCard style={{ padding: 16, marginBottom: 12 }}>
                     <View className="flex-row justify-between items-start mb-2.5">
                       <View className="flex-1 pr-2">
-                        <View className="flex-row items-center gap-2">
-                          <Text className="font-inter-bold text-base text-on-surface">{displayTitle}</Text>
+                        <View className="flex-row items-center gap-2 mb-1">
+                          <Text className="font-inter-bold text-[11px] text-text-muted uppercase tracking-widest" numberOfLines={1}>
+                            {displayTitle}
+                          </Text>
                           <View className="flex-row items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5">
                             <MaterialIcons name="visibility" size={11} color={Tokens.colors.primary} />
-                            <Text className="font-inter-bold text-[10px] text-primary uppercase tracking-wider">Detail</Text>
                           </View>
                         </View>
-                        <View className="flex-row items-center mt-1 gap-1.5">
-                          <MaterialIcons name="calendar-today" size={12} color={Tokens.colors.textMuted} />
-                          <Text className="font-inter-medium text-xs text-text-muted">
+                        <View className="flex-row items-center gap-1.5 mt-1.5">
+                          <Text className="font-inter-medium text-xs text-text-muted mr-1">Tanggal:</Text>
+                          <Text className="font-semibold text-sm text-black">
                             {dateDisplay}
                           </Text>
                         </View>
                       </View>
                       <StatusBadge label={status} type={getStatusType(status) as any} />
                     </View>
-                    <Text className="font-inter text-[13px] text-text-muted leading-5 mt-1" numberOfLines={2}>
-                      {item.reason}
-                    </Text>
-
-                    {status === 'PENDING' && (
-                      <Pressable
-                        onPress={() => handleCancel(item.id)}
-                        className="mt-4 flex-row items-center justify-center gap-1.5 bg-error/10 px-4 py-2 rounded-full self-start"
-                      >
-                        <MaterialIcons name="close" size={14} color={Tokens.colors.error} />
-                        <Text className="font-inter-bold text-[11px] text-error uppercase tracking-wider">Batalkan</Text>
-                      </Pressable>
-                    )}
-                  </View>
+                  </GlassCard>
                 </Pressable>
               );
             })}
@@ -659,6 +651,43 @@ export default function LeaveScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
+              <GlassCard style={{ padding: 16, marginBottom: 20 }}>
+                <View className="flex-row items-center justify-between mb-3">
+                  <View>
+                    <Text className="font-manrope-bold text-lg text-primary">Pilih Tipe</Text>
+                    <Text className="font-inter text-xs text-text-muted mt-1">Pilih jenis pengajuan</Text>
+                  </View>
+                  {selectedLeaveType ? (
+                    <View className="bg-primary/10 px-3 py-1.5 rounded-full">
+                      <Text className="font-inter-bold text-[10px] text-primary uppercase tracking-wider">
+                        {isHourlyLeave ? 'Izin per jam' : 'Cuti / Izin'}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+
+                {leaveTypes.length === 0 ? (
+                  <Text className="font-inter text-sm text-text-muted">Memuat tipe pengajuan...</Text>
+                ) : (
+                  <View className="flex-row flex-wrap gap-2.5">
+                    {leaveTypes.map((type) => {
+                      const active = form.leave_type_id === type.id;
+                      return (
+                        <Pressable
+                          key={type.id}
+                          className={`px-4 py-2.5 rounded-full border ${active ? 'bg-primary border-primary' : 'bg-primary/5 border-primary/10'}`}
+                          onPress={() => handleSelectLeaveType(type.id)}
+                        >
+                          <Text className={`font-inter-bold text-[13px] ${active ? 'text-white' : 'text-primary'}`}>
+                            {formatLeaveTypeName(type.name)}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                )}
+              </GlassCard>
+
               {isHourlyLeave ? (
                 <GlassCard style={{ padding: 14, marginBottom: 16 }}>
                   <Text className="font-inter-bold text-sm text-primary mb-2">Izin per jam</Text>
@@ -748,9 +777,11 @@ export default function LeaveScreen() {
                     markedDates={markedDates}
                     onDayPress={onDayPress}
                   />
-                  <View className="flex-row items-center justify-center gap-1.5 mt-2.5 pt-2.5 border-t border-black/5">
-                    <MaterialIcons name="info-outline" size={14} color={Tokens.colors.textMuted} />
-                    <Text className="font-inter-medium text-[11px] text-text-muted">Pilih tanggal mulai dan akhir untuk ajukan cuti</Text>
+                  <View className="flex-row items-start gap-2 mt-2.5 pt-2.5 border-t border-black/5">
+                    <MaterialIcons name="info-outline" size={14} color={Tokens.colors.textMuted} style={{ marginTop: 2 }} />
+                    <Text className="font-inter-medium text-[11px] text-text-muted flex-1 leading-4">
+                      Pilih tanggal mulai dan akhir untuk ajukan cuti. Jika hanya <Text className="font-inter-bold">1 hari</Text>, pilih tanggal yang sama (contoh: klik tanggal 17, berarti mulai dan selesai di tanggal 17).
+                    </Text>
                   </View>
                 </GlassCard>
               )}
@@ -808,17 +839,23 @@ export default function LeaveScreen() {
 
                   <View className="flex-row gap-2 mt-3">
                     <Pressable
+                      onPress={pickImage}
+                      className="flex-1 py-3 rounded-xl bg-secondary-container items-center"
+                    >
+                      <Text className="font-inter-bold text-[12px] text-primary">Pilih Galeri</Text>
+                    </Pressable>
+                    <Pressable
                       onPress={pickDocument}
                       className="flex-1 py-3 rounded-xl bg-primary/5 border border-primary/10 items-center"
                     >
-                      <Text className="font-inter-bold text-[12px] text-primary">Upload File</Text>
+                      <Text className="font-inter-bold text-[12px] text-primary">Pilih Dokumen</Text>
                     </Pressable>
                   </View>
                 </GlassCard>
               ) : null}
 
               <Button
-                title="Submit Request"
+                title="Kirim Pengajuan Cuti"
                 onPress={handleCreate}
                 loading={createMutation.isPending}
                 className="mt-5 h-14 rounded-2xl"
@@ -989,40 +1026,6 @@ export default function LeaveScreen() {
                   </View>
                 ) : null}
 
-                <GlassCard style={{ padding: 16, marginBottom: 14 }}>
-                  <View className="flex-row items-center gap-3">
-                    <View className="w-16 h-16 rounded-2xl overflow-hidden bg-primary/10 items-center justify-center">
-                      {selectedLeaveDetail.employee?.photo_url ? (
-                        <Image
-                          source={{ uri: selectedLeaveDetail.employee.photo_url }}
-                          className="w-16 h-16"
-                          resizeMode="cover"
-                        />
-                      ) : (
-                        <Text className="font-manrope-extrabold text-lg text-primary">
-                          {(selectedLeaveDetail.employee?.full_name || selectedLeaveDetail.employee_id || '?').charAt(0).toUpperCase()}
-                        </Text>
-                      )}
-                    </View>
-                    <View className="flex-1">
-                      <Text className="font-manrope-bold text-lg text-on-surface" numberOfLines={1}>
-                        {selectedLeaveDetail.employee?.full_name || 'Karyawan'}
-                      </Text>
-                      <Text className="font-inter text-xs text-text-muted mt-0.5">
-                        {selectedLeaveDetail.employee?.nik || selectedLeaveDetail.employee_id || '-'}
-                      </Text>
-                      <View className="flex-row items-center gap-2 mt-2 flex-wrap">
-                        <StatusBadge label={getLeaveStatus(selectedLeaveDetail)} type={getStatusType(getLeaveStatus(selectedLeaveDetail)) as any} />
-                        {selectedLeaveDetail.document_url ? (
-                          <View className="bg-secondary-container px-2.5 py-1 rounded-full">
-                            <Text className="font-inter-bold text-[10px] text-on-surface uppercase tracking-wider">Ada dokumen</Text>
-                          </View>
-                        ) : null}
-                      </View>
-                    </View>
-                  </View>
-                </GlassCard>
-
                 <View className="flex-row flex-wrap -mx-1.5">
                   <View className="w-1/2 px-1.5 mb-3">
                     <GlassCard style={{ padding: 14, minHeight: 84 }}>
@@ -1077,28 +1080,47 @@ export default function LeaveScreen() {
                 <GlassCard style={{ padding: 14, marginBottom: 14 }}>
                   <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Dokumen Pendukung</Text>
                   {selectedLeaveDetail.document_url ? (
-                    <Pressable
-                      onPress={async () => {
-                        try {
-                          await Linking.openURL(selectedLeaveDetail.document_url as string);
-                        } catch {
-                          Alert.alert('Error', 'Gagal membuka dokumen');
-                        }
-                      }}
-                      className="mt-3 flex-row items-center justify-between rounded-2xl bg-primary/5 px-4 py-3"
-                    >
-                      <View className="flex-row items-center gap-2 flex-1 pr-3">
-                        <MaterialIcons name="description" size={18} color={Tokens.colors.primary} />
-                        <Text className="font-inter-bold text-sm text-primary" numberOfLines={1}>
-                          Buka dokumen lampiran
-                        </Text>
-                      </View>
-                      <MaterialIcons name="chevron-right" size={18} color={Tokens.colors.primary} />
-                    </Pressable>
+                    <View className="mt-3">
+                      {(() => {
+                        const rawUrl = selectedLeaveDetail.document_url as string;
+                        const fullUrl = rawUrl.startsWith('http')
+                          ? rawUrl
+                          : `${process.env.EXPO_PUBLIC_API_URL || 'https://hris.javasuperfood.com'}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`;
+
+                        return (
+                          <>
+                            {fullUrl.match(/\.(jpeg|jpg|gif|png)$/i) ? (
+                              <View className="w-full h-48 rounded-xl overflow-hidden mb-3 bg-black/5 border border-black/5">
+                                <Image
+                                  source={{ uri: fullUrl }}
+                                  className="w-full h-full"
+                                  resizeMode="cover"
+                                />
+                              </View>
+                            ) : null}
+                          </>
+                        );
+                      })()}
+                    </View>
                   ) : (
                     <Text className="font-inter text-sm text-text-muted mt-2">Tidak ada dokumen lampiran.</Text>
                   )}
                 </GlassCard>
+
+                {getLeaveStatus(selectedLeaveDetail) === 'PENDING' && (
+                  <Pressable
+                    onPress={() => {
+                      closeDetail();
+                      setTimeout(() => {
+                        handleCancel(selectedLeaveDetail.id);
+                      }, 300);
+                    }}
+                    className="mt-2 mb-4 flex-row items-center justify-center gap-2 bg-error/10 px-4 py-3.5 rounded-2xl"
+                  >
+                    <MaterialIcons name="close" size={18} color={Tokens.colors.error} />
+                    <Text className="font-inter-bold text-sm text-error uppercase tracking-wider">Batalkan Pengajuan</Text>
+                  </Pressable>
+                )}
               </ScrollView>
             )}
           </View>

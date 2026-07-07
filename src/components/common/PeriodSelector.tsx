@@ -6,18 +6,18 @@ import { Tokens } from '../../core/theme/tokens';
 type PeriodField = 'month' | 'year';
 
 const MONTH_OPTIONS = [
-  { value: 1, label: 'Jan' },
-  { value: 2, label: 'Feb' },
-  { value: 3, label: 'Mar' },
-  { value: 4, label: 'Apr' },
+  { value: 1, label: 'Januari' },
+  { value: 2, label: 'Februari' },
+  { value: 3, label: 'Maret' },
+  { value: 4, label: 'April' },
   { value: 5, label: 'Mei' },
-  { value: 6, label: 'Jun' },
-  { value: 7, label: 'Jul' },
-  { value: 8, label: 'Agt' },
-  { value: 9, label: 'Sep' },
-  { value: 10, label: 'Okt' },
-  { value: 11, label: 'Nov' },
-  { value: 12, label: 'Des' },
+  { value: 6, label: 'Juni' },
+  { value: 7, label: 'Juli' },
+  { value: 8, label: 'Agustus' },
+  { value: 9, label: 'September' },
+  { value: 10, label: 'Oktober' },
+  { value: 11, label: 'November' },
+  { value: 12, label: 'Desember' },
 ] as const;
 
 interface PeriodSelectorProps {
@@ -46,8 +46,13 @@ export function PeriodSelector({
 
   const resolvedYearOptions = useMemo(() => {
     if (yearOptions && yearOptions.length > 0) return yearOptions;
+
     const currentYear = new Date().getFullYear();
-    return Array.from({ length: 10 }, (_, index) => currentYear - index);
+
+    return Array.from(
+      { length: currentYear - 2025 + 1 },
+      (_, index) => 2025 + index
+    ).reverse();
   }, [yearOptions]);
 
   const selectedMonthLabel = MONTH_OPTIONS.find((item) => item.value === month)?.label || 'Pilih bulan';

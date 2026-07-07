@@ -21,6 +21,7 @@ expo-env.d.ts
 # Metro
 .metro-health-check*
 
+ServiceAccountHRIS.json
 # debug
 npm-debug.*
 yarn-debug.*
