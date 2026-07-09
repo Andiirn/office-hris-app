@@ -1,9 +1,9 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import * as DocumentPicker from 'expo-document-picker';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -35,13 +35,16 @@ export default function VisitScreen() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const router = useRouter();
+  const cameraRef = useRef<React.ElementRef<typeof CameraView> | null>(null);
 
   const [modalVisible, setModalVisible] = useState(false);
   const [locationName, setLocationName] = useState('');
   const [reason, setReason] = useState('');
-  const [photoFile, setPhotoFile] = useState<DocumentPicker.DocumentPickerAsset | null>(null);
+  const [photoFile, setPhotoFile] = useState<{ uri: string; name: string; mimeType?: string | null } | null>(null);
+  const [cameraVisible, setCameraVisible] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
 
   // Tab State
   const [activeTab, setActiveTab] = useState<'me' | 'team'>('me');
@@ -137,16 +140,31 @@ export default function VisitScreen() {
 
   const pickPhoto = async () => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['image/*'],
-        copyToCacheDirectory: true,
-        multiple: false,
-      });
-
-      if (result.canceled || !result.assets?.length) return;
-      setPhotoFile(result.assets[0]);
+      const permission = cameraPermission ?? (await requestCameraPermission());
+      if (!permission.granted) {
+        Alert.alert('Izin Kamera Diperlukan', 'Harap berikan izin kamera untuk mengambil foto kunjungan.');
+        return;
+      }
+      setCameraVisible(true);
     } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Gagal mengambil gambar');
+      Alert.alert('Error', error?.message || 'Gagal membuka kamera');
+    }
+  };
+
+  const capturePhoto = async () => {
+    try {
+      const camera = cameraRef.current;
+      if (!camera) return;
+      const photo = await camera.takePictureAsync({ quality: 0.8, skipProcessing: false });
+      if (!photo?.uri) return;
+      setPhotoFile({
+        uri: photo.uri,
+        name: `visit_${Date.now()}.jpg`,
+        mimeType: photo.format === 'png' ? 'image/png' : 'image/jpeg',
+      });
+      setCameraVisible(false);
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Gagal mengambil foto');
     }
   };
 
@@ -464,7 +482,7 @@ export default function VisitScreen() {
                       className="border border-dashed border-black/20 bg-black/5 rounded-2xl p-6 items-center justify-center flex-row gap-2 active:opacity-60"
                     >
                       <MaterialIcons name="photo-camera" size={20} color={Tokens.colors.primary} />
-                      <Text className="font-inter-bold text-sm text-primary">Ambil Foto / Pilih Gambar</Text>
+                      <Text className="font-inter-bold text-sm text-primary">Ambil Foto Langsung</Text>
                     </Pressable>
                   )}
                 </View>
@@ -505,6 +523,39 @@ export default function VisitScreen() {
       </Modal>
 
       {/* Photo Preview Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={cameraVisible}
+        onRequestClose={() => setCameraVisible(false)}
+      >
+        <View className="flex-1 bg-black">
+          <CameraView
+            ref={cameraRef}
+            style={{ flex: 1 }}
+            facing="back"
+          />
+          <View className="absolute top-0 left-0 right-0 px-5 pt-16 flex-row items-center justify-between">
+            <Pressable
+              className="w-10 h-10 rounded-full bg-black/40 items-center justify-center"
+              onPress={() => setCameraVisible(false)}
+            >
+              <MaterialIcons name="close" size={24} color="#ffffff" />
+            </Pressable>
+            <Text className="font-manrope-bold text-base text-white">Ambil Foto Kunjungan</Text>
+            <View className="w-10" />
+          </View>
+          <View className="absolute bottom-12 left-0 right-0 items-center">
+            <Pressable
+              className="w-20 h-20 rounded-full bg-white items-center justify-center border-4 border-white/40"
+              onPress={capturePhoto}
+            >
+              <View className="w-16 h-16 rounded-full bg-primary" />
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
       <Modal
         animationType="fade"
         transparent={true}
