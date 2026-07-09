@@ -102,7 +102,11 @@ export interface VisitRequest {
   visit_time: string;
   reason: string;
   location_name: string;
-  visit_photo_url?: string | null;
+  photo?: {
+    uri: string;
+    name: string;
+    type?: string | null;
+  } | null;
 }
 
 export interface VisitItem {
@@ -134,6 +138,8 @@ export interface VisitItem {
 
 export interface VisitListQuery {
   employee_id?: string;
+  company_id?: string;
+  branch_id?: string;
   status?: string;
   date_from?: string;
   date_to?: string;

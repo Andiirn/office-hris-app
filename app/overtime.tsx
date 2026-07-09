@@ -5,11 +5,14 @@ import { MotiView } from 'moti';
 import React, { useMemo, useState } from 'react';
 import {
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
@@ -31,13 +34,6 @@ import { CreateOvertimeRequest, OvertimeType } from '../src/types/overtime';
 import { getAttendanceBadgeProps } from '../src/utils/status';
 
 type OvertimeMode = 'attendance' | 'pre_submit';
-type TimeField = 'start_time' | 'end_time';
-
-const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
-  const hours = Math.floor(index / 2);
-  const minutes = index % 2 === 0 ? '00' : '30';
-  return `${String(hours).padStart(2, '0')}:${minutes}`;
-});
 
 const OVERTIME_TYPE_LABELS: Record<OvertimeType, string> = {
   REGULAR: 'Hari Kerja',
@@ -47,6 +43,20 @@ const OVERTIME_TYPE_LABELS: Record<OvertimeType, string> = {
 
 function formatLocalDate(value: Date) {
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+}
+
+function normalizeTimeInput(value: string) {
+  const digits = value.replace(/[^0-9]/g, '').slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+}
+
+function toTimeValue(value: string) {
+  const [hours = '', minutes = ''] = value.split(':');
+  const hh = Number(hours);
+  const mm = Number(minutes);
+  if (!hours || !minutes || Number.isNaN(hh) || Number.isNaN(mm) || hh > 23 || mm > 59) return null;
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 }
 
 function getOvertimeStatus(item: any) {
@@ -85,9 +95,7 @@ export default function OvertimeScreen() {
 
   const [modalVisible, setModalVisible] = useState(false);
   const [attendancePickerVisible, setAttendancePickerVisible] = useState(false);
-  const [timePickerVisible, setTimePickerVisible] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
-  const [timeField, setTimeField] = useState<TimeField>('start_time');
   const [mode, setMode] = useState<OvertimeMode>('attendance');
   const [showSuccessAnim, setShowSuccessAnim] = useState(false);
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
@@ -172,7 +180,6 @@ export default function OvertimeScreen() {
       ]);
       setModalVisible(false);
       setAttendancePickerVisible(false);
-      setTimePickerVisible(false);
       setShowSuccessAnim(true);
     },
     onError: (error: any) => {
@@ -187,7 +194,6 @@ export default function OvertimeScreen() {
   const resetAndClose = () => {
     setModalVisible(false);
     setAttendancePickerVisible(false);
-    setTimePickerVisible(false);
     setShowSuccessAnim(false);
   };
 
@@ -208,15 +214,6 @@ export default function OvertimeScreen() {
       overtime_date: attendance.attendance_date || attendance.date || prev.overtime_date,
     }));
     setAttendancePickerVisible(false);
-  };
-
-  const handleSelectTime = (value: string) => {
-    setForm(prev => {
-      const next = { ...prev };
-      next[timeField] = value;
-      return next;
-    });
-    setTimePickerVisible(false);
   };
 
   const resetForm = () => {
@@ -245,12 +242,19 @@ export default function OvertimeScreen() {
       return;
     }
 
+    const startTime = toTimeValue(form.start_time);
+    const endTime = toTimeValue(form.end_time);
+    if (!startTime || !endTime) {
+      Alert.alert('Error', 'Format jam harus HH:MM');
+      return;
+    }
+
     createMutation.mutate({
       ...form,
       attendance_id: mode === 'attendance' ? form.attendance_id : null,
       overtime_date: form.overtime_date,
-      start_time: toLocalDateTimeString(form.overtime_date, form.start_time),
-      end_time: toLocalDateTimeString(form.overtime_date, form.end_time),
+      start_time: toLocalDateTimeString(form.overtime_date, startTime),
+      end_time: toLocalDateTimeString(form.overtime_date, endTime),
     });
   };
 
@@ -287,12 +291,6 @@ export default function OvertimeScreen() {
       ? `${attendance.attendance_date || attendance.date || '-'} · ${formatOvertimeTime(attendance.checkin_at || attendance.checkin_time)}`
       : 'Attendance terpilih';
   }, [form.attendance_id, selectableAttendanceHistory]);
-
-  const selectedTimeLabel = (field: TimeField) => {
-    const value = form[field];
-    if (!value) return 'Pilih jam';
-    return value.includes('T') ? value.slice(11, 16) : value.slice(0, 5);
-  };
 
   const formatDateLabel = (value?: string | null) => {
     if (!value) return '-';
@@ -335,7 +333,7 @@ export default function OvertimeScreen() {
           </Pressable>
           <View className="flex-1">
             <Text className="font-manrope-extrabold text-3xl text-primary">Lembur</Text>
-            <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Ajukan lembur dari kehadiran atau manual</Text>
+            <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Riwayat & Pengajuan Lembur</Text>
           </View>
         </View>
         <Pressable
@@ -444,6 +442,12 @@ export default function OvertimeScreen() {
                           {item.attendance_date || item.overtime_date || item.created_at?.split('T')[0] || '-'}
                         </Text>
                       </View>
+                      <View className="flex-row items-center gap-1.5">
+                        <Text className="font-inter-medium text-xs text-text-muted mr-1">Dibuat:</Text>
+                        <Text className="font-inter-medium text-xs text-text-muted">
+                          {formatDateTimeLabel(item.created_at)}
+                        </Text>
+                      </View>
 
                     </View>
                     <View className="items-end">
@@ -479,250 +483,239 @@ export default function OvertimeScreen() {
 
       <Modal
         animationType="slide"
-        transparent
         visible={modalVisible}
         onRequestClose={resetAndClose}
       >
-        <View className="flex-1 bg-primary/40 justify-end">
-          <View className="bg-background rounded-t-[32px] p-6 max-h-[92%] shadow-2xl">
-            <View className="flex-row justify-between items-start mb-4">
-              <View>
-                <Text className="font-manrope-extrabold text-2xl text-primary">Ajukan Lembur</Text>
-                <Text className="font-inter-medium text-xs text-text-muted mt-0.5">Pilih mode pengajuan</Text>
+        <SafeAreaView className="flex-1 bg-background">
+          <KeyboardAvoidingView
+            className="flex-1"
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
+            <View className="flex-row justify-between items-start px-5 pt-2 pb-5">
+              <View className="flex-row items-center gap-3 flex-1">
+                <Pressable
+                  onPress={resetAndClose}
+                  className="w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm active:opacity-60"
+                  accessibilityRole="button"
+                  accessibilityLabel="Tutup form lembur"
+                >
+                  <MaterialIcons name="arrow-back" size={22} color={Tokens.colors.primary} />
+                </Pressable>
+                <View className="flex-1">
+                  <Text className="font-manrope-extrabold text-3xl text-primary">Pengajuan Lembur</Text>
+                  <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Pilih mode pengajuan</Text>
+                </View>
               </View>
-              <Pressable className="w-9 h-9 rounded-full bg-black/5 items-center justify-center" onPress={resetAndClose}>
-                <MaterialIcons name="close" size={20} color={Tokens.colors.text} />
-              </Pressable>
             </View>
 
-            <View className="flex-row gap-2 mb-5">
-              <Pressable
-                onPress={() => setMode('attendance')}
-                className={`flex-1 py-3 rounded-xl border items-center ${mode === 'attendance' ? 'bg-primary border-primary' : 'bg-[#f8f8f8] border-transparent'}`}
+            <View className="flex-1 relative">
+              <ScrollView
+                className="flex-1"
+                contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
               >
-                <Text className={`font-inter-bold text-[10px] ${mode === 'attendance' ? 'text-white' : 'text-text-muted'}`}>Dari Kehadiran</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setMode('pre_submit')}
-                className={`flex-1 py-3 rounded-xl border items-center ${mode === 'pre_submit' ? 'bg-primary border-primary' : 'bg-[#f8f8f8] border-transparent'}`}
-              >
-                <Text className={`font-inter-bold text-[10px] ${mode === 'pre_submit' ? 'text-white' : 'text-text-muted'}`}>Manual</Text>
-              </Pressable>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              {mode === 'attendance' ? (
-                <View className="mb-4">
-                  <Text className="font-inter-bold text-sm text-primary mb-3 ml-1">Pilih Kehadiran</Text>
+                <View className="flex-row gap-2 mb-5">
                   <Pressable
-                    className="flex-row items-center justify-between px-4 py-3 rounded-xl bg-[#f8f8f8]"
-                    onPress={async () => {
-                      setAttendancePickerVisible(true);
-                      await refetchAttendanceHistory();
-                    }}
+                    onPress={() => setMode('attendance')}
+                    className={`flex-1 py-3 rounded-xl border items-center ${mode === 'attendance' ? 'bg-primary border-primary' : 'bg-[#f8f8f8] border-transparent'}`}
                   >
-                    <View className="flex-1 pr-3">
-                      <Text className="font-inter-bold text-sm text-on-surface" numberOfLines={1}>{attendanceLabel}</Text>
-                      <Text className="font-inter-medium text-[10px] text-text-muted mt-1">Tap untuk pilih dari daftar kehadiran</Text>
-                    </View>
-                    <MaterialIcons name="keyboard-arrow-down" size={22} color={Tokens.colors.textMuted} />
+                    <Text className={`font-inter-bold text-[10px] ${mode === 'attendance' ? 'text-white' : 'text-text-muted'}`}>Dari Kehadiran</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setMode('pre_submit')}
+                    className={`flex-1 py-3 rounded-xl border items-center ${mode === 'pre_submit' ? 'bg-primary border-primary' : 'bg-[#f8f8f8] border-transparent'}`}
+                  >
+                    <Text className={`font-inter-bold text-[10px] ${mode === 'pre_submit' ? 'text-white' : 'text-text-muted'}`}>Manual</Text>
                   </Pressable>
                 </View>
-              ) : (
-                <View className="mb-4">
-                  <Text className="font-inter-bold text-sm text-primary mb-3 ml-1">Pilih Tanggal Lembur</Text>
-                  <GlassCard style={{ padding: 10 }}>
-                    <Calendar
-                      current={form.overtime_date}
-                      minDate={new Date().toISOString().slice(0, 10)}
-                      onDayPress={(day) => setForm(prev => ({ ...prev, overtime_date: day.dateString }))}
-                      markedDates={markedAttendanceDate}
-                      theme={{
-                        backgroundColor: 'transparent',
-                        calendarBackground: 'transparent',
-                        textSectionTitleColor: Tokens.colors.primary,
-                        selectedDayBackgroundColor: Tokens.colors.primary,
-                        selectedDayTextColor: '#ffffff',
-                        todayTextColor: Tokens.colors.primary,
-                        dayTextColor: Tokens.colors.text,
-                        textDisabledColor: Tokens.colors.outline,
-                        arrowColor: Tokens.colors.primary,
-                        monthTextColor: Tokens.colors.primary,
-                        textDayFontFamily: 'Inter_400Regular',
-                        textMonthFontFamily: 'Manrope_700Bold',
-                        textDayHeaderFontFamily: 'Inter_700Bold',
+
+                {mode === 'attendance' ? (
+                  <View className="mb-4">
+                    <Text className="font-inter-bold text-sm text-primary mb-3 ml-1">Pilih Kehadiran</Text>
+                    <Pressable
+                      className="flex-row items-center justify-between px-4 py-3 rounded-xl bg-[#f8f8f8]"
+                      onPress={async () => {
+                        setAttendancePickerVisible(true);
+                        await refetchAttendanceHistory();
                       }}
-                      style={{ borderRadius: 16 }}
-                    />
-                  </GlassCard>
+                    >
+                      <View className="flex-1 pr-3">
+                        <Text className="font-inter-bold text-sm text-on-surface" numberOfLines={1}>{attendanceLabel}</Text>
+                        <Text className="font-inter-medium text-[10px] text-text-muted mt-1">Tap untuk pilih dari daftar kehadiran</Text>
+                      </View>
+                      <MaterialIcons name="keyboard-arrow-down" size={22} color={Tokens.colors.textMuted} />
+                    </Pressable>
+                  </View>
+                ) : (
+                  <View className="mb-4">
+                    <Text className="font-inter-bold text-sm text-primary mb-3 ml-1">Pilih Tanggal Lembur</Text>
+                    <GlassCard style={{ padding: 10 }}>
+                      <Calendar
+                        current={form.overtime_date}
+                        minDate={new Date().toISOString().slice(0, 10)}
+                        onDayPress={(day) => setForm(prev => ({ ...prev, overtime_date: day.dateString }))}
+                        markedDates={markedAttendanceDate}
+                        theme={{
+                          backgroundColor: 'transparent',
+                          calendarBackground: 'transparent',
+                          textSectionTitleColor: Tokens.colors.primary,
+                          selectedDayBackgroundColor: Tokens.colors.primary,
+                          selectedDayTextColor: '#ffffff',
+                          todayTextColor: Tokens.colors.primary,
+                          dayTextColor: Tokens.colors.text,
+                          textDisabledColor: Tokens.colors.outline,
+                          arrowColor: Tokens.colors.primary,
+                          monthTextColor: Tokens.colors.primary,
+                          textDayFontFamily: 'Inter_400Regular',
+                          textMonthFontFamily: 'Manrope_700Bold',
+                          textDayHeaderFontFamily: 'Inter_700Bold',
+                        }}
+                        style={{ borderRadius: 16 }}
+                      />
+                    </GlassCard>
+                  </View>
+                )}
+
+                <Text className="font-inter-bold text-sm text-primary mb-3 ml-1">Tipe Lembur</Text>
+                <View className="flex-row gap-2 mb-5">
+                  {overtimeTypes.map((type) => (
+                    <Pressable
+                      key={type}
+                      onPress={() => setForm(prev => ({ ...prev, overtime_type: type }))}
+                      className={`flex-1 py-3 rounded-xl border items-center ${form.overtime_type === type ? 'bg-primary border-primary' : 'bg-[#f8f8f8] border-transparent'}`}
+                    >
+                      <Text className={`font-inter-bold text-[10px] ${form.overtime_type === type ? 'text-white' : 'text-text-muted'}`}>
+                        {OVERTIME_TYPE_LABELS[type]}
+                      </Text>
+                    </Pressable>
+                  ))}
                 </View>
-              )}
 
-              <Text className="font-inter-bold text-sm text-primary mb-3 ml-1">Tipe Lembur</Text>
-              <View className="flex-row gap-2 mb-5">
-                {overtimeTypes.map((type) => (
-                  <Pressable
-                    key={type}
-                    onPress={() => setForm(prev => ({ ...prev, overtime_type: type }))}
-                    className={`flex-1 py-3 rounded-xl border items-center ${form.overtime_type === type ? 'bg-primary border-primary' : 'bg-[#f8f8f8] border-transparent'}`}
-                  >
-                    <Text className={`font-inter-bold text-[10px] ${form.overtime_type === type ? 'text-white' : 'text-text-muted'}`}>
-                      {OVERTIME_TYPE_LABELS[type]}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
+                <Text className="font-inter-bold text-sm text-primary mb-3 ml-1">Waktu Lembur</Text>
+                <View className="flex-row gap-3 mb-5">
+                  <View className="flex-1 px-4 py-3 rounded-xl bg-[#f8f8f8]">
+                    <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Mulai</Text>
+                    <TextInput
+                      value={form.start_time}
+                      onChangeText={(text) => setForm(prev => ({ ...prev, start_time: normalizeTimeInput(text) }))}
+                      placeholder="18:00"
+                      keyboardType="number-pad"
+                      maxLength={5}
+                      className="font-inter-bold text-sm text-on-surface mt-1 p-0"
+                    />
+                  </View>
+                  <View className="flex-1 px-4 py-3 rounded-xl bg-[#f8f8f8]">
+                    <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Selesai</Text>
+                    <TextInput
+                      value={form.end_time}
+                      onChangeText={(text) => setForm(prev => ({ ...prev, end_time: normalizeTimeInput(text) }))}
+                      placeholder="21:00"
+                      keyboardType="number-pad"
+                      maxLength={5}
+                      className="font-inter-bold text-sm text-on-surface mt-1 p-0"
+                    />
+                  </View>
+                </View>
+                <Text className="font-inter text-[11px] text-text-muted -mt-3 mb-5 ml-1">Isi manual format `HH:MM`.</Text>
 
-              <Text className="font-inter-bold text-sm text-primary mb-3 ml-1">Waktu Lembur</Text>
-              <View className="flex-row gap-3 mb-5">
-                <Pressable
-                  className="flex-1 px-4 py-3 rounded-xl bg-[#f8f8f8]"
-                  onPress={() => {
-                    setTimeField('start_time');
-                    setTimePickerVisible(true);
-                  }}
-                >
-                  <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Mulai</Text>
-                  <Text className="font-inter-bold text-sm text-on-surface mt-1">{selectedTimeLabel('start_time')}</Text>
-                </Pressable>
-                <Pressable
-                  className="flex-1 px-4 py-3 rounded-xl bg-[#f8f8f8]"
-                  onPress={() => {
-                    setTimeField('end_time');
-                    setTimePickerVisible(true);
-                  }}
-                >
-                  <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Selesai</Text>
-                  <Text className="font-inter-bold text-sm text-on-surface mt-1">{selectedTimeLabel('end_time')}</Text>
-                </Pressable>
-              </View>
-
-              <Input
-                label="Alasan Lembur (Opsional)"
-                value={form.reason}
-                onChangeText={(text) => setForm(prev => ({ ...prev, reason: text }))}
-                placeholder="Selesaikan laporan bulanan..."
-                multiline
-                numberOfLines={3}
-                style={{ height: 80, textAlignVertical: 'top', paddingTop: 12 }}
-              />
-
-              <Button
-                title="Kirim Pengajuan"
-                onPress={handleCreate}
-                loading={createMutation.isPending}
-                disabled={createMutation.isPending}
-                className="mt-4 h-14 rounded-2xl"
-              />
-              <View className="h-8" />
-            </ScrollView>
-
-            {(attendancePickerVisible || timePickerVisible) ? (
-              <View className="absolute inset-0">
-                <Pressable
-                  className="absolute inset-0 bg-black/40"
-                  onPress={() => {
-                    setAttendancePickerVisible(false);
-                    setTimePickerVisible(false);
-                  }}
+                <Input
+                  label="Alasan Lembur (Opsional)"
+                  value={form.reason}
+                  onChangeText={(text) => setForm(prev => ({ ...prev, reason: text }))}
+                  placeholder="Selesaikan laporan bulanan..."
+                  multiline
+                  numberOfLines={3}
+                  style={{ height: 80, textAlignVertical: 'top', paddingTop: 12 }}
                 />
 
-                {attendancePickerVisible ? (
-                  <View className="absolute inset-x-0 bottom-0 bg-background rounded-t-[28px] p-5 max-h-[80%]">
-                    <View className="flex-row justify-between items-center mb-4">
-                      <View>
-                        <Text className="font-manrope-bold text-xl text-primary">Pilih Kehadiran</Text>
-                        <Text className="font-inter text-xs text-text-muted">Scroll lalu tap salah satu attendance</Text>
-                      </View>
-                      <Pressable onPress={() => setAttendancePickerVisible(false)} className="w-9 h-9 rounded-full bg-black/5 items-center justify-center">
-                        <MaterialIcons name="close" size={18} color={Tokens.colors.text} />
-                      </Pressable>
-                    </View>
+                <Button
+                  title="Kirim Pengajuan"
+                  onPress={handleCreate}
+                  loading={createMutation.isPending}
+                  disabled={createMutation.isPending}
+                  className="mt-4 h-14 rounded-2xl"
+                />
+              </ScrollView>
 
-                    <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                      {isLoadingAttendance ? (
-                        <Text className="font-inter text-sm text-text-muted py-6 text-center">Memuat attendance...</Text>
-                      ) : selectableAttendanceHistory.length === 0 ? (
-                        <View className="p-4 bg-black/5 rounded-xl border border-dashed border-outline">
-                          <Text className="font-inter text-xs text-text-muted text-center">Tidak ada data kehadiran terbaru</Text>
+              {attendancePickerVisible ? (
+                <View className="absolute inset-0">
+                  <Pressable
+                    className="absolute inset-0 bg-black/40"
+                    onPress={() => {
+                      setAttendancePickerVisible(false);
+                    }}
+                  />
+
+                  {attendancePickerVisible ? (
+                    <View className="absolute inset-x-0 bottom-0 bg-background rounded-t-[28px] p-5 max-h-[80%]">
+                      <View className="flex-row justify-between items-center mb-4">
+                        <View>
+                          <Text className="font-manrope-bold text-xl text-primary">Pilih Kehadiran</Text>
+                          <Text className="font-inter text-xs text-text-muted">Scroll lalu tap salah satu attendance</Text>
                         </View>
-                      ) : (
-                        selectableAttendanceHistory.slice(0, 30).map((att) => {
-                          const isSelected = form.attendance_id === att.id;
-                          return (
-                            <Pressable
-                              key={att.id}
-                              className={`p-4 rounded-xl border mb-2 ${isSelected ? 'bg-primary/5 border-primary' : 'bg-[#f8f8f8] border-transparent'}`}
-                              onPress={() => handlePickAttendance(att)}
-                            >
-                              <View className="flex-row justify-between items-center">
-                                <View className="flex-row items-center gap-3 flex-1">
-                                  <View className={`w-8 h-8 rounded-full items-center justify-center ${isSelected ? 'bg-primary' : 'bg-outline/20'}`}>
-                                    <MaterialIcons name="event" size={14} color={isSelected ? '#fff' : Tokens.colors.textMuted} />
-                                  </View>
-                                  <View className="flex-1">
-                                    <View className="flex-row items-center gap-2">
-                                      <Text className={`font-inter-bold text-sm ${isSelected ? 'text-primary' : 'text-on-surface'}`}>
-                                        {att.attendance_date || att.date}
-                                      </Text>
-                                      {att.attendance_status && (() => {
-                                        const badgeProps = getAttendanceBadgeProps(att.attendance_status);
-                                        return (
-                                          <View className={`px-1.5 py-0.5 rounded-md ${badgeProps.bgClass}`}>
-                                            <Text className={`font-inter-bold text-[8px] ${badgeProps.textClass}`}>
-                                              {badgeProps.label}
-                                            </Text>
-                                          </View>
-                                        );
-                                      })()}
-                                    </View>
-                                    <Text className="font-inter-medium text-[10px] text-text-muted">
-                                      {formatOvertimeTime(att.checkin_at || att.checkin_time)} - {formatOvertimeTime(att.checkout_at || att.checkout_time)}
-                                    </Text>
-                                  </View>
-                                </View>
-                                {isSelected ? <MaterialIcons name="check-circle" size={20} color={Tokens.colors.primary} /> : null}
-                              </View>
-                            </Pressable>
-                          );
-                        })
-                      )}
-                    </ScrollView>
-                  </View>
-                ) : null}
-
-                {timePickerVisible ? (
-                  <View className="absolute inset-x-0 bottom-0 bg-background rounded-t-[28px] p-5 max-h-[70%]">
-                    <View className="flex-row justify-between items-center mb-4">
-                      <View>
-                        <Text className="font-manrope-bold text-xl text-primary">Pilih Jam</Text>
-                        <Text className="font-inter text-xs text-text-muted">Scroll untuk memilih {timeField === 'start_time' ? 'start time' : 'end time'}</Text>
+                        <Pressable onPress={() => setAttendancePickerVisible(false)} className="w-9 h-9 rounded-full bg-black/5 items-center justify-center">
+                          <MaterialIcons name="close" size={18} color={Tokens.colors.text} />
+                        </Pressable>
                       </View>
-                      <Pressable onPress={() => setTimePickerVisible(false)} className="w-9 h-9 rounded-full bg-black/5 items-center justify-center">
-                        <MaterialIcons name="close" size={18} color={Tokens.colors.text} />
-                      </Pressable>
-                    </View>
 
-                    <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                      {TIME_OPTIONS.map((value) => {
-                        const active = selectedTimeLabel(timeField) === value;
-                        return (
-                          <Pressable
-                            key={value}
-                            onPress={() => handleSelectTime(value)}
-                            className={`px-4 py-3 rounded-xl mb-2 ${active ? 'bg-primary/5 border border-primary' : 'bg-[#f8f8f8]'}`}
-                          >
-                            <Text className={`font-inter-bold text-sm ${active ? 'text-primary' : 'text-on-surface'}`}>{value}</Text>
-                          </Pressable>
-                        );
-                      })}
-                    </ScrollView>
-                  </View>
-                ) : null}
-              </View>
-            ) : null}
-          </View>
-        </View>
+                      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                        {isLoadingAttendance ? (
+                          <Text className="font-inter text-sm text-text-muted py-6 text-center">Memuat attendance...</Text>
+                        ) : selectableAttendanceHistory.length === 0 ? (
+                          <View className="p-4 bg-black/5 rounded-xl border border-dashed border-outline">
+                            <Text className="font-inter text-xs text-text-muted text-center">Tidak ada data kehadiran terbaru</Text>
+                          </View>
+                        ) : (
+                          selectableAttendanceHistory.slice(0, 30).map((att) => {
+                            const isSelected = form.attendance_id === att.id;
+                            return (
+                              <Pressable
+                                key={att.id}
+                                className={`p-4 rounded-xl border mb-2 ${isSelected ? 'bg-primary/5 border-primary' : 'bg-[#f8f8f8] border-transparent'}`}
+                                onPress={() => handlePickAttendance(att)}
+                              >
+                                <View className="flex-row justify-between items-center">
+                                  <View className="flex-row items-center gap-3 flex-1">
+                                    <View className={`w-8 h-8 rounded-full items-center justify-center ${isSelected ? 'bg-primary' : 'bg-outline/20'}`}>
+                                      <MaterialIcons name="event" size={14} color={isSelected ? '#fff' : Tokens.colors.textMuted} />
+                                    </View>
+                                    <View className="flex-1">
+                                      <View className="flex-row items-center gap-2">
+                                        <Text className={`font-inter-bold text-sm ${isSelected ? 'text-primary' : 'text-on-surface'}`}>
+                                          {att.attendance_date || att.date}
+                                        </Text>
+                                        {att.attendance_status && (() => {
+                                          const badgeProps = getAttendanceBadgeProps(att.attendance_status);
+                                          return (
+                                            <View className={`px-1.5 py-0.5 rounded-md ${badgeProps.bgClass}`}>
+                                              <Text className={`font-inter-bold text-[8px] ${badgeProps.textClass}`}>
+                                                {badgeProps.label}
+                                              </Text>
+                                            </View>
+                                          );
+                                        })()}
+                                      </View>
+                                      <Text className="font-inter-medium text-[10px] text-text-muted">
+                                        {formatOvertimeTime(att.checkin_at || att.checkin_time)} - {formatOvertimeTime(att.checkout_at || att.checkout_time)}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                  {isSelected ? <MaterialIcons name="check-circle" size={20} color={Tokens.colors.primary} /> : null}
+                                </View>
+                              </Pressable>
+                            );
+                          })
+                        )}
+                      </ScrollView>
+                    </View>
+                  ) : null}
+
+                </View>
+              ) : null}
+            </View>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
       </Modal>
 
       <Modal

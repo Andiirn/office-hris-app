@@ -9,11 +9,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
   Text,
+  TextInput,
   View
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
@@ -33,23 +36,35 @@ import { leaveService } from '../src/services/leave.service';
 import { useAuthStore } from '../src/stores/auth.store';
 import { CreateLeaveRequest } from '../src/types/leave';
 
-const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
-  const hours = Math.floor(index / 2);
-  const minutes = index % 2 === 0 ? '00' : '30';
-  return `${String(hours).padStart(2, '0')}:${minutes}`;
-});
-
-type TimeField = 'start_time' | 'end_time';
-
 function formatTime(timeStr?: string | null) {
   if (!timeStr) return '--:--';
   if (timeStr.includes('T')) return timeStr.split('T')[1].slice(0, 5);
   return timeStr.slice(0, 5);
 }
 
+function normalizeTimeInput(value: string) {
+  const digits = value.replace(/[^0-9]/g, '').slice(0, 4);
+  if (digits.length <= 2) return digits;
+  return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+}
+
+function toTimeValue(value?: string | null) {
+  if (!value) return null;
+  const [hours = '', minutes = ''] = value.split(':');
+  const hh = Number(hours);
+  const mm = Number(minutes);
+  if (!hours || !minutes || Number.isNaN(hh) || Number.isNaN(mm) || hh > 23 || mm > 59) return null;
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+}
+
 function isHourlyLeaveType(type?: { code?: string | null; name?: string | null; category?: string | null } | null) {
   const haystack = `${type?.code || ''} ${type?.name || ''} ${type?.category || ''}`.toLowerCase();
   return /hour|jam|per\s*jam|hourly/.test(haystack);
+}
+
+function allowsReplacement(type?: { code?: string | null; name?: string | null; category?: string | null } | null) {
+  const haystack = `${type?.code || ''} ${type?.name || ''} ${type?.category || ''}`.toLowerCase();
+  return /khusus|tahunan/.test(haystack);
 }
 
 function formatLeaveTypeName(name?: string | null) {
@@ -74,9 +89,7 @@ export default function LeaveScreen() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [modalVisible, setModalVisible] = useState(false);
   const [replacementModalVisible, setReplacementModalVisible] = useState(false);
-  const [timePickerVisible, setTimePickerVisible] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
-  const [timeField, setTimeField] = useState<TimeField>('start_time');
   const [selectedDetailId, setSelectedDetailId] = useState<string | null>(null);
   const [selectedRange, setSelectedRange] = useState<{ start?: string, end?: string }>({});
   const [selectedHourlyDate, setSelectedHourlyDate] = useState<string>(new Date().toISOString().slice(0, 10));
@@ -141,6 +154,7 @@ export default function LeaveScreen() {
     [form.leave_type_id, leaveTypes],
   );
   const isHourlyLeave = isHourlyLeaveType(selectedLeaveType);
+  const canChooseReplacement = allowsReplacement(selectedLeaveType);
 
   const { data: colleagues = [], isLoading: isLoadingColleagues } = useQuery({
     queryKey: ['colleagues', profile?.division_id, debouncedSearch],
@@ -177,7 +191,6 @@ export default function LeaveScreen() {
       ]);
 
       setModalVisible(false);
-      setTimePickerVisible(false);
       setSelectedRange({});
       setSelectedHourlyDate(new Date().toISOString().slice(0, 10));
       setDocumentFile(null);
@@ -346,16 +359,20 @@ export default function LeaveScreen() {
     }
 
     if (isHourlyLeave) {
-      if (!payload.start_time || !payload.end_time) {
-        Alert.alert('Error', 'Pilih jam mulai dan jam selesai');
+      const startTime = toTimeValue(payload.start_time);
+      const endTime = toTimeValue(payload.end_time);
+      if (!startTime || !endTime) {
+        Alert.alert('Upss!', 'Pilih jam mulai dan jam selesai dahulu');
         return;
       }
+      payload.start_time = startTime;
+      payload.end_time = endTime;
     } else if (!payload.start_date || !payload.end_date) {
-      Alert.alert('Error', 'Pilih tanggal mulai dan selesai');
+      Alert.alert('Upss!', 'Pilih tanggal dahulu');
       return;
     }
 
-    console.log('[Leave] Submitting payload:', payload);
+    // console.log('[Leave] Submitting payload:', payload);
     createMutation.mutate({
       request: payload,
       documentFile,
@@ -371,6 +388,7 @@ export default function LeaveScreen() {
   const handleSelectLeaveType = (typeId: string) => {
     const nextType = leaveTypes.find((type) => type.id === typeId);
     const nextIsHourly = isHourlyLeaveType(nextType);
+    const nextCanChooseReplacement = allowsReplacement(nextType);
 
     setForm((prev) => ({
       ...prev,
@@ -379,10 +397,14 @@ export default function LeaveScreen() {
       end_date: nextIsHourly ? selectedHourlyDate : prev.end_date,
       start_time: nextIsHourly ? prev.start_time : '',
       end_time: nextIsHourly ? prev.end_time : '',
+      replacement_id: nextCanChooseReplacement ? prev.replacement_id : '',
     }));
     setSelectedRange({});
     setSelectedHourlyDate(today);
-    setTimePickerVisible(false);
+    if (!nextCanChooseReplacement) {
+      setReplacementModalVisible(false);
+      setColleagueSearch('');
+    }
   };
 
   const pickImage = async () => {
@@ -427,9 +449,12 @@ export default function LeaveScreen() {
 
   const clearDocument = () => setDocumentFile(null);
 
-  const handleSelectTime = (value: string) => {
-    setForm((prev) => ({ ...prev, [timeField]: value }));
-    setTimePickerVisible(false);
+  const resetAndCloseCreate = () => {
+    setModalVisible(false);
+    setSelectedRange({});
+    setDocumentFile(null);
+    setColleagueSearch('');
+    setReplacementModalVisible(false);
   };
 
   const resetForm = () => {
@@ -446,15 +471,8 @@ export default function LeaveScreen() {
     setSelectedHourlyDate(new Date().toISOString().slice(0, 10));
     setDocumentFile(null);
     setColleagueSearch('');
-    setTimePickerVisible(false);
     setReplacementModalVisible(false);
     setModalVisible(false);
-  };
-
-  const selectedTimeLabel = (field: TimeField) => {
-    const value = form[field];
-    if (!value) return 'Pilih jam';
-    return formatTime(value);
   };
 
   const handleCancel = (id: string) => {
@@ -608,6 +626,12 @@ export default function LeaveScreen() {
                             {dateDisplay}
                           </Text>
                         </View>
+                        <View className="flex-row items-center gap-1.5 mt-1">
+                          <Text className="font-inter-medium text-xs text-text-muted mr-1">Dibuat:</Text>
+                          <Text className="font-inter-medium text-xs text-text-muted">
+                            {formatDateTimeLabel(item.created_at)}
+                          </Text>
+                        </View>
                       </View>
                       <StatusBadge label={status} type={getStatusType(status) as any} />
                     </View>
@@ -620,90 +644,139 @@ export default function LeaveScreen() {
       </ScrollView>
 
       <Modal
-        animationType="fade"
-        transparent={true}
+        animationType="slide"
         visible={modalVisible}
-        onRequestClose={() => {
-          setModalVisible(false);
-          setSelectedRange({});
-          setTimePickerVisible(false);
-          setDocumentFile(null);
-          setColleagueSearch('');
-        }}
+        onRequestClose={resetAndCloseCreate}
       >
-        <View className="flex-1 bg-black/40 justify-end">
-          <View className="bg-background rounded-t-[32px] p-6 pb-12 max-h-[90%] shadow-2xl">
-            <View className="flex-row justify-between items-start mb-6">
-              <View>
-                <Text className="font-manrope-extrabold text-2xl text-primary">Pengajuan {formatLeaveTypeName(selectedLeaveType?.name)}</Text>
-              </View>
+        <SafeAreaView className="flex-1 bg-background">
+          <KeyboardAvoidingView
+            className="flex-1"
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
+            <View className="flex-row items-center px-5 pt-2 pb-4 z-10">
               <Pressable
-                className="w-9 h-9 rounded-full bg-black/5 items-center justify-center"
-                onPress={() => {
-                  setModalVisible(false);
-                  setSelectedRange({});
-                  setTimePickerVisible(false);
-                  setColleagueSearch('');
-                }}
+                onPress={resetAndCloseCreate}
+                className="w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm active:opacity-60"
+                style={{ flexShrink: 0 }}
+                accessibilityRole="button"
+                accessibilityLabel="Tutup form cuti"
               >
-                <MaterialIcons name="close" size={20} color={Tokens.colors.text} />
+                <MaterialIcons name="arrow-back" size={22} color={Tokens.colors.primary} />
               </Pressable>
+              <View className="flex-1 min-w-0 ml-3 pr-1">
+                <Text className="font-manrope-extrabold text-[26px] leading-[32px] text-primary" numberOfLines={1} ellipsizeMode="tail">
+                  Pengajuan Izin & Cuti
+                </Text>
+                <Text className="font-inter-medium text-sm text-text-muted mt-0.5" numberOfLines={1}>
+                  Pilih jenis pengajuan
+                </Text>
+              </View>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <GlassCard style={{ padding: 16, marginBottom: 20 }}>
-                <View className="flex-row items-center justify-between mb-3">
-                  <View>
-                    <Text className="font-manrope-bold text-lg text-primary">Pilih Tipe</Text>
-                    <Text className="font-inter text-xs text-text-muted mt-1">Pilih jenis pengajuan</Text>
+            <View className="flex-1 relative">
+              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 48 }}>
+                <GlassCard style={{ padding: 16, marginBottom: 20 }}>
+                  <View className="flex-row items-center justify-between mb-3">
+                    <View>
+                      <Text className="font-manrope-bold text-lg text-primary">Pilih Tipe</Text>
+                    </View>
                   </View>
-                  {selectedLeaveType ? (
-                    <View className="bg-primary/10 px-3 py-1.5 rounded-full">
-                      <Text className="font-inter-bold text-[10px] text-primary uppercase tracking-wider">
-                        {isHourlyLeave ? 'Izin per jam' : 'Cuti / Izin'}
+
+                  {leaveTypes.length === 0 ? (
+                    <Text className="font-inter text-sm text-text-muted">Memuat tipe pengajuan...</Text>
+                  ) : (
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ paddingRight: 4 }}
+                    >
+                      <View className="flex-row gap-2.5">
+                        {leaveTypes.map((type) => {
+                          const active = form.leave_type_id === type.id;
+                          return (
+                            <Pressable
+                              key={type.id}
+                              className={`px-4 py-2.5 rounded-full border ${active ? 'bg-primary border-primary' : 'bg-primary/5 border-primary/10'}`}
+                              onPress={() => handleSelectLeaveType(type.id)}
+                            >
+                              <Text className={`font-inter-bold text-[13px] ${active ? 'text-white' : 'text-primary'}`}>
+                                {formatLeaveTypeName(type.name)}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </ScrollView>
+                  )}
+                </GlassCard>
+
+                {isHourlyLeave ? (
+                  <GlassCard style={{ padding: 14, marginBottom: 16 }}>
+                    <Text className="font-inter-bold text-sm text-primary mb-2">Izin per jam</Text>
+                    <Text className="font-inter text-xs text-text-muted">
+                      Pilih tanggal dulu, lalu isi jam mulai dan selesai.
+                    </Text>
+                    <View className="mt-4">
+                      <Calendar
+                        current={selectedHourlyDate}
+                        onDayPress={(day) => setSelectedHourlyDate(day.dateString)}
+                        markedDates={{
+                          [selectedHourlyDate]: {
+                            selected: true,
+                            selectedColor: Tokens.colors.primary,
+                          },
+                        }}
+                        theme={{
+                          backgroundColor: 'transparent',
+                          calendarBackground: 'transparent',
+                          textSectionTitleColor: Tokens.colors.primary,
+                          selectedDayBackgroundColor: Tokens.colors.primary,
+                          selectedDayTextColor: '#ffffff',
+                          todayTextColor: Tokens.colors.primary,
+                          dayTextColor: Tokens.colors.text,
+                          textDisabledColor: Tokens.colors.outline,
+                          arrowColor: Tokens.colors.primary,
+                          monthTextColor: Tokens.colors.primary,
+                          textDayFontFamily: 'Inter_500Medium',
+                          textMonthFontFamily: 'Manrope_700Bold',
+                          textDayHeaderFontFamily: 'Inter_700Bold',
+                        }}
+                        style={{ borderRadius: 16 }}
+                      />
+                      <Text className="font-inter text-[11px] text-text-muted mt-2 text-center">
+                        Tanggal terpilih: {selectedHourlyDate}
                       </Text>
                     </View>
-                  ) : null}
-                </View>
-
-                {leaveTypes.length === 0 ? (
-                  <Text className="font-inter text-sm text-text-muted">Memuat tipe pengajuan...</Text>
+                    <View className="flex-row gap-3 mt-4">
+                      <View className="flex-1 px-4 py-3 rounded-xl bg-[#f8f8f8]">
+                        <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Mulai</Text>
+                        <TextInput
+                          value={form.start_time || ''}
+                          onChangeText={(text) => setForm((prev) => ({ ...prev, start_time: normalizeTimeInput(text) }))}
+                          placeholder="08:00"
+                          keyboardType="number-pad"
+                          maxLength={5}
+                          className="font-inter-bold text-sm text-on-surface mt-1 p-0"
+                        />
+                      </View>
+                      <View className="flex-1 px-4 py-3 rounded-xl bg-[#f8f8f8]">
+                        <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Selesai</Text>
+                        <TextInput
+                          value={form.end_time || ''}
+                          onChangeText={(text) => setForm((prev) => ({ ...prev, end_time: normalizeTimeInput(text) }))}
+                          placeholder="10:00"
+                          keyboardType="number-pad"
+                          maxLength={5}
+                          className="font-inter-bold text-sm text-on-surface mt-1 p-0"
+                        />
+                      </View>
+                    </View>
+                    <Text className="font-inter text-[11px] text-text-muted mt-2">Isi manual format `HH:MM`.</Text>
+                  </GlassCard>
                 ) : (
-                  <View className="flex-row flex-wrap gap-2.5">
-                    {leaveTypes.map((type) => {
-                      const active = form.leave_type_id === type.id;
-                      return (
-                        <Pressable
-                          key={type.id}
-                          className={`px-4 py-2.5 rounded-full border ${active ? 'bg-primary border-primary' : 'bg-primary/5 border-primary/10'}`}
-                          onPress={() => handleSelectLeaveType(type.id)}
-                        >
-                          <Text className={`font-inter-bold text-[13px] ${active ? 'text-white' : 'text-primary'}`}>
-                            {formatLeaveTypeName(type.name)}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                )}
-              </GlassCard>
-
-              {isHourlyLeave ? (
-                <GlassCard style={{ padding: 14, marginBottom: 16 }}>
-                  <Text className="font-inter-bold text-sm text-primary mb-2">Izin per jam</Text>
-                  <Text className="font-inter text-xs text-text-muted">
-                    Pilih tanggal dulu, lalu isi jam mulai dan selesai.
-                  </Text>
-                  <View className="mt-4">
+                  <GlassCard style={{ padding: 10, marginBottom: 16 }}>
                     <Calendar
-                      current={selectedHourlyDate}
-                      onDayPress={(day) => setSelectedHourlyDate(day.dateString)}
-                      markedDates={{
-                        [selectedHourlyDate]: {
-                          selected: true,
-                          selectedColor: Tokens.colors.primary,
-                        },
-                      }}
+                      current={selectedRange.start || form.start_date || today}
                       theme={{
                         backgroundColor: 'transparent',
                         calendarBackground: 'transparent',
@@ -713,242 +786,164 @@ export default function LeaveScreen() {
                         todayTextColor: Tokens.colors.primary,
                         dayTextColor: Tokens.colors.text,
                         textDisabledColor: Tokens.colors.outline,
+                        dotColor: Tokens.colors.primary,
+                        selectedDotColor: '#ffffff',
                         arrowColor: Tokens.colors.primary,
                         monthTextColor: Tokens.colors.primary,
+                        indicatorColor: Tokens.colors.primary,
                         textDayFontFamily: 'Inter_500Medium',
                         textMonthFontFamily: 'Manrope_700Bold',
                         textDayHeaderFontFamily: 'Inter_700Bold',
+                        textDayFontSize: 12,
+                        textMonthFontSize: 16,
+                        textDayHeaderFontSize: 12
                       }}
-                      style={{ borderRadius: 16 }}
+                      markingType={'period'}
+                      markedDates={markedDates}
+                      onDayPress={onDayPress}
                     />
-                    <Text className="font-inter text-[11px] text-text-muted mt-2 text-center">
-                      Tanggal terpilih: {selectedHourlyDate}
+                    <View className="flex-row items-start gap-2 mt-2.5 pt-2.5 border-t border-black/5">
+                      <MaterialIcons name="info-outline" size={14} color={Tokens.colors.textMuted} style={{ marginTop: 2 }} />
+                      <Text className="font-inter-medium text-[11px] text-text-muted flex-1 leading-4">
+                        Pilih tanggal mulai dan akhir untuk ajukan cuti. Jika hanya <Text className="font-inter-bold">1 hari</Text>, pilih tanggal yang sama (contoh: klik tanggal 17, berarti mulai dan selesai di tanggal 17).
+                      </Text>
+                    </View>
+                  </GlassCard>
+                )}
+
+                <Input
+                  label="Alasan"
+                  value={form.reason}
+                  onChangeText={(text) => setForm({ ...form, reason: text })}
+                  placeholder="Masukkan Alasan Cuti?"
+                  multiline
+                  numberOfLines={3}
+                  style={{ height: 100, textAlignVertical: 'top', paddingTop: 12 }}
+                />
+
+                {canChooseReplacement ? (
+                  <GlassCard style={{ padding: 14, marginTop: 12 }}>
+                    <Text className="font-inter-bold text-sm text-primary mb-2">Pengganti (Opsional)</Text>
+                    <Text className="font-inter text-xs text-text-muted mb-3">
+                      Pilih rekan 1 divisi untuk menggantikan Anda selama cuti. Jika tidak ada rekan 1 divisi, kosongkan.
                     </Text>
-                  </View>
-                  <View className="flex-row gap-3 mt-4">
                     <Pressable
-                      className="flex-1 px-4 py-3 rounded-xl bg-[#f8f8f8]"
-                      onPress={() => {
-                        setTimeField('start_time');
-                        setTimePickerVisible(true);
-                      }}
+                      onPress={() => setReplacementModalVisible(true)}
+                      className="flex-row items-center justify-between px-4 py-3 bg-black/5 rounded-xl border border-outline"
                     >
-                      <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Mulai</Text>
-                      <Text className="font-inter-bold text-sm text-on-surface mt-1">{selectedTimeLabel('start_time')}</Text>
+                      <Text className={`font-inter-medium text-sm ${form.replacement_id ? 'text-black' : 'text-text-muted'}`}>
+                        {form.replacement_id
+                          ? colleagues.find(c => c.id === form.replacement_id)?.full_name || 'Karyawan Terpilih'
+                          : 'Pilih Pengganti'}
+                      </Text>
+                      <MaterialIcons name="chevron-right" size={20} color={Tokens.colors.textMuted} />
                     </Pressable>
-                    <Pressable
-                      className="flex-1 px-4 py-3 rounded-xl bg-[#f8f8f8]"
-                      onPress={() => {
-                        setTimeField('end_time');
-                        setTimePickerVisible(true);
-                      }}
-                    >
-                      <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Selesai</Text>
-                      <Text className="font-inter-bold text-sm text-on-surface mt-1">{selectedTimeLabel('end_time')}</Text>
-                    </Pressable>
-                  </View>
-                </GlassCard>
-              ) : (
-                <GlassCard style={{ padding: 10, marginBottom: 16 }}>
-                  <Calendar
-                    current={selectedRange.start || form.start_date || today}
-                    theme={{
-                      backgroundColor: 'transparent',
-                      calendarBackground: 'transparent',
-                      textSectionTitleColor: Tokens.colors.primary,
-                      selectedDayBackgroundColor: Tokens.colors.primary,
-                      selectedDayTextColor: '#ffffff',
-                      todayTextColor: Tokens.colors.primary,
-                      dayTextColor: Tokens.colors.text,
-                      textDisabledColor: Tokens.colors.outline,
-                      dotColor: Tokens.colors.primary,
-                      selectedDotColor: '#ffffff',
-                      arrowColor: Tokens.colors.primary,
-                      monthTextColor: Tokens.colors.primary,
-                      indicatorColor: Tokens.colors.primary,
-                      textDayFontFamily: 'Inter_500Medium',
-                      textMonthFontFamily: 'Manrope_700Bold',
-                      textDayHeaderFontFamily: 'Inter_700Bold',
-                      textDayFontSize: 12,
-                      textMonthFontSize: 16,
-                      textDayHeaderFontSize: 12
-                    }}
-                    markingType={'period'}
-                    markedDates={markedDates}
-                    onDayPress={onDayPress}
-                  />
-                  <View className="flex-row items-start gap-2 mt-2.5 pt-2.5 border-t border-black/5">
-                    <MaterialIcons name="info-outline" size={14} color={Tokens.colors.textMuted} style={{ marginTop: 2 }} />
-                    <Text className="font-inter-medium text-[11px] text-text-muted flex-1 leading-4">
-                      Pilih tanggal mulai dan akhir untuk ajukan cuti. Jika hanya <Text className="font-inter-bold">1 hari</Text>, pilih tanggal yang sama (contoh: klik tanggal 17, berarti mulai dan selesai di tanggal 17).
+                  </GlassCard>
+                ) : null}
+
+                {requiresDocument ? (
+                  <GlassCard style={{ padding: 14, marginTop: 12 }}>
+                    <Text className="font-inter-bold text-sm text-primary mb-2">Dokumen Pendukung</Text>
+                    <Text className="font-inter text-xs text-text-muted mb-3">
+                      Jika tidak melampirkan dokumen, akan dikenakan potongan gaji
                     </Text>
-                  </View>
-                </GlassCard>
-              )}
 
-              <Input
-                label="Alasan"
-                value={form.reason}
-                onChangeText={(text) => setForm({ ...form, reason: text })}
-                placeholder="Masukkan Alasan Cuti?"
-                multiline
-                numberOfLines={3}
-                style={{ height: 100, textAlignVertical: 'top', paddingTop: 12 }}
-              />
-
-              <GlassCard style={{ padding: 14, marginTop: 12 }}>
-                <Text className="font-inter-bold text-sm text-primary mb-2">Pengganti (Opsional)</Text>
-                <Text className="font-inter text-xs text-text-muted mb-3">
-                  Pilih rekan 1 divisi untuk menggantikan Anda selama cuti.
-                </Text>
-                <Pressable
-                  onPress={() => setReplacementModalVisible(true)}
-                  className="flex-row items-center justify-between px-4 py-3 bg-black/5 rounded-xl border border-outline"
-                >
-                  <Text className={`font-inter-medium text-sm ${form.replacement_id ? 'text-black' : 'text-text-muted'}`}>
-                    {form.replacement_id
-                      ? colleagues.find(c => c.id === form.replacement_id)?.full_name || 'Karyawan Terpilih'
-                      : 'Pilih Pengganti'}
-                  </Text>
-                  <MaterialIcons name="chevron-right" size={20} color={Tokens.colors.textMuted} />
-                </Pressable>
-              </GlassCard>
-
-              {requiresDocument ? (
-                <GlassCard style={{ padding: 14, marginTop: 12 }}>
-                  <Text className="font-inter-bold text-sm text-primary mb-2">Dokumen Pendukung</Text>
-                  <Text className="font-inter text-xs text-text-muted mb-3">
-                    Opsional. Kalau ada surat dokter / bukti sakit, silakan upload. Kalau tidak, langsung kirim saja.
-                  </Text>
-
-                  {documentFile ? (
-                    <View className="flex-row items-center justify-between bg-black/5 px-3 py-3 rounded-xl">
-                      <View className="flex-1 pr-3">
-                        <Text className="font-inter-bold text-sm text-on-surface" numberOfLines={1}>
-                          {documentFile.name}
-                        </Text>
-                        <Text className="font-inter text-[10px] text-text-muted mt-1">
-                          {documentFile.mimeType || 'file'}
-                        </Text>
+                    {documentFile ? (
+                      <View className="flex-row items-center justify-between bg-black/5 px-3 py-3 rounded-xl">
+                        <View className="flex-1 pr-3">
+                          <Text className="font-inter-bold text-sm text-on-surface" numberOfLines={1}>
+                            {documentFile.name}
+                          </Text>
+                          <Text className="font-inter text-[10px] text-text-muted mt-1">
+                            {documentFile.mimeType || 'file'}
+                          </Text>
+                        </View>
+                        <Pressable onPress={clearDocument} className="w-8 h-8 rounded-full bg-white items-center justify-center">
+                          <MaterialIcons name="close" size={18} color={Tokens.colors.error} />
+                        </Pressable>
                       </View>
-                      <Pressable onPress={clearDocument} className="w-8 h-8 rounded-full bg-white items-center justify-center">
-                        <MaterialIcons name="close" size={18} color={Tokens.colors.error} />
+                    ) : null}
+
+                    <View className="flex-row gap-2 mt-3">
+                      <Pressable
+                        onPress={pickImage}
+                        className="flex-1 py-3 rounded-xl bg-secondary-container items-center"
+                      >
+                        <Text className="font-inter-bold text-[12px] text-primary">Pilih Galeri</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={pickDocument}
+                        className="flex-1 py-3 rounded-xl bg-primary/5 border border-primary/10 items-center"
+                      >
+                        <Text className="font-inter-bold text-[12px] text-primary">Pilih Dokumen</Text>
                       </Pressable>
                     </View>
-                  ) : null}
+                  </GlassCard>
+                ) : null}
 
-                  <View className="flex-row gap-2 mt-3">
-                    <Pressable
-                      onPress={pickImage}
-                      className="flex-1 py-3 rounded-xl bg-secondary-container items-center"
-                    >
-                      <Text className="font-inter-bold text-[12px] text-primary">Pilih Galeri</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={pickDocument}
-                      className="flex-1 py-3 rounded-xl bg-primary/5 border border-primary/10 items-center"
-                    >
-                      <Text className="font-inter-bold text-[12px] text-primary">Pilih Dokumen</Text>
-                    </Pressable>
-                  </View>
-                </GlassCard>
-              ) : null}
-
-              <Button
-                title="Kirim Pengajuan Cuti"
-                onPress={handleCreate}
-                loading={createMutation.isPending}
-                className="mt-5 h-14 rounded-2xl"
-              />
-              <View className="h-10" />
-              <View className="h-6" />
-            </ScrollView>
-          </View>
-        </View>
-
-        {timePickerVisible && (
-          <View className="absolute inset-0 z-50 flex-1 bg-black/40 justify-end">
-            <View className="bg-background rounded-t-[28px] p-5 max-h-[70%]">
-              <View className="flex-row justify-between items-center mb-4">
-                <View>
-                  <Text className="font-manrope-bold text-xl text-primary">Pilih Jam</Text>
-                  <Text className="font-inter text-xs text-text-muted">Scroll untuk memilih {timeField === 'start_time' ? 'start time' : 'end time'}</Text>
-                </View>
-                <Pressable onPress={() => setTimePickerVisible(false)} className="w-9 h-9 rounded-full bg-black/5 items-center justify-center">
-                  <MaterialIcons name="close" size={18} color={Tokens.colors.text} />
-                </Pressable>
-              </View>
-
-              <ScrollView showsVerticalScrollIndicator={false}>
-                {TIME_OPTIONS.map((value) => {
-                  const active = selectedTimeLabel(timeField) === value;
-                  return (
-                    <Pressable
-                      key={value}
-                      onPress={() => handleSelectTime(value)}
-                      className={`px-4 py-3 rounded-xl mb-2 ${active ? 'bg-primary/5 border border-primary' : 'bg-[#f8f8f8]'}`}
-                    >
-                      <Text className={`font-inter-bold text-sm ${active ? 'text-primary' : 'text-on-surface'}`}>{value}</Text>
-                    </Pressable>
-                  );
-                })}
+                <Button
+                  title="Kirim Pengajuan Cuti"
+                  onPress={handleCreate}
+                  loading={createMutation.isPending}
+                  className="mt-5 h-14 rounded-2xl"
+                />
               </ScrollView>
-            </View>
-          </View>
-        )}
 
-        {replacementModalVisible && (
-          <View className="absolute inset-0 z-50 flex-1 bg-black/40 justify-end">
-            <View className="bg-background rounded-t-[28px] p-5 h-[80%] shadow-2xl">
-              <View className="flex-row justify-between items-center mb-4">
-                <View>
-                  <Text className="font-manrope-bold text-xl text-primary">Pilih Pengganti</Text>
-                  <Text className="font-inter text-xs text-text-muted">Cari rekan 1 divisi</Text>
-                </View>
-                <Pressable onPress={() => { setReplacementModalVisible(false); setColleagueSearch(''); }} className="w-9 h-9 rounded-full bg-black/5 items-center justify-center">
-                  <MaterialIcons name="close" size={18} color={Tokens.colors.text} />
-                </Pressable>
-              </View>
-
-              <Input
-                placeholder="Cari nama karyawan..."
-                value={colleagueSearch}
-                onChangeText={setColleagueSearch}
-              />
-
-              <ScrollView showsVerticalScrollIndicator={false} className="mt-4">
-                {isLoadingColleagues ? (
-                  <Text className="font-inter text-center text-sm text-text-muted mt-4">Memuat data...</Text>
-                ) : colleagues.filter(c => c.id !== user?.id).length > 0 ? (
-                  colleagues.filter(c => c.id !== user?.id).map((c) => {
-                    const active = form.replacement_id === c.id;
-                    return (
-                      <Pressable
-                        key={c.id}
-                        onPress={() => {
-                          setForm({ ...form, replacement_id: active ? '' : c.id });
-                          setReplacementModalVisible(false);
-                          setColleagueSearch('');
-                        }}
-                        className={`flex-row items-center justify-between p-4 mb-2 rounded-xl border ${active ? 'bg-primary/5 border-primary' : 'bg-white border-outline'}`}
-                      >
-                        <View>
-                          <Text className={`font-inter-bold text-sm ${active ? 'text-primary' : 'text-on-surface'}`}>{c.full_name}</Text>
-                          <Text className="font-inter text-[11px] text-text-muted mt-0.5">{c.nik}</Text>
-                        </View>
-                        {active && <MaterialIcons name="check-circle" size={20} color={Tokens.colors.primary} />}
+              {replacementModalVisible && canChooseReplacement ? (
+                <View className="absolute inset-0 z-50 flex-1 bg-black/40 justify-end">
+                  <View className="bg-background rounded-t-[28px] p-5 h-[80%] shadow-2xl">
+                    <View className="flex-row justify-between items-center mb-4">
+                      <View>
+                        <Text className="font-manrope-bold text-xl text-primary">Pilih Pengganti</Text>
+                        <Text className="font-inter text-xs text-text-muted">Cari rekan 1 divisi</Text>
+                      </View>
+                      <Pressable onPress={() => { setReplacementModalVisible(false); setColleagueSearch(''); }} className="w-9 h-9 rounded-full bg-black/5 items-center justify-center">
+                        <MaterialIcons name="close" size={18} color={Tokens.colors.text} />
                       </Pressable>
-                    );
-                  })
-                ) : debouncedSearch ? (
-                  <Text className="font-inter text-center text-sm text-text-muted mt-4">Tidak ada hasil untuk &quot;{debouncedSearch}&quot;</Text>
-                ) : (
-                  <Text className="font-inter text-center text-sm text-text-muted mt-4">Ketik nama untuk mencari</Text>
-                )}
-              </ScrollView>
+                    </View>
+
+                    <Input
+                      placeholder="Cari nama karyawan..."
+                      value={colleagueSearch}
+                      onChangeText={setColleagueSearch}
+                    />
+
+                    <ScrollView showsVerticalScrollIndicator={false} className="mt-4">
+                      {isLoadingColleagues ? (
+                        <Text className="font-inter text-center text-sm text-text-muted mt-4">Memuat data...</Text>
+                      ) : colleagues.filter(c => c.id !== user?.id).length > 0 ? (
+                        colleagues.filter(c => c.id !== user?.id).map((c) => {
+                          const active = form.replacement_id === c.id;
+                          return (
+                            <Pressable
+                              key={c.id}
+                              onPress={() => {
+                                setForm({ ...form, replacement_id: active ? '' : c.id });
+                                setReplacementModalVisible(false);
+                                setColleagueSearch('');
+                              }}
+                              className={`flex-row items-center justify-between p-4 mb-2 rounded-xl border ${active ? 'bg-primary/5 border-primary' : 'bg-white border-outline'}`}
+                            >
+                              <View>
+                                <Text className={`font-inter-bold text-sm ${active ? 'text-primary' : 'text-on-surface'}`}>{c.full_name}</Text>
+                                <Text className="font-inter text-[11px] text-text-muted mt-0.5">{c.nik}</Text>
+                              </View>
+                              {active && <MaterialIcons name="check-circle" size={20} color={Tokens.colors.primary} />}
+                            </Pressable>
+                          );
+                        })
+                      ) : debouncedSearch ? (
+                        <Text className="font-inter text-center text-sm text-text-muted mt-4">Tidak ada hasil untuk &quot;{debouncedSearch}&quot;</Text>
+                      ) : (
+                        <Text className="font-inter text-center text-sm text-text-muted mt-4">Ketik nama untuk mencari</Text>
+                      )}
+                    </ScrollView>
+                  </View>
+                </View>
+              ) : null}
             </View>
-          </View>
-        )}
+          </KeyboardAvoidingView>
+        </SafeAreaView>
       </Modal>
 
       <Modal

@@ -44,6 +44,13 @@ const extractArray = <T>(raw: any): T[] => {
   return [];
 };
 
+const normalizeVisitPhotoUrl = (value?: string | null) => {
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) return value;
+  const baseUrl = process.env.EXPO_PUBLIC_API_URL || 'https://hris.javasuperfood.com';
+  return `${baseUrl}${value.startsWith('/') ? '' : '/'}${value}`;
+};
+
 export const createSelfiePhotoCode = () => {
   const prefix = Date.now().toString(36).toUpperCase();
   const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -187,11 +194,18 @@ export const attendanceService = {
       });
       const data = unwrapData<any>(response.data);
       
-      if (Array.isArray(data)) return data;
-      if (data && Array.isArray(data.items)) return data.items;
-      if (data && Array.isArray(data.data)) return data.data;
-      
-      return [];
+      const rawItems = Array.isArray(data)
+        ? data
+        : data && Array.isArray(data.items)
+          ? data.items
+          : data && Array.isArray(data.data)
+            ? data.data
+            : [];
+
+      return rawItems.map((item: VisitItem) => ({
+        ...item,
+        visit_photo_url: normalizeVisitPhotoUrl(item.visit_photo_url),
+      }));
     } catch (error: any) {
       devError('[AttendanceService] listVisits error:', error?.message);
       return [];
@@ -199,7 +213,26 @@ export const attendanceService = {
   },
 
   async requestVisit(payload: VisitRequest): Promise<any> {
-    const response = await api.post('/attendance/visit', payload);
+    const formData = new FormData();
+    formData.append('gps_lat', String(payload.gps_lat));
+    formData.append('gps_long', String(payload.gps_long));
+    formData.append('visit_date', payload.visit_date);
+    formData.append('visit_time', payload.visit_time);
+    formData.append('reason', payload.reason);
+    formData.append('location_name', payload.location_name);
+    if (payload.photo?.uri) {
+      formData.append('photo', {
+        uri: payload.photo.uri,
+        name: payload.photo.name,
+        type: payload.photo.type || 'image/jpeg',
+      } as any);
+    }
+
+    const response = await api.post('/attendance/visit', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return unwrapData<any>(response.data);
   },
 

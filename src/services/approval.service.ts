@@ -1,12 +1,29 @@
 import { api } from '../core/api/client';
 import { unwrapData } from '../core/api/envelope';
+import { attendanceService } from './attendance.service';
+import { leaveService } from './leave.service';
+import { overtimeService } from './overtime.service';
+import { resignService } from './resign.service';
 import { ApprovalFeedback, ApprovalItem, ApprovalRequestDetail } from '../types/approval';
 
 export const approvalService = {
   async getPending(params?: { page?: number; limit?: number }): Promise<ApprovalItem[]> {
     const response = await api.get('/approvals/pending', { params });
     const rawList = unwrapData<ApprovalItem[]>(response.data) || [];
-    return rawList.map((item) => this.normalizeItem(item));
+    const normalized = rawList.map((item) => this.normalizeItem(item));
+    return Promise.all(
+      normalized.map(async (item) => {
+        const requestId = item.approval_request_id || item.request_id || item.id;
+        if (!requestId) return this.enrichReferenceDetail(item);
+
+        try {
+          const detail = await this.getRequestDetail(requestId);
+          return this.enrichReferenceDetail(this.mergeApprovalRequestDetail(item, detail));
+        } catch {
+          return this.enrichReferenceDetail(item);
+        }
+      })
+    );
   },
 
   async getHistory(params?: { page?: number; limit?: number }): Promise<ApprovalItem[]> {
@@ -20,9 +37,9 @@ export const approvalService = {
 
         try {
           const detail = await this.getRequestDetail(requestId);
-          return this.mergeApprovalRequestDetail(item, detail);
+          return this.enrichReferenceDetail(this.mergeApprovalRequestDetail(item, detail));
         } catch {
-          return item;
+          return this.enrichReferenceDetail(item);
         }
       })
     );
@@ -98,7 +115,43 @@ export const approvalService = {
       reference_type: detail.reference_type || item.reference_type,
       current_level: detail.current_level ?? item.current_level,
       max_level: detail.max_level ?? item.max_level,
+      histories: detail.histories ?? item.histories ?? [],
       reference_detail: detail.reference_detail ?? item.reference_detail ?? null,
     };
+  },
+
+  async enrichReferenceDetail(item: ApprovalItem): Promise<ApprovalItem> {
+    const referenceId = item.reference_id;
+    if (!referenceId) return item;
+
+    try {
+      const detail = await this.getReferenceDetail(item.module_name, referenceId);
+      if (!detail) return item;
+
+      return {
+        ...item,
+        reference_detail: {
+          ...(item.reference_detail ?? {}),
+          ...detail,
+        },
+      };
+    } catch {
+      return item;
+    }
+  },
+
+  async getReferenceDetail(moduleName: string, referenceId: string): Promise<Record<string, any> | null> {
+    switch (String(moduleName || '').toUpperCase()) {
+      case 'LEAVE':
+        return leaveService.getRequest(referenceId);
+      case 'OVERTIME':
+        return overtimeService.getRecordDetail(referenceId);
+      case 'ATTENDANCE_CORRECTION':
+        return attendanceService.getCorrectionDetail(referenceId);
+      case 'RESIGN':
+        return resignService.getRequestDetail(referenceId);
+      default:
+        return null;
+    }
   },
 };

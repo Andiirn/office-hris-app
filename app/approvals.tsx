@@ -1,24 +1,34 @@
-import React, { useState, useMemo } from 'react';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { router, useFocusEffect } from 'expo-router';
+import React, { useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  Pressable,
-  TextInput,
-  RefreshControl,
   ActivityIndicator,
-  Alert
+  Alert,
+  Image,
+  Modal,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TextInput,
+  View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { router } from 'expo-router';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Tokens } from '../src/core/theme/tokens';
-import { approvalService } from '../src/services/approval.service';
-import { useAuthStore } from '../src/stores/auth.store';
 import { GlassCard } from '../src/components/ui/GlassCard';
 import { StatusBadge } from '../src/components/ui/StatusBadge';
-import { ApprovalItem } from '../src/types/approval';
+import { Tokens } from '../src/core/theme/tokens';
+import { formatOvertimeTime } from '../src/features/overtime/time';
+import { approvalService } from '../src/services/approval.service';
+import { useAuthStore } from '../src/stores/auth.store';
+import {
+  ApprovalItem,
+  getApprovalReferenceDetail,
+  getCorrectionApprovalDetail,
+  getLeaveApprovalDetail,
+  getOvertimeApprovalDetail,
+  getResignApprovalDetail,
+} from '../src/types/approval';
 
 export default function ApprovalsScreen() {
   const insets = useSafeAreaInsets();
@@ -28,6 +38,7 @@ export default function ApprovalsScreen() {
   const [tab, setTab] = useState<'pending' | 'history'>('pending');
   const [selectedModule, setSelectedModule] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [photoModalUrl, setPhotoModalUrl] = useState<string | null>(null);
   const approvalSource = tab === 'pending' ? 'pending' : 'history';
 
   // 1. Query data
@@ -50,11 +61,17 @@ export default function ApprovalsScreen() {
     },
     enabled: !!user?.id,
     staleTime: 30 * 1000,
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
+    refetchOnMount: 'always',
+    refetchOnReconnect: true,
     placeholderData: (previous) => previous,
   });
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!user?.id) return;
+      refetch();
+    }, [approvalSource, refetch, user?.id])
+  );
 
   // 2. Process Approval/Rejection Mutation
   const processMutation = useMutation({
@@ -187,14 +204,65 @@ export default function ApprovalsScreen() {
     }
   };
 
+  const parseDateOnly = (value?: string | null) => {
+    if (!value) return null;
+    const dateOnly = value.split('T')[0].split(' ')[0];
+    const [year, month, day] = dateOnly.split('-').map(Number);
+    if (!year || !month || !day) return null;
+    return new Date(year, month - 1, day, 12, 0, 0, 0);
+  };
+
+  const formatDayLabel = (value?: string | null) => {
+    const date = parseDateOnly(value);
+    if (!date) return '-';
+    return new Intl.DateTimeFormat('id-ID', { weekday: 'long' }).format(date);
+  };
+
+  const formatDateLabel = (value?: string | null) => {
+    const date = parseDateOnly(value);
+    if (!date) return '-';
+    return new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }).format(date);
+  };
+
+  const getLeaveTotalDays = (detail: { start_date?: string | null; end_date?: string | null; total_days?: number | null }) => {
+    if (typeof detail.total_days === 'number' && Number.isFinite(detail.total_days) && detail.total_days > 0) {
+      return detail.total_days;
+    }
+
+    const start = parseDateOnly(detail.start_date);
+    const end = parseDateOnly(detail.end_date || detail.start_date);
+    if (!start || !end) return null;
+
+    return Math.max(1, Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)) + 1);
+  };
+
+  const formatFullDate = (date?: string) => {
+    if (!date) return '-';
+
+    return new Date(date).toLocaleDateString('id-ID', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  };
+
+
   const renderDetailFields = (item: ApprovalItem) => {
-    const detail = item.reference_detail;
-    const approvalDate = item.approved_at || item.requested_at || item.created_at;
+    const detail = getApprovalReferenceDetail(item);
+    const createdDate = item.requested_at || item.created_at;
+    const approvalDate = item.approved_at || createdDate;
+    const createdAtField = (
+      <Text className="font-inter text-xs text-text-muted">
+        Diajukan Pada: <Text className="font-inter-semibold text-on-surface">{formatDate(createdDate)}</Text>
+      </Text>
+    );
 
     if (!detail) {
       const timestampLabel = tab === 'pending' ? 'Diajukan pada' : 'Diproses pada';
       return (
         <View className="gap-1 mt-1">
+          {createdAtField}
           <Text className="font-inter text-xs text-text-muted">
             {timestampLabel}: <Text className="font-inter-semibold text-on-surface">{formatDate(approvalDate)}</Text>
           </Text>
@@ -204,27 +272,85 @@ export default function ApprovalsScreen() {
     }
 
     switch (item.module_name) {
-      case 'LEAVE':
+      case 'LEAVE': {
+        const detail = ((getLeaveApprovalDetail(item) || getApprovalReferenceDetail(item) || {}) as Record<string, any>);
+        const totalDays = getLeaveTotalDays(detail);
+        const rawDocumentUrl = detail.document_url ? String(detail.document_url) : null;
+        const documentUrl = rawDocumentUrl
+          ? rawDocumentUrl.startsWith('http')
+            ? rawDocumentUrl
+            : `${process.env.EXPO_PUBLIC_API_URL || 'https://hris.javasuperfood.com'}${rawDocumentUrl.startsWith('/') ? '' : '/'}${rawDocumentUrl}`
+          : null;
+        const hasImageDocument = !!documentUrl && /\.(jpeg|jpg|gif|png)$/i.test(documentUrl);
+        const replacementLabel = detail.replacement?.full_name || detail.replacement_name || detail.replacement_id || null;
         return (
           <View className="gap-1 mt-1">
+            {createdAtField}
             <Text className="font-inter text-xs text-text-muted">
-              Tipe: <Text className="font-inter-semibold text-on-surface">{detail.leave_type_name || '-'}</Text>
+              Tipe: <Text className="font-inter-semibold text-on-surface">{detail.leave_type_name || detail.leave_type?.name || '-'}</Text>
             </Text>
             <Text className="font-inter text-xs text-text-muted">
-              Tanggal: <Text className="font-inter-semibold text-on-surface">{detail.start_date} s/d {detail.end_date || detail.start_date}</Text>
+              Untuk Tanggal:{' '}
+              <Text className="font-inter-semibold text-on-surface">
+                {detail.start_date
+                  ? detail.end_date && detail.end_date !== detail.start_date
+                    ? `${formatFullDate(detail.start_date)} s/d ${formatFullDate(detail.end_date)}`
+                    : formatFullDate(detail.start_date)
+                  : '-'}
+              </Text>
+
+              {typeof totalDays === 'number' && (
+                <Text className="font-inter-semibold text-on-surface">
+                  {' '}· {totalDays} {totalDays > 1 ? 'hari' : 'hari'}
+                </Text>
+              )}
             </Text>
+            {replacementLabel ? (
+              <Text className="font-inter text-xs text-text-muted">
+                Pengganti: <Text className="font-inter-semibold text-on-surface">{replacementLabel}</Text>
+              </Text>
+            ) : null}
+            {hasImageDocument ? (
+              <Text className="font-inter text-xs text-text-muted">
+                Dokumen:{' '}
+                <Text
+                  onPress={() => setPhotoModalUrl(documentUrl)}
+                  className="font-inter-semibold text-primary underline"
+                >
+                  Lihat dokumen
+                </Text>
+              </Text>
+            ) : null}
             {detail.reason ? <Text className="font-inter text-xs text-text-muted italic mt-0.5">Alasan: &quot;{detail.reason}&quot;</Text> : null}
           </View>
         );
-      case 'OVERTIME':
+      }
+      case 'OVERTIME': {
+        const detail = ((getOvertimeApprovalDetail(item) || getApprovalReferenceDetail(item) || {}) as Record<string, any>);
         return (
           <View className="gap-1 mt-1">
+            {createdAtField}
             <Text className="font-inter text-xs text-text-muted">
-              Tanggal Lembur: <Text className="font-inter-semibold text-on-surface">{detail.overtime_date || detail.date || '-'}</Text>
+              Tanggal Lembur:{' '}
+              <Text className="font-inter-semibold text-on-surface">
+                {detail.overtime_date || detail.date ? (
+                  <>
+                    {formatDayLabel(detail.overtime_date || detail.date)},{' '}
+                    {formatDateLabel(detail.overtime_date || detail.date)}
+                  </>
+                ) : (
+                  '-'
+                )}
+              </Text>
             </Text>
             <Text className="font-inter text-xs text-text-muted">
               Durasi: <Text className="font-inter-semibold text-on-surface">{detail.overtime_hours || detail.hours || '-'} Jam</Text>
             </Text>
+            {(detail.start_time || detail.end_time) ? (
+              <Text className="font-inter text-xs text-text-muted">
+                Jam: <Text className="font-inter-semibold text-on-surface">{formatOvertimeTime(detail.start_time)} - {formatOvertimeTime(detail.end_time)}</Text>
+              </Text>
+            ) : null}
             <Text className="font-inter text-xs text-text-muted">
               Tipe: <Text className="font-inter-semibold text-on-surface">{detail.overtime_type || '-'}</Text>
             </Text>
@@ -236,9 +362,12 @@ export default function ApprovalsScreen() {
             {detail.reason ? <Text className="font-inter text-xs text-text-muted italic mt-0.5">Alasan: &quot;{detail.reason}&quot;</Text> : null}
           </View>
         );
-      case 'ATTENDANCE_CORRECTION':
+      }
+      case 'ATTENDANCE_CORRECTION': {
+        const detail = ((getCorrectionApprovalDetail(item) || getApprovalReferenceDetail(item) || {}) as Record<string, any>);
         return (
           <View className="gap-1 mt-1">
+            {createdAtField}
             <Text className="font-inter text-xs text-text-muted">
               Koreksi Masuk: <Text className="font-inter-semibold text-on-surface">{detail.corrected_checkin || '-'}</Text>
             </Text>
@@ -248,44 +377,75 @@ export default function ApprovalsScreen() {
             {detail.reason ? <Text className="font-inter text-xs text-text-muted italic mt-0.5">Alasan: &quot;{detail.reason}&quot;</Text> : null}
           </View>
         );
+      }
       case 'ATTENDANCE_VISIT':
-      case 'VISIT':
+      case 'VISIT': {
+        const detail = ((getApprovalReferenceDetail(item) || {}) as Record<string, any>);
         return (
           <View className="gap-1 mt-1">
+            {createdAtField}
             <Text className="font-inter text-xs text-text-muted">
               Kunjungan Ke: <Text className="font-inter-semibold text-on-surface">{detail.location_name || '-'}</Text>
             </Text>
             {detail.notes ? <Text className="font-inter text-xs text-text-muted italic mt-0.5">Catatan: &quot;{detail.notes}&quot;</Text> : null}
           </View>
         );
-      case 'RESIGN':
+      }
+      case 'RESIGN': {
+        const detail = ((getResignApprovalDetail(item) || getApprovalReferenceDetail(item) || {}) as Record<string, any>);
         return (
           <View className="gap-1 mt-1">
+            {createdAtField}
             <Text className="font-inter text-xs text-text-muted">
               Efektif Resign: <Text className="font-inter-semibold text-on-surface">{detail.resign_date || '-'}</Text>
             </Text>
             {detail.reason ? <Text className="font-inter text-xs text-text-muted italic mt-0.5">Alasan: &quot;{detail.reason}&quot;</Text> : null}
           </View>
         );
+      }
       default:
-        return detail.reason ? <Text className="font-inter text-xs text-text-muted italic mt-1">Catatan: &quot;{detail.reason}&quot;</Text> : null;
+        return (
+          <View className="gap-1 mt-1">
+            {createdAtField}
+            {detail.reason ? <Text className="font-inter text-xs text-text-muted italic">Catatan: &quot;{detail.reason}&quot;</Text> : null}
+          </View>
+        );
     }
   };
 
-  const renderPendingNotice = (item: ApprovalItem) => (
-    <View className="mt-2 rounded-xl bg-primary/5 px-3 py-2">
-      <Text className="font-inter-semibold text-[11px] text-primary">
-        Butuh persetujuan kamu dulu
-      </Text>
-      <Text className="font-inter text-[11px] text-text-muted mt-0.5">
-        Request ini belum bisa lanjut ke level berikutnya sebelum kamu setujui atau tolak.
-      </Text>
-      <Text className="font-inter text-[11px] text-text-muted mt-0.5">
-        Level saat ini: <Text className="font-inter-semibold text-on-surface">{item.current_level ?? '-'}</Text>
-        {' '}dari <Text className="font-inter-semibold text-on-surface">{item.max_level ?? '-'}</Text>
-      </Text>
-    </View>
-  );
+  const renderPendingNotice = (item: ApprovalItem) => {
+    const histories = [...(item.histories ?? [])].sort((a, b) => (a.level_order ?? 0) - (b.level_order ?? 0));
+    const lastAction = histories.length > 0 ? histories[histories.length - 1] : null;
+    const hasRejected = histories.some((history) => String(history.action || '').toUpperCase() === 'REJECT');
+    const previousApproverNames = histories
+      .map((history) => history.approver?.full_name)
+      .filter((name): name is string => Boolean(name))
+      .join(', ');
+
+    return (
+      <View className="mt-2 rounded-xl bg-primary/5 px-3 py-2">
+        <Text className="font-inter-semibold text-[11px] text-primary">
+          {hasRejected ? 'Pengajuan sudah ditolak' : 'Menunggu persetujuan kamu'}
+        </Text>
+        {previousApproverNames ? (
+          <View className="mt-1.5">
+            <Text className="font-inter text-[11px] text-text-muted">
+              Diproses sebelumnya: <Text className="font-inter-semibold text-on-surface">{previousApproverNames}</Text>
+            </Text>
+            {lastAction?.comment ? (
+              <Text className="font-inter text-[11px] text-text-muted italic mt-1">
+                Catatan: &quot;{lastAction.comment}&quot;
+              </Text>
+            ) : null}
+          </View>
+        ) : (
+          <Text className="font-inter text-[11px] text-text-muted mt-0.5">
+            Kamu yang memproses pertama.
+          </Text>
+        )}
+      </View>
+    );
+  };
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -486,6 +646,35 @@ export default function ApprovalsScreen() {
           </View>
         )}
       </ScrollView>
+
+      <Modal
+        visible={!!photoModalUrl}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPhotoModalUrl(null)}
+      >
+        <View className="flex-1 bg-black/90" style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}>
+          <View className="px-5 pt-2 pb-4 flex-row items-center justify-between">
+            <Text className="font-manrope-bold text-lg text-white">Dokumen Pengajuan</Text>
+            <Pressable
+              onPress={() => setPhotoModalUrl(null)}
+              className="w-10 h-10 rounded-full bg-white/10 items-center justify-center"
+            >
+              <MaterialIcons name="close" size={22} color="#fff" />
+            </Pressable>
+          </View>
+
+          <View className="flex-1 items-center justify-center px-4 pb-6">
+            {photoModalUrl ? (
+              <Image
+                source={{ uri: photoModalUrl }}
+                className="w-full h-full"
+                resizeMode="contain"
+              />
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

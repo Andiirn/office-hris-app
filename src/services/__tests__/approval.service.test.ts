@@ -10,7 +10,8 @@ jest.mock('../../core/api/client', () => ({
 
 describe('approvalService', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    (api.get as jest.Mock).mockReset();
+    (api.post as jest.Mock).mockReset();
   });
 
   it('getPending fetches and normalizes pending approvals', async () => {
@@ -179,6 +180,123 @@ describe('approvalService', () => {
         overtime_hours: 1.5,
         overtime_type: 'REGULAR',
         overtime_amount: 50000,
+      },
+    });
+  });
+
+  it('getPending exchanges leave reference_id for leave detail when approval detail is incomplete', async () => {
+    (api.get as jest.Mock)
+      .mockResolvedValueOnce({
+        data: {
+          success: true,
+          data: [
+            {
+              id: 'approval-1',
+              approval_request_id: 'approval-request-1',
+              module_name: 'LEAVE',
+              reference_id: 'leave-1',
+              reference_type: 'leave_request',
+              current_level: 1,
+              max_level: 2,
+              status: 'PENDING',
+              created_at: '2026-07-08T09:00:00Z',
+              requester: {
+                id: 'emp-1',
+                full_name: 'Budi Santoso',
+                nik: '26019382',
+              },
+            },
+          ],
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          success: true,
+          data: {
+            id: 'approval-request-1',
+            module_name: 'LEAVE',
+            reference_id: 'leave-1',
+            reference_type: 'leave_request',
+            requester_id: 'emp-1',
+            current_level: 2,
+            max_level: 2,
+            status: 'IN_PROGRESS',
+            created_at: '2026-07-08T09:00:00Z',
+            requester: {
+              id: 'emp-1',
+              full_name: 'Budi Santoso',
+              nik: '26019382',
+            },
+            histories: [
+              {
+                id: 'hist-1',
+                approver_id: 'mgr-1',
+                level_order: 1,
+                action: 'APPROVE',
+                comment: 'Approved by manager',
+                approved_at: '2026-07-08T10:00:00Z',
+                approver: {
+                  id: 'mgr-1',
+                  full_name: 'Siti Manager',
+                  nik: '21066042',
+                },
+              },
+            ],
+            reference_detail: {
+              reason: 'Family event',
+            },
+          },
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          success: true,
+          data: {
+            id: 'leave-1',
+            leave_type_id: 'leave-type-1',
+            leave_type_name: 'Annual Leave',
+            start_date: '2026-07-10',
+            end_date: '2026-07-11',
+            reason: 'Family event',
+            status: 'PENDING',
+            created_at: '2026-07-08T09:00:00Z',
+            replacement_id: 'emp-2',
+            replacement: {
+              id: 'emp-2',
+              full_name: 'Siti Aminah',
+              nik: '21066042',
+            },
+          },
+        },
+      });
+
+    const result = await approvalService.getPending();
+
+    expect(api.get).toHaveBeenNthCalledWith(1, '/approvals/pending', {
+      params: undefined,
+    });
+    expect(api.get).toHaveBeenNthCalledWith(2, '/approvals/approval-request-1');
+    expect(api.get).toHaveBeenNthCalledWith(3, '/leave/requests/leave-1');
+    expect(result[0]).toMatchObject({
+      module_name: 'LEAVE',
+      reference_id: 'leave-1',
+      current_level: 2,
+      histories: [
+        {
+          approver_id: 'mgr-1',
+          level_order: 1,
+          action: 'APPROVE',
+          comment: 'Approved by manager',
+        },
+      ],
+      reference_detail: {
+        leave_type_name: 'Annual Leave',
+        replacement_id: 'emp-2',
+        replacement: {
+          id: 'emp-2',
+          full_name: 'Siti Aminah',
+          nik: '21066042',
+        },
       },
     });
   });

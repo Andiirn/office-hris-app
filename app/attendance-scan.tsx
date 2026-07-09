@@ -1,4 +1,5 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQueryClient } from '@tanstack/react-query';
 import { CameraView, useCameraPermissions, type CameraCapturedPicture } from 'expo-camera';
 import * as Device from 'expo-device';
@@ -6,7 +7,7 @@ import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { MotiView } from 'moti';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../src/components/ui/Button';
 import { Skeleton, SkeletonCard } from '../src/components/ui/Skeleton';
@@ -27,6 +28,8 @@ type ScanFailure = {
   reasons: string[];
   mode: ScanMode;
 };
+
+const SELFIE_INFO_SEEN_KEY = 'attendance_scan_selfie_info_seen';
 
 const FRAUD_REASON_LABELS: Record<string, string> = {
   TAMPERED_TOKEN: 'Token selfie tidak valid atau berubah',
@@ -529,6 +532,26 @@ export default function AttendanceScanScreen() {
     setCheckinMessage(null);
     setErrorMessage(null);
     setScanFailure(null);
+
+    if (mode === 'selfie') {
+      AsyncStorage.getItem(SELFIE_INFO_SEEN_KEY)
+        .then((value) => {
+          if (value === 'true') return;
+          Alert.alert(
+            'Info Mode Selfie',
+            'Jika ingin menggunakan mode selfie, pastikan HRD sudah menugaskan Anda untuk menggunakannya terlebih dahulu.',
+            [
+              {
+                text: 'Mengerti',
+                onPress: () => {
+                  AsyncStorage.setItem(SELFIE_INFO_SEEN_KEY, 'true').catch(() => {});
+                },
+              },
+            ]
+          );
+        })
+        .catch(() => {});
+    }
   };
 
   const isScannerVisible =
@@ -609,7 +632,7 @@ export default function AttendanceScanScreen() {
             <Text className="font-inter text-sm text-on-surface-variant text-center px-2">
               {errorMessage || 'Aplikasi memerlukan izin lokasi untuk melakukan absensi.'}
             </Text>
-            <Button title="Buka Pengaturan" onPress={() => Linking.openSettings()} className="w-full mt-2" />
+            <Button title="Coba Lagi" onPress={requestLocationPermission} className="w-full mt-2" />
           </View>
         )}
 
@@ -618,9 +641,9 @@ export default function AttendanceScanScreen() {
             <View className="w-16 h-16 rounded-full bg-red-50 items-center justify-center mb-2">
               <MaterialIcons name="gps-not-fixed" size={32} color={Tokens.colors.error} />
             </View>
-            <Text className="font-manrope-bold text-lg text-error text-center">Jangan Curang</Text>
+            <Text className="font-manrope-bold text-lg text-error text-center">Fake GPS Terdeteksi</Text>
             <Text className="font-inter text-sm text-on-surface-variant text-center px-2">
-              Matikan fake GPS atau lokasi palsu, lalu ulangi sebelum scan QR atau selfie.
+              Matikan fake GPS atau lokasi palsu terlebih dahulu, lalu coba lagi.
             </Text>
             <Button title="Coba Lagi" onPress={requestLocationPermission} className="w-full mt-2" />
           </View>
@@ -641,23 +664,14 @@ export default function AttendanceScanScreen() {
 
         {status === 'granted' && cameraStatus === 'granted' && (
           <View className="items-center w-full gap-5">
-            <View className="w-full max-w-[320px] rounded-2xl bg-white/80 px-4 py-3 border border-white/90 shadow-sm">
-              <Text className="font-manrope-bold text-sm text-primary">
-                Mode aktif: {isSelfieMode ? 'Selfie' : 'Scan QR'}
-              </Text>
-              <Text className="font-inter text-xs text-text-muted mt-1">
-                {isSelfieMode
-                  ? 'Ambil foto selfie untuk absensi selfie anti-fraud.'
-                  : 'Arahkan kamera ke QR code cabang untuk check-in atau check-out.'}
-              </Text>
-            </View>
-
-            <View className="bg-white/80 rounded-2xl px-4 py-2.5 border border-white/90 shadow-sm flex-row items-center gap-2 mb-2">
-              <View className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-              <Text className="font-inter-semibold text-xs text-on-surface-variant">
-                GPS Terkunci: {coords?.lat.toFixed(5)}, {coords?.long.toFixed(5)}
-              </Text>
-            </View>
+            {!isSelfieMode ? (
+              <View className="w-full max-w-[320px] rounded-2xl bg-white/80 px-4 py-3 border border-white/90 shadow-sm">
+                <Text className="font-inter-bold text-[10px] text-primary uppercase tracking-wider">Lokasi Saat Ini</Text>
+                <Text className="font-inter text-xs text-on-surface-variant mt-1 leading-5">
+                  {address || 'Mengambil lokasi jalan...'}
+                </Text>
+              </View>
+            ) : null}
 
             {isScannerVisible && (
               <>

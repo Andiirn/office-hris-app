@@ -13328,299 +13328,6 @@
         }
       }
     },
-    "/api/v1/attendance/selfie/checkin": {
-      "post": {
-        "tags": [
-          "Attendance"
-        ],
-        "summary": "Checkin Selfie",
-        "operationId": "checkin_selfie_api_v1_attendance_selfie_checkin_post",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SelfieRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SuccessResponse_AttendanceResponse_"
-                }
-              }
-            }
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Bad request — business rule violation",
-                  "errors": []
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Bad Request"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Resource not found",
-                  "errors": []
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Conflict — resource already exists",
-                  "errors": []
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Conflict"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Validation error",
-                  "errors": [
-                    {
-                      "field": "nik",
-                      "message": "Field required",
-                      "type": "missing"
-                    }
-                  ]
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unprocessable Entity"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Not authenticated — missing or invalid token",
-                  "errors": []
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Attendance rejected due to fraud detection",
-                  "errors": [
-                    "LOCATION_SPOOFING",
-                    "MOCK_GPS"
-                  ]
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Forbidden"
-          }
-        }
-      }
-    },
-    "/api/v1/attendance/selfie/checkout": {
-      "post": {
-        "tags": [
-          "Attendance"
-        ],
-        "summary": "Checkout Selfie",
-        "operationId": "checkout_selfie_api_v1_attendance_selfie_checkout_post",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SelfieRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SuccessResponse_AttendanceResponse_"
-                }
-              }
-            }
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Bad request — business rule violation",
-                  "errors": []
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Bad Request"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Resource not found",
-                  "errors": []
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Conflict — resource already exists",
-                  "errors": []
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Conflict"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Validation error",
-                  "errors": [
-                    {
-                      "field": "nik",
-                      "message": "Field required",
-                      "type": "missing"
-                    }
-                  ]
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unprocessable Entity"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Not authenticated — missing or invalid token",
-                  "errors": []
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Access denied — insufficient permissions",
-                  "errors": []
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Forbidden"
-          }
-        }
-      }
-    },
     "/api/v1/attendance/": {
       "get": {
         "tags": [
@@ -15104,6 +14811,40 @@
             }
           },
           {
+            "name": "company_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Company Id"
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Branch Id"
+            }
+          },
+          {
             "name": "status",
             "in": "query",
             "required": false,
@@ -15345,9 +15086,9 @@
         "requestBody": {
           "required": true,
           "content": {
-            "application/json": {
+            "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/VisitRequest"
+                "$ref": "#/components/schemas/Body_request_visit_api_v1_attendance_visit_post"
               }
             }
           }
@@ -33155,489 +32896,6 @@
           }
         }
       }
-    },
-    "/api/v1/selfie/employees": {
-      "get": {
-        "tags": [
-          "Selfie Access"
-        ],
-        "summary": "List Selfie Employees",
-        "operationId": "list_selfie_employees_api_v1_selfie_employees_get",
-        "parameters": [
-          {
-            "name": "skip",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "default": 0,
-              "title": "Skip"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "default": 50,
-              "title": "Limit"
-            }
-          },
-          {
-            "name": "company_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Company Id"
-            }
-          },
-          {
-            "name": "branch_id",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Branch Id"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response List Selfie Employees Api V1 Selfie Employees Get"
-                }
-              }
-            }
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Bad request — business rule violation",
-                  "errors": []
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Bad Request"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Resource not found",
-                  "errors": []
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Conflict — resource already exists",
-                  "errors": []
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Conflict"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Validation error",
-                  "errors": [
-                    {
-                      "field": "nik",
-                      "message": "Field required",
-                      "type": "missing"
-                    }
-                  ]
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unprocessable Entity"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Not authenticated — missing or invalid token",
-                  "errors": []
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Access denied — insufficient permissions",
-                  "errors": []
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Forbidden"
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "Selfie Access"
-        ],
-        "summary": "Grant Selfie Access",
-        "operationId": "grant_selfie_access_api_v1_selfie_employees_post",
-        "parameters": [
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SelfieEmployeeGrant"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Grant Selfie Access Api V1 Selfie Employees Post"
-                }
-              }
-            }
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Bad request — business rule violation",
-                  "errors": []
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Bad Request"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Resource not found",
-                  "errors": []
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Conflict — resource already exists",
-                  "errors": []
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Conflict"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Validation error",
-                  "errors": [
-                    {
-                      "field": "nik",
-                      "message": "Field required",
-                      "type": "missing"
-                    }
-                  ]
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unprocessable Entity"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Not authenticated — missing or invalid token",
-                  "errors": []
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Access denied — insufficient permissions",
-                  "errors": []
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Forbidden"
-          }
-        }
-      }
-    },
-    "/api/v1/selfie/employees/{employee_id}": {
-      "delete": {
-        "tags": [
-          "Selfie Access"
-        ],
-        "summary": "Revoke Selfie Access",
-        "operationId": "revoke_selfie_access_api_v1_selfie_employees__employee_id__delete",
-        "parameters": [
-          {
-            "name": "employee_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Employee Id"
-            }
-          },
-          {
-            "name": "authorization",
-            "in": "header",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Authorization"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Revoke Selfie Access Api V1 Selfie Employees  Employee Id  Delete"
-                }
-              }
-            }
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Bad request — business rule violation",
-                  "errors": []
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Bad Request"
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Resource not found",
-                  "errors": []
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Conflict — resource already exists",
-                  "errors": []
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Conflict"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Validation error",
-                  "errors": [
-                    {
-                      "field": "nik",
-                      "message": "Field required",
-                      "type": "missing"
-                    }
-                  ]
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unprocessable Entity"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Not authenticated — missing or invalid token",
-                  "errors": []
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "example": {
-                  "success": false,
-                  "message": "Access denied — insufficient permissions",
-                  "errors": []
-                },
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Forbidden"
-          }
-        }
-      }
     }
   },
   "components": {
@@ -33691,6 +32949,29 @@
           "created_at"
         ],
         "title": "ActiveQRSessionResponse"
+      },
+      "AllowanceBreakdownItem": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "percentage": {
+            "type": "number",
+            "title": "Percentage"
+          },
+          "amount": {
+            "type": "number",
+            "title": "Amount"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "percentage",
+          "amount"
+        ],
+        "title": "AllowanceBreakdownItem"
       },
       "ApprovalActionEnum": {
         "type": "string",
@@ -34267,22 +33548,6 @@
             ],
             "title": "Checkin Photo Url"
           },
-          "checkout_photo_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Checkout Photo Url"
-          },
-          "is_selfie": {
-            "type": "boolean",
-            "title": "Is Selfie",
-            "default": false
-          },
           "attendance_status": {
             "type": "string",
             "title": "Attendance Status"
@@ -34436,72 +33701,6 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/TimemarkInfo"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "selfie_checkin_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Selfie Checkin Code"
-          },
-          "selfie_checkout_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Selfie Checkout Code"
-          },
-          "selfie_checkin_data": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Selfie Checkin Data"
-          },
-          "selfie_checkout_data": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Selfie Checkout Data"
-          },
-          "selfie_checkin": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/SelfieInfo"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "selfie_checkout": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/SelfieInfo"
               },
               {
                 "type": "null"
@@ -34842,22 +34041,6 @@
             ],
             "title": "Checkin Photo Url"
           },
-          "checkout_photo_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Checkout Photo Url"
-          },
-          "is_selfie": {
-            "type": "boolean",
-            "title": "Is Selfie",
-            "default": false
-          },
           "attendance_status": {
             "type": "string",
             "title": "Attendance Status"
@@ -34997,72 +34180,6 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/TimemarkInfo"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "selfie_checkin_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Selfie Checkin Code"
-          },
-          "selfie_checkout_code": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Selfie Checkout Code"
-          },
-          "selfie_checkin_data": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Selfie Checkin Data"
-          },
-          "selfie_checkout_data": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Selfie Checkout Data"
-          },
-          "selfie_checkin": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/SelfieInfo"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "selfie_checkout": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/SelfieInfo"
               },
               {
                 "type": "null"
@@ -35780,6 +34897,59 @@
           "file"
         ],
         "title": "Body_import_ter_categories_api_v1_payroll_ter_categories_import_post"
+      },
+      "Body_request_visit_api_v1_attendance_visit_post": {
+        "properties": {
+          "gps_lat": {
+            "type": "number",
+            "title": "Gps Lat"
+          },
+          "gps_long": {
+            "type": "number",
+            "title": "Gps Long"
+          },
+          "visit_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Visit Date"
+          },
+          "visit_time": {
+            "type": "string",
+            "title": "Visit Time"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 5,
+            "title": "Reason"
+          },
+          "location_name": {
+            "type": "string",
+            "minLength": 2,
+            "title": "Location Name"
+          },
+          "photo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "binary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "gps_lat",
+          "gps_long",
+          "visit_date",
+          "visit_time",
+          "reason",
+          "location_name"
+        ],
+        "title": "Body_request_visit_api_v1_attendance_visit_post"
       },
       "Body_upload_avatar_api_v1_profile_avatar_post": {
         "properties": {
@@ -37285,6 +36455,12 @@
             "title": "Salary",
             "default": 0
           },
+          "allowance": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Allowance",
+            "default": 0
+          },
           "is_salary_below_threshold": {
             "type": "boolean",
             "title": "Is Salary Below Threshold",
@@ -38602,6 +37778,11 @@
             "type": "number",
             "title": "Salary"
           },
+          "allowance": {
+            "type": "number",
+            "title": "Allowance",
+            "default": 0
+          },
           "is_salary_below_threshold": {
             "type": "boolean",
             "title": "Is Salary Below Threshold",
@@ -38835,6 +38016,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/EmployeeNested"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "income_summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IncomeSummary"
               },
               {
                 "type": "null"
@@ -39650,6 +38841,39 @@
         ],
         "title": "ImportAttendanceResultResponse"
       },
+      "IncomeSummary": {
+        "properties": {
+          "gaji_pokok": {
+            "type": "number",
+            "title": "Gaji Pokok"
+          },
+          "tunjangan_tetap": {
+            "type": "number",
+            "title": "Tunjangan Tetap"
+          },
+          "total_thp": {
+            "type": "number",
+            "title": "Total Thp"
+          },
+          "tunjangan_tidak_tetap": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NonFixedAllowanceSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "gaji_pokok",
+          "tunjangan_tetap",
+          "total_thp"
+        ],
+        "title": "IncomeSummary"
+      },
       "LeaveApprovalAction": {
         "properties": {
           "action": {
@@ -40457,6 +39681,27 @@
           "position_id"
         ],
         "title": "MeResponse"
+      },
+      "NonFixedAllowanceSummary": {
+        "properties": {
+          "total": {
+            "type": "number",
+            "title": "Total"
+          },
+          "breakdown": {
+            "items": {
+              "$ref": "#/components/schemas/AllowanceBreakdownItem"
+            },
+            "type": "array",
+            "title": "Breakdown",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "total"
+        ],
+        "title": "NonFixedAllowanceSummary"
       },
       "NotificationResponse": {
         "properties": {
@@ -42076,6 +41321,11 @@
             "title": "Is Active",
             "default": true
           },
+          "is_fixed": {
+            "type": "boolean",
+            "title": "Is Fixed",
+            "default": false
+          },
           "salary_tier": {
             "anyOf": [
               {
@@ -42134,6 +41384,11 @@
             "type": "boolean",
             "title": "Is Active",
             "default": true
+          },
+          "is_fixed": {
+            "type": "boolean",
+            "title": "Is Fixed",
+            "default": false
           },
           "salary_tier": {
             "anyOf": [
@@ -42246,6 +41501,17 @@
               }
             ],
             "title": "Is Active"
+          },
+          "is_fixed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Fixed"
           },
           "salary_tier": {
             "anyOf": [
@@ -42602,6 +41868,11 @@
             ],
             "title": "Umr"
           },
+          "allowance_threshold": {
+            "type": "number",
+            "title": "Allowance Threshold",
+            "default": 7000000
+          },
           "created_at": {
             "type": "string",
             "format": "date-time",
@@ -42668,6 +41939,17 @@
               }
             ],
             "title": "Umr"
+          },
+          "allowance_threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowance Threshold"
           }
         },
         "type": "object",
@@ -43916,119 +43198,6 @@
           "created_at"
         ],
         "title": "SecurityLogResponse"
-      },
-      "SelfieEmployeeGrant": {
-        "properties": {
-          "employee_ids": {
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "type": "array",
-            "minItems": 1,
-            "title": "Employee Ids"
-          }
-        },
-        "type": "object",
-        "required": [
-          "employee_ids"
-        ],
-        "title": "SelfieEmployeeGrant"
-      },
-      "SelfieInfo": {
-        "properties": {
-          "photo_code": {
-            "type": "string",
-            "title": "Photo Code"
-          },
-          "address": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Address"
-          }
-        },
-        "type": "object",
-        "required": [
-          "photo_code"
-        ],
-        "title": "SelfieInfo"
-      },
-      "SelfieRequest": {
-        "properties": {
-          "photoCode": {
-            "type": "string",
-            "minLength": 1,
-            "title": "Photocode"
-          },
-          "timestamp": {
-            "type": "integer",
-            "title": "Timestamp"
-          },
-          "timezoneID": {
-            "type": "string",
-            "title": "Timezoneid",
-            "default": "Asia/Jakarta"
-          },
-          "lat": {
-            "type": "number",
-            "maximum": 90.0,
-            "minimum": -90.0,
-            "title": "Lat"
-          },
-          "lng": {
-            "type": "number",
-            "maximum": 180.0,
-            "minimum": -180.0,
-            "title": "Lng"
-          },
-          "address": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Address"
-          },
-          "deviceID": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Deviceid"
-          },
-          "deviceModel": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Devicemodel"
-          }
-        },
-        "type": "object",
-        "required": [
-          "photoCode",
-          "timestamp",
-          "lat",
-          "lng"
-        ],
-        "title": "SelfieRequest"
       },
       "SettingItem": {
         "properties": {
@@ -47215,6 +46384,18 @@
             "minimum": 0.0,
             "title": "Salary"
           },
+          "allowance": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowance"
+          },
           "is_salary_below_threshold": {
             "anyOf": [
               {
@@ -47282,62 +46463,6 @@
           "action"
         ],
         "title": "VisitApprovalAction"
-      },
-      "VisitRequest": {
-        "properties": {
-          "gps_lat": {
-            "type": "number",
-            "maximum": 90.0,
-            "minimum": -90.0,
-            "title": "Gps Lat"
-          },
-          "gps_long": {
-            "type": "number",
-            "maximum": 180.0,
-            "minimum": -180.0,
-            "title": "Gps Long"
-          },
-          "visit_date": {
-            "type": "string",
-            "format": "date",
-            "title": "Visit Date"
-          },
-          "visit_time": {
-            "type": "string",
-            "title": "Visit Time"
-          },
-          "reason": {
-            "type": "string",
-            "minLength": 5,
-            "title": "Reason"
-          },
-          "location_name": {
-            "type": "string",
-            "minLength": 2,
-            "title": "Location Name"
-          },
-          "visit_photo_url": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Visit Photo Url"
-          }
-        },
-        "type": "object",
-        "required": [
-          "gps_lat",
-          "gps_long",
-          "visit_date",
-          "visit_time",
-          "reason",
-          "location_name"
-        ],
-        "title": "VisitRequest"
       },
       "VisitResponse": {
         "properties": {
@@ -47975,10 +47100,6 @@
     {
       "name": "HR Assignments",
       "description": "Super Admin: manage HR scope assignments"
-    },
-    {
-      "name": "Selfie Access",
-      "description": "Manajemen whitelist karyawan untuk absensi selfie dari mobile"
     }
   ]
 }

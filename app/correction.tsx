@@ -127,7 +127,7 @@ export default function CorrectionScreen() {
         limit: 100,
       });
     },
-    enabled: attendancePickerVisible && !!user?.id,
+    enabled: modalVisible && !!user?.id,
   });
 
   const { data: selectedCorrectionDetail, isLoading: isLoadingDetail, isError: isDetailError, refetch: refetchDetail } = useQuery({
@@ -259,7 +259,7 @@ export default function CorrectionScreen() {
   };
 
   const attendanceLabel = useMemo(() => {
-    if (!selectedAttendance) return 'Tap untuk pilih dari daftar';
+    if (!selectedAttendance) return 'Silakan pilih kehadiran terlebih dahulu';
     return `${getAttendanceDate(selectedAttendance)} · ${formatTime(getCheckIn(selectedAttendance))} - ${formatTime(getCheckOut(selectedAttendance))}`;
   }, [selectedAttendance]);
 
@@ -425,239 +425,236 @@ export default function CorrectionScreen() {
       {/* Creation Modal */}
       <Modal
         visible={modalVisible}
-        transparent
         animationType="slide"
         onRequestClose={resetForm}
       >
-        <View className="flex-1 bg-black/40 justify-end">
+        <SafeAreaView className="flex-1 bg-background">
           <KeyboardAvoidingView
+            className="flex-1"
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
-            className="bg-background rounded-t-[32px] shadow-2xl relative overflow-hidden"
-            style={{ maxHeight: '90%', minHeight: '50%' }}
           >
-            {!attendancePickerVisible ? (
-              <>
-                <View className="px-6 pt-6 flex-row justify-between items-start mb-4">
-                  <View>
-                    <Text className="font-manrope-extrabold text-2xl text-primary">Ajukan Koreksi</Text>
-                    <Text className="font-inter-medium text-xs text-text-muted mt-0.5">
-                      Koreksi jam masuk/pulang kehadiran yang keliru
+            <View className="flex-row items-center px-5 pt-2 pb-4 z-10">
+              <Pressable
+                onPress={resetForm}
+                className="w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm active:opacity-60"
+                style={{ flexShrink: 0 }}
+                accessibilityRole="button"
+                accessibilityLabel="Tutup form koreksi"
+              >
+                <MaterialIcons name="arrow-back" size={22} color={Tokens.colors.primary} />
+              </Pressable>
+              <View className="flex-1 min-w-0 ml-3 pr-1">
+                <Text className="font-manrope-extrabold text-[26px] leading-[32px] text-primary" numberOfLines={1} ellipsizeMode="tail">
+                  Pengajuan Koreksi
+                </Text>
+                <Text className="font-inter-medium text-sm text-text-muted mt-0.5" numberOfLines={1}>
+                  Koreksi jam masuk dan pulang yang keliru
+                </Text>
+              </View>
+            </View>
+
+            <View className="flex-1 relative">
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
+              >
+                <GlassCard style={{ padding: 16, marginBottom: 16 }}>
+                  <View className="flex-row items-center justify-between mb-2">
+                    <Text className="font-inter-bold text-sm text-primary">Pilih Kehadiran</Text>
+                    {attendancePickerVisible ? (
+                      <Pressable onPress={() => setAttendancePickerVisible(false)} className="px-2 py-1">
+                        <Text className="font-inter-bold text-[11px] text-primary">Tutup</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                  <Pressable
+                    className="flex-row items-center justify-between px-4 py-3 rounded-xl bg-primary/5 border border-primary/10 active:opacity-60"
+                    onPress={() => setAttendancePickerVisible((prev) => !prev)}
+                  >
+                    <View className="flex-1 pr-3">
+                      <Text className="font-inter-bold text-sm text-on-surface" numberOfLines={1}>
+                        {attendanceLabel}
+                      </Text>
+                      {selectedAttendance && (
+                        <Text className="font-inter-medium text-[10px] text-text-muted mt-0.5">
+                          Jam awal: {formatTime(getCheckIn(selectedAttendance))} - {formatTime(getCheckOut(selectedAttendance))}
+                        </Text>
+                      )}
+                    </View>
+                    <MaterialIcons name={attendancePickerVisible ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={22} color={Tokens.colors.textMuted} />
+                  </Pressable>
+
+                  {attendancePickerVisible ? (
+                    <View className="mt-3 rounded-2xl bg-black/5 p-3">
+                      <Text className="font-inter text-[11px] text-text-muted mb-3">Pilih salah satu absensi 30 hari terakhir.</Text>
+                      <ScrollView showsVerticalScrollIndicator={false} nestedScrollEnabled style={{ maxHeight: 280 }}>
+                        {isLoadingAttendance ? (
+                          <Text className="font-inter text-sm text-text-muted py-6 text-center">Memuat data...</Text>
+                        ) : attendanceHistory.length === 0 ? (
+                          <View className="p-4 bg-black/5 rounded-xl border border-dashed border-outline">
+                            <Text className="font-inter text-xs text-text-muted text-center">Tidak ada data kehadiran</Text>
+                          </View>
+                        ) : (
+                          attendanceHistory.map((att: AttendanceItem) => {
+                            const isSelected = getAttendanceRecordId(selectedAttendance) === getAttendanceRecordId(att);
+                            return (
+                              <Pressable
+                                key={att.id}
+                                className={`p-4 rounded-xl border mb-2 ${isSelected ? 'bg-primary/5 border-primary' : 'bg-[#f8f8f8] border-transparent'}`}
+                                onPress={() => handlePickAttendance(att)}
+                              >
+                                <View className="flex-row justify-between items-center">
+                                  <View className="flex-row items-center gap-3 flex-1">
+                                    <View className={`w-8 h-8 rounded-full items-center justify-center ${isSelected ? 'bg-primary' : 'bg-outline/20'}`}>
+                                      <MaterialIcons name="event" size={14} color={isSelected ? '#fff' : Tokens.colors.textMuted} />
+                                    </View>
+                                    <View className="flex-1">
+                                      <View className="flex-row items-center gap-2">
+                                        <Text className={`font-inter-bold text-sm ${isSelected ? 'text-primary' : 'text-on-surface'}`}>
+                                          {getAttendanceDate(att)}
+                                        </Text>
+                                        {att.attendance_status && (() => {
+                                          const badgeProps = getAttendanceBadgeProps(att.attendance_status);
+                                          return (
+                                            <View className={`px-1.5 py-0.5 rounded-md ${badgeProps.bgClass}`}>
+                                              <Text className={`font-inter-bold text-[8px] ${badgeProps.textClass}`}>
+                                                {badgeProps.label}
+                                              </Text>
+                                            </View>
+                                          );
+                                        })()}
+                                      </View>
+                                      <Text className="font-inter-medium text-[10px] text-text-muted mt-0.5">
+                                        {formatTime(getCheckIn(att))} - {formatTime(getCheckOut(att))}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                  {isSelected ? <MaterialIcons name="check-circle" size={20} color={Tokens.colors.primary} /> : null}
+                                </View>
+                              </Pressable>
+                            );
+                          })
+                        )}
+                      </ScrollView>
+                    </View>
+                  ) : null}
+                </GlassCard>
+
+                <View className="flex-row gap-3 mb-4">
+                  <View className="flex-1 bg-white border border-black/5 rounded-2xl p-3 shadow-sm">
+                    <View className="flex-row justify-between items-center mb-2">
+                      <Text className="font-inter-bold text-[10px] text-text-muted uppercase">Check In</Text>
+                      <Pressable onPress={() => setCheckinExists(!checkinExists)}>
+                        <MaterialIcons
+                          name={checkinExists ? 'check-box' : 'check-box-outline-blank'}
+                          size={18}
+                          color={Tokens.colors.primary}
+                        />
+                      </Pressable>
+                    </View>
+                    <View
+                      className={`bg-primary/5 rounded-2xl border border-primary/10 px-2 py-4 items-center justify-center ${!checkinExists && 'opacity-40'}`}
+                    >
+                      {selectedAttendance && checkinExists ? (
+                        <View className="flex-row items-center justify-center w-full">
+                          <TextInput
+                            value={correctedCheckinHour}
+                            onChangeText={(t) => setCorrectedCheckinHour(t.replace(/[^0-9]/g, '').slice(0, 2))}
+                            keyboardType="number-pad"
+                            maxLength={2}
+                            selectTextOnFocus
+                            className="flex-1 font-manrope-extrabold text-[32px] leading-[36px] text-primary tracking-tight p-0 text-right"
+                          />
+                          <Text className="font-manrope-extrabold text-[28px] leading-[36px] text-primary tracking-tight p-0 mx-1">:</Text>
+                          <TextInput
+                            value={correctedCheckinMin}
+                            onChangeText={(t) => setCorrectedCheckinMin(t.replace(/[^0-9]/g, '').slice(0, 2))}
+                            keyboardType="number-pad"
+                            maxLength={2}
+                            selectTextOnFocus
+                            className="flex-1 font-manrope-extrabold text-[32px] leading-[36px] text-primary tracking-tight p-0 text-left"
+                          />
+                        </View>
+                      ) : (
+                        <Text className="font-manrope-extrabold text-[28px] leading-[36px] text-text-muted tracking-tight text-center w-full">
+                          --:--
+                        </Text>
+                      )}
+                    </View>
+                    <Text className="font-inter text-[10px] text-text-muted mt-2 text-center">
+                      Tap angka untuk ubah
                     </Text>
                   </View>
-                  <Pressable className="w-9 h-9 rounded-full bg-black/5 items-center justify-center" onPress={resetForm}>
-                    <MaterialIcons name="close" size={20} color={Tokens.colors.text} />
-                  </Pressable>
-                </View>
 
-                <ScrollView
-                  showsVerticalScrollIndicator={false}
-                  keyboardShouldPersistTaps="handled"
-                  contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 24 }}
-                >
-                  {/* Select Attendance Field */}
-                  <View className="mb-4">
-                    <Text className="font-inter-bold text-sm text-primary mb-2">Pilih Kehadiran</Text>
-                    <Pressable
-                      className="flex-row items-center justify-between px-4 py-3 rounded-xl bg-primary/5 border border-primary/10 active:opacity-60"
-                      onPress={() => setAttendancePickerVisible(true)}
-                    >
-                      <View className="flex-1 pr-3">
-                        <Text className="font-inter-bold text-sm text-on-surface" numberOfLines={1}>
-                          {selectedAttendance ? attendanceLabel : 'Tap untuk memilih data kehadiran'}
-                        </Text>
-                        {selectedAttendance && (
-                          <Text className="font-inter-medium text-[10px] text-text-muted mt-0.5">
-                            Jam awal: {formatTime(getCheckIn(selectedAttendance))} - {formatTime(getCheckOut(selectedAttendance))}
-                          </Text>
-                        )}
-                      </View>
-                      <MaterialIcons name="keyboard-arrow-down" size={22} color={Tokens.colors.textMuted} />
-                    </Pressable>
-                  </View>
-
-                  {selectedAttendance && (
-                    <>
-                      <View className="flex-row gap-3 mb-4">
-                        {/* Check In Column */}
-                        <View className="flex-1 bg-white border border-black/5 rounded-2xl p-3 shadow-sm">
-                          <View className="flex-row justify-between items-center mb-2">
-                            <Text className="font-inter-bold text-[10px] text-text-muted uppercase">Check In</Text>
-                            <Pressable onPress={() => setCheckinExists(!checkinExists)}>
-                              <MaterialIcons
-                                name={checkinExists ? "check-box" : "check-box-outline-blank"}
-                                size={18}
-                                color={Tokens.colors.primary}
-                              />
-                            </Pressable>
-                          </View>
-                          <View
-                            className={`bg-primary/5 rounded-2xl border border-primary/10 px-2 py-4 items-center justify-center ${!checkinExists && 'opacity-40'}`}
-                          >
-                            {checkinExists ? (
-                              <View className="flex-row items-center justify-center w-full">
-                                <TextInput
-                                  value={correctedCheckinHour}
-                                  onChangeText={(t) => setCorrectedCheckinHour(t.replace(/[^0-9]/g, '').slice(0, 2))}
-                                  keyboardType="number-pad"
-                                  maxLength={2}
-                                  selectTextOnFocus
-                                  className="flex-1 font-manrope-extrabold text-[32px] leading-[36px] text-primary tracking-tight p-0 text-right"
-                                />
-                                <Text className="font-manrope-extrabold text-[28px] leading-[36px] text-primary tracking-tight p-0 mx-1">:</Text>
-                                <TextInput
-                                  value={correctedCheckinMin}
-                                  onChangeText={(t) => setCorrectedCheckinMin(t.replace(/[^0-9]/g, '').slice(0, 2))}
-                                  keyboardType="number-pad"
-                                  maxLength={2}
-                                  selectTextOnFocus
-                                  className="flex-1 font-manrope-extrabold text-[32px] leading-[36px] text-primary tracking-tight p-0 text-left"
-                                />
-                              </View>
-                            ) : (
-                              <Text className="font-manrope-extrabold text-[28px] leading-[36px] text-text-muted tracking-tight text-center w-full">
-                                --:--
-                              </Text>
-                            )}
-                          </View>
-                          <Text className="font-inter text-[10px] text-text-muted mt-2 text-center">
-                            Tap angka untuk ubah
-                          </Text>
-                        </View>
-
-                        {/* Check Out Column */}
-                        <View className="flex-1 bg-white border border-black/5 rounded-2xl p-3 shadow-sm">
-                          <View className="flex-row justify-between items-center mb-2">
-                            <Text className="font-inter-bold text-[10px] text-text-muted uppercase">Check Out</Text>
-                            <Pressable onPress={() => setCheckoutExists(!checkoutExists)}>
-                              <MaterialIcons
-                                name={checkoutExists ? "check-box" : "check-box-outline-blank"}
-                                size={18}
-                                color={Tokens.colors.primary}
-                              />
-                            </Pressable>
-                          </View>
-                          <View
-                            className={`bg-primary/5 rounded-2xl border border-primary/10 px-2 py-4 items-center justify-center ${!checkoutExists && 'opacity-40'}`}
-                          >
-                            {checkoutExists ? (
-                              <View className="flex-row items-center justify-center w-full">
-                                <TextInput
-                                  value={correctedCheckoutHour}
-                                  onChangeText={(t) => setCorrectedCheckoutHour(t.replace(/[^0-9]/g, '').slice(0, 2))}
-                                  keyboardType="number-pad"
-                                  maxLength={2}
-                                  selectTextOnFocus
-                                  className="flex-1 font-manrope-extrabold text-[32px] leading-[36px] text-primary tracking-tight p-0 text-right"
-                                />
-                                <Text className="font-manrope-extrabold text-[28px] leading-[36px] text-primary tracking-tight p-0 mx-1">:</Text>
-                                <TextInput
-                                  value={correctedCheckoutMin}
-                                  onChangeText={(t) => setCorrectedCheckoutMin(t.replace(/[^0-9]/g, '').slice(0, 2))}
-                                  keyboardType="number-pad"
-                                  maxLength={2}
-                                  selectTextOnFocus
-                                  className="flex-1 font-manrope-extrabold text-[32px] leading-[36px] text-primary tracking-tight p-0 text-left"
-                                />
-                              </View>
-                            ) : (
-                              <Text className="font-manrope-extrabold text-[28px] leading-[36px] text-text-muted tracking-tight text-center w-full">
-                                --:--
-                              </Text>
-                            )}
-                          </View>
-                          <Text className="font-inter text-[10px] text-text-muted mt-2 text-center">
-                            Tap angka untuk ubah
-                          </Text>
-                        </View>
-                      </View>
-
-                      <Input
-                        label="Alasan Koreksi"
-                        value={reason}
-                        onChangeText={setReason}
-                        placeholder="Contoh: lupa absen check-in karena buru-buru"
-                        multiline
-                        numberOfLines={3}
-                        style={{ height: 88, textAlignVertical: 'top', paddingTop: 12 }}
-                      />
-
-                      <Button
-                        title="Kirim Koreksi"
-                        onPress={submitCorrection}
-                        loading={createMutation.isPending}
-                        disabled={createMutation.isPending}
-                        className="h-14 rounded-2xl mt-4"
-                      />
-                    </>
-                  )}
-                </ScrollView>
-              </>
-            ) : (
-              <View className="flex-1 min-h-[300px]">
-                <View className="px-6 pt-6 flex-row justify-between items-center mb-4">
-                  <View>
-                    <Text className="font-manrope-bold text-xl text-primary">Pilih Kehadiran</Text>
-                    <Text className="font-inter text-xs text-text-muted">Tap salah satu baris absensi 30 hari terakhir</Text>
-                  </View>
-                  <Pressable onPress={() => setAttendancePickerVisible(false)} className="w-9 h-9 rounded-full bg-black/5 items-center justify-center">
-                    <MaterialIcons name="close" size={18} color={Tokens.colors.text} />
-                  </Pressable>
-                </View>
-
-                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 24 }}>
-                  {isLoadingAttendance ? (
-                    <Text className="font-inter text-sm text-text-muted py-6 text-center">Memuat data...</Text>
-                  ) : attendanceHistory.length === 0 ? (
-                    <View className="p-4 bg-black/5 rounded-xl border border-dashed border-outline">
-                      <Text className="font-inter text-xs text-text-muted text-center">Tidak ada data kehadiran</Text>
+                  <View className="flex-1 bg-white border border-black/5 rounded-2xl p-3 shadow-sm">
+                    <View className="flex-row justify-between items-center mb-2">
+                      <Text className="font-inter-bold text-[10px] text-text-muted uppercase">Check Out</Text>
+                      <Pressable onPress={() => setCheckoutExists(!checkoutExists)}>
+                        <MaterialIcons
+                          name={checkoutExists ? 'check-box' : 'check-box-outline-blank'}
+                          size={18}
+                          color={Tokens.colors.primary}
+                        />
+                      </Pressable>
                     </View>
-                  ) : (
-                    attendanceHistory.map((att: AttendanceItem) => {
-                      const isSelected = getAttendanceRecordId(selectedAttendance) === getAttendanceRecordId(att);
-                      return (
-                        <Pressable
-                          key={att.id}
-                          className={`p-4 rounded-xl border mb-2 ${isSelected ? 'bg-primary/5 border-primary' : 'bg-[#f8f8f8] border-transparent'}`}
-                          onPress={() => handlePickAttendance(att)}
-                        >
-                          <View className="flex-row justify-between items-center">
-                            <View className="flex-row items-center gap-3 flex-1">
-                              <View className={`w-8 h-8 rounded-full items-center justify-center ${isSelected ? 'bg-primary' : 'bg-outline/20'}`}>
-                                <MaterialIcons name="event" size={14} color={isSelected ? '#fff' : Tokens.colors.textMuted} />
-                              </View>
-                              <View className="flex-1">
-                                <View className="flex-row items-center gap-2">
-                                  <Text className={`font-inter-bold text-sm ${isSelected ? 'text-primary' : 'text-on-surface'}`}>
-                                    {getAttendanceDate(att)}
-                                  </Text>
-                                  {att.attendance_status && (() => {
-                                    const badgeProps = getAttendanceBadgeProps(att.attendance_status);
-                                    return (
-                                      <View className={`px-1.5 py-0.5 rounded-md ${badgeProps.bgClass}`}>
-                                        <Text className={`font-inter-bold text-[8px] ${badgeProps.textClass}`}>
-                                          {badgeProps.label}
-                                        </Text>
-                                      </View>
-                                    );
-                                  })()}
-                                </View>
-                                <Text className="font-inter-medium text-[10px] text-text-muted mt-0.5">
-                                  {formatTime(getCheckIn(att))} - {formatTime(getCheckOut(att))}
-                                </Text>
-                              </View>
-                            </View>
-                            {isSelected ? <MaterialIcons name="check-circle" size={20} color={Tokens.colors.primary} /> : null}
-                          </View>
-                        </Pressable>
-                      );
-                    })
-                  )}
-                </ScrollView>
-              </View>
-            )}
+                    <View
+                      className={`bg-primary/5 rounded-2xl border border-primary/10 px-2 py-4 items-center justify-center ${!checkoutExists && 'opacity-40'}`}
+                    >
+                      {selectedAttendance && checkoutExists ? (
+                        <View className="flex-row items-center justify-center w-full">
+                          <TextInput
+                            value={correctedCheckoutHour}
+                            onChangeText={(t) => setCorrectedCheckoutHour(t.replace(/[^0-9]/g, '').slice(0, 2))}
+                            keyboardType="number-pad"
+                            maxLength={2}
+                            selectTextOnFocus
+                            className="flex-1 font-manrope-extrabold text-[32px] leading-[36px] text-primary tracking-tight p-0 text-right"
+                          />
+                          <Text className="font-manrope-extrabold text-[28px] leading-[36px] text-primary tracking-tight p-0 mx-1">:</Text>
+                          <TextInput
+                            value={correctedCheckoutMin}
+                            onChangeText={(t) => setCorrectedCheckoutMin(t.replace(/[^0-9]/g, '').slice(0, 2))}
+                            keyboardType="number-pad"
+                            maxLength={2}
+                            selectTextOnFocus
+                            className="flex-1 font-manrope-extrabold text-[32px] leading-[36px] text-primary tracking-tight p-0 text-left"
+                          />
+                        </View>
+                      ) : (
+                        <Text className="font-manrope-extrabold text-[28px] leading-[36px] text-text-muted tracking-tight text-center w-full">
+                          --:--
+                        </Text>
+                      )}
+                    </View>
+                    <Text className="font-inter text-[10px] text-text-muted mt-2 text-center">
+                      Tap angka untuk ubah
+                    </Text>
+                  </View>
+                </View>
+
+                <Input
+                  label="Alasan Koreksi"
+                  value={reason}
+                  onChangeText={setReason}
+                  placeholder="Contoh: lupa absen check-in karena buru-buru"
+                  multiline
+                  numberOfLines={3}
+                  style={{ height: 88, textAlignVertical: 'top', paddingTop: 12 }}
+                />
+
+                <Button
+                  title="Kirim Koreksi"
+                  onPress={submitCorrection}
+                  loading={createMutation.isPending}
+                  disabled={createMutation.isPending || !selectedAttendance}
+                  className="h-14 rounded-2xl mt-4"
+                />
+              </ScrollView>
+            </View>
           </KeyboardAvoidingView>
-        </View>
+        </SafeAreaView>
       </Modal>
 
       <Modal

@@ -24,8 +24,10 @@ import { GlassCard } from '../src/components/ui/GlassCard';
 import { Input } from '../src/components/ui/Input';
 import { SkeletonCard } from '../src/components/ui/Skeleton';
 import { StatusBadge } from '../src/components/ui/StatusBadge';
+import { filterVisitsByDescendants, findDescendantIds } from '../src/features/visit/hierarchy';
 import { Tokens } from '../src/core/theme/tokens';
 import { attendanceService } from '../src/services/attendance.service';
+import { employeeService } from '../src/services/employee.service';
 import { useAuthStore } from '../src/stores/auth.store';
 import { VisitItem, VisitRequest } from '../src/types/attendance';
 
@@ -53,9 +55,6 @@ export default function VisitScreen() {
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
 
-  const isManager = ["MANAGER", "MANAGER_HR_ADMIN", "MANAGER_HR_PAYROLL", "HEAD_DIVISION", "CEO", "DIRECTOR"]
-    .includes((user?.role || "").toUpperCase());
-
   // 1. Fetch Visit History
   const { data: history = [], isLoading: isLoadingMe, refetch: refetchMe, isFetching: isFetchingMe } = useQuery({
     queryKey: ['visit-history', 'me', user?.id, selectedYear, selectedMonth],
@@ -63,17 +62,43 @@ export default function VisitScreen() {
     enabled: !!user?.id,
   });
 
+  const { data: hierarchy = [] } = useQuery({
+    queryKey: ['employee-hierarchy', user?.company_id, user?.branch_id],
+    queryFn: () => employeeService.getHierarchy({
+      company_id: user?.company_id ?? undefined,
+      branch_id: user?.branch_id ?? undefined,
+    }),
+    enabled: !!user?.id,
+  });
+
+  const subordinateIds = useMemo(
+    () => (user?.id ? findDescendantIds(hierarchy, user.id) : []),
+    [hierarchy, user?.id]
+  );
+
+  useEffect(() => {
+    if (activeTab === 'team' && subordinateIds.length === 0) {
+      setActiveTab('me');
+    }
+  }, [activeTab, subordinateIds.length]);
+
   // Fetch Team Visits
   const { data: teamVisitsRaw, isLoading: isLoadingTeam, refetch: refetchTeam, isFetching: isFetchingTeam } = useQuery({
-    queryKey: ['visit-history', 'team', selectedYear, selectedMonth],
-    queryFn: () => attendanceService.listVisits({ year: selectedYear, month: selectedMonth, limit: 50 }),
-    enabled: isManager && activeTab === 'team',
+    queryKey: ['visit-history', 'team', user?.company_id, user?.branch_id, selectedYear, selectedMonth],
+    queryFn: () => attendanceService.listVisits({
+      company_id: user?.company_id ?? undefined,
+      branch_id: user?.branch_id ?? undefined,
+      year: selectedYear,
+      month: selectedMonth,
+      limit: 50,
+    }),
+    enabled: subordinateIds.length > 0 && activeTab === 'team',
   });
 
   const teamVisits = useMemo(() => {
     if (!teamVisitsRaw) return [];
-    return teamVisitsRaw.filter((v: VisitItem) => v.employee_id !== user?.id);
-  }, [teamVisitsRaw, user?.id]);
+    return filterVisitsByDescendants(teamVisitsRaw, subordinateIds);
+  }, [teamVisitsRaw, subordinateIds]);
 
   const currentData = activeTab === 'me' ? history : teamVisits;
   const isLoading = activeTab === 'me' ? isLoadingMe : isLoadingTeam;
@@ -288,7 +313,7 @@ export default function VisitScreen() {
               />
             </View>
 
-            {isManager && (
+            {subordinateIds.length > 0 && (
               <View className="flex-row bg-black/5 p-1 rounded-xl mb-6">
                 <Pressable
                   onPress={() => setActiveTab('me')}
@@ -300,13 +325,13 @@ export default function VisitScreen() {
                   onPress={() => setActiveTab('team')}
                   className={`flex-1 items-center py-2.5 rounded-lg ${activeTab === 'team' ? 'bg-white shadow-sm' : ''}`}
                 >
-                  <Text className={`font-inter-bold text-sm ${activeTab === 'team' ? 'text-primary' : 'text-text-muted'}`}>Riwayat Tim</Text>
+                  <Text className={`font-inter-bold text-sm ${activeTab === 'team' ? 'text-primary' : 'text-text-muted'}`}>Riwayat Bawahan</Text>
                 </Pressable>
               </View>
             )}
 
             <Text className="font-manrope-bold text-lg text-primary mb-4">
-              {activeTab === 'team' ? 'Riwayat Kunjungan Tim' : 'Riwayat Kunjungan Saya'}
+              {activeTab === 'team' ? 'Riwayat Visit Bawahan' : 'Riwayat Kunjungan Saya'}
             </Text>
 
             {isLoading && (
@@ -461,7 +486,11 @@ export default function VisitScreen() {
                       visit_time: currentTime,
                       reason: reason.trim(),
                       location_name: locationName.trim(),
-                      visit_photo_url: photoFile ? `https://hris.javasuperfood.com/uploads/visits/visit_${user?.id}_${Date.now()}.jpg` : null
+                      photo: photoFile ? {
+                        uri: photoFile.uri,
+                        name: photoFile.name,
+                        type: photoFile.mimeType,
+                      } : null,
                     });
                   }}
                   loading={submitMutation.isPending}
