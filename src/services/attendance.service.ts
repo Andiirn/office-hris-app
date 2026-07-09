@@ -236,6 +236,18 @@ export const attendanceService = {
     return unwrapData<any>(response.data);
   },
 
+  async approveVisit(visitId: string): Promise<any> {
+    const response = await api.post(`/attendance/visit/${visitId}/approve`);
+    return unwrapData<any>(response.data);
+  },
+
+  async rejectVisit(visitId: string, reason: string): Promise<any> {
+    const response = await api.post(`/attendance/visit/${visitId}/reject`, {
+      reason,
+    });
+    return unwrapData<any>(response.data);
+  },
+
   async listCorrections(query?: CorrectionListQuery): Promise<AttendanceCorrection[]> {
     try {
       devLog('[AttendanceService] Fetching corrections with query:', JSON.stringify(query));

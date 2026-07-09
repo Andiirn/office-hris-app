@@ -12,7 +12,7 @@ export type HomeMenuItem = {
   disabled?: boolean;
 };
 
-export function buildHomeMenuItems(role?: string | null, approvalCount?: number): HomeMenuItem[] {
+export function buildHomeMenuItems(role?: string | null, approvalCount?: number, visitPendingCount?: number): HomeMenuItem[] {
   const items: HomeMenuItem[] = [
     { icon: 'event-available', title: 'Izin & Cuti', color: '#f59e0b', bgColor: '#fef3c7', onPress: () => router.push('/leave') },
     { icon: 'work-history', title: 'Lembur', color: '#8b5cf6', bgColor: '#ede9fe', onPress: () => router.push('/overtime') },
@@ -20,7 +20,14 @@ export function buildHomeMenuItems(role?: string | null, approvalCount?: number)
     { icon: 'event', title: 'Absensi', color: '#3b82f6', bgColor: '#dbeafe', onPress: () => router.push('/attendance') },
     { icon: 'fact-check', title: 'Koreksi', color: '#14b8a6', bgColor: '#ccfbf1', onPress: () => router.push('/correction' as any) },
     { icon: 'exit-to-app', title: 'Resign', color: '#ef4444', bgColor: '#fee2e2', onPress: () => router.push('/resign') },
-    { icon: 'place', title: 'Visit', color: '#ec4899', bgColor: '#fce7f3', onPress: () => router.push('/visit' as any) },
+    {
+      icon: 'place',
+      title: 'Visit',
+      color: '#ec4899',
+      bgColor: '#fce7f3',
+      onPress: () => router.push((visitPendingCount && visitPendingCount > 0 ? '/visit?tab=team' : '/visit') as any),
+      badgeCount: visitPendingCount && visitPendingCount > 0 ? visitPendingCount : undefined,
+    },
   ];
 
   const hasApprovalAccess = canApprove(role);

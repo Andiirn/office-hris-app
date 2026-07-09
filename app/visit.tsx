@@ -2,7 +2,7 @@ import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -35,6 +35,7 @@ export default function VisitScreen() {
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const router = useRouter();
+  const params = useLocalSearchParams<{ tab?: string }>();
   const cameraRef = useRef<React.ElementRef<typeof CameraView> | null>(null);
 
   const [modalVisible, setModalVisible] = useState(false);
@@ -45,9 +46,12 @@ export default function VisitScreen() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const [selectedVisitAction, setSelectedVisitAction] = useState<VisitItem | null>(null);
+  const [selectedVisitDetail, setSelectedVisitDetail] = useState<VisitItem | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
 
   // Tab State
-  const [activeTab, setActiveTab] = useState<'me' | 'team'>('me');
+  const [activeTab, setActiveTab] = useState<'me' | 'team'>(params.tab === 'team' ? 'team' : 'me');
 
   // Preview Image State
   const [previewVisible, setPreviewVisible] = useState(false);
@@ -84,6 +88,12 @@ export default function VisitScreen() {
       setActiveTab('me');
     }
   }, [activeTab, subordinateIds.length]);
+
+  useEffect(() => {
+    if (params.tab === 'team' && subordinateIds.length > 0) {
+      setActiveTab('team');
+    }
+  }, [params.tab, subordinateIds.length]);
 
   // Fetch Team Visits
   const { data: teamVisitsRaw, isLoading: isLoadingTeam, refetch: refetchTeam, isFetching: isFetchingTeam } = useQuery({
@@ -196,6 +206,27 @@ export default function VisitScreen() {
     }
   });
 
+  const visitActionMutation = useMutation({
+    mutationFn: ({ visitId, action, reason }: { visitId: string; action: 'APPROVE' | 'REJECT'; reason?: string }) => (
+      action === 'APPROVE'
+        ? attendanceService.approveVisit(visitId)
+        : attendanceService.rejectVisit(visitId, reason ?? '')
+    ),
+    onSuccess: async (_, variables) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['visit-history', 'team', user?.company_id, user?.branch_id, selectedYear, selectedMonth] }),
+        queryClient.refetchQueries({ queryKey: ['visit-history', 'team', user?.company_id, user?.branch_id, selectedYear, selectedMonth], type: 'active' }),
+      ]);
+      setSelectedVisitAction(null);
+      setRejectReason('');
+      Alert.alert('Sukses', variables.action === 'APPROVE' ? 'Visit berhasil disetujui' : 'Visit berhasil ditolak');
+    },
+    onError: (error: any) => {
+      const errMsg = error?.response?.data?.message || 'Gagal memproses visit';
+      Alert.alert('Gagal', errMsg);
+    },
+  });
+
   const onRefresh = () => {
     if (activeTab === 'me') {
       refetchMe();
@@ -216,31 +247,63 @@ export default function VisitScreen() {
   };
 
   const isFormValid = locationName.trim().length >= 2 && reason.trim().length >= 5 && !!coords;
+  const canSubmitReject = rejectReason.trim().length >= 2 && !!selectedVisitAction && !visitActionMutation.isPending;
+
+  const handleApproveVisit = (item: VisitItem) => {
+    Alert.alert(
+      'Setujui Visit',
+      `Setujui kunjungan ${item.employee?.name || item.employee?.full_name || 'karyawan ini'}?`,
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: 'Setujui',
+          onPress: () => visitActionMutation.mutate({ visitId: item.id, action: 'APPROVE' }),
+        },
+      ]
+    );
+  };
+
+  const handleRejectVisit = (item: VisitItem) => {
+    setSelectedVisitAction(item);
+    setRejectReason('');
+  };
 
   const renderVisitCard = ({ item }: { item: VisitItem }) => (
-    <GlassCard style={{ padding: 16, marginBottom: 16 }}>
+    <Pressable
+      disabled={activeTab !== 'me'}
+      onPress={() => {
+        if (activeTab === 'me') {
+          setSelectedVisitDetail(item);
+        }
+      }}
+    >
+      <GlassCard style={{ padding: 16, marginBottom: 16, backgroundColor: 'rgba(255, 255, 255, 0.95)' }}>
       {activeTab === 'team' && item.employee && (
-        <View className="mb-3 flex-row items-center gap-2 border-b border-black/5 pb-2">
-          <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center">
+        <View className="flex-row items-center flex-1 mr-2 mb-3" style={{ gap: 8 }}>
+          <View className="w-9 h-9 rounded-2xl bg-primary/5 items-center justify-center">
             <Text className="font-manrope-bold text-primary text-xs">
               {(item.employee?.name || item.employee?.full_name || '?').charAt(0).toUpperCase()}
             </Text>
           </View>
           <View className="flex-1">
-            <Text className="font-inter-bold text-sm text-black">{item.employee.name || item.employee.full_name || 'Tanpa Nama'}</Text>
-            <Text className="font-inter text-[10px] text-text-muted">{item.employee.nik || '-'}</Text>
+            <Text className="font-manrope-bold text-sm text-on-surface" numberOfLines={1}>
+              {item.employee.name || item.employee.full_name || 'Tanpa Nama'}
+            </Text>
+            <Text className="font-inter-medium text-[10px] text-text-muted uppercase tracking-wider">
+              {item.employee.nik || '-'}
+            </Text>
           </View>
         </View>
       )}
 
       <View className="flex-row justify-between items-start mb-3">
         <View className="flex-1 mr-2">
-          <Text className="font-inter-bold text-base text-black" numberOfLines={1}>
+          <Text className="font-manrope-bold text-sm text-on-surface" numberOfLines={1}>
             {item.location_name}
           </Text>
           <View className="flex-row items-center mt-1.5 gap-1.5">
             <MaterialIcons name="event" size={12} color={Tokens.colors.textMuted} />
-            <Text className="font-inter-medium text-xs text-text-muted">
+            <Text className="font-inter text-[11px] text-text-muted">
               {item.visit_date} · {item.visit_time.substring(0, 5)}
             </Text>
           </View>
@@ -248,36 +311,73 @@ export default function VisitScreen() {
         <StatusBadge label={item.status} type={getStatusType(item.status)} />
       </View>
 
-      <View className="bg-black/5 p-3 rounded-xl mb-2">
-        <Text className="font-inter text-sm text-black leading-5">{item.reason}</Text>
-      </View>
-
-      <View className="flex-row items-center justify-between mt-2">
-        <View className="flex-row items-center gap-1.5">
-          <MaterialIcons name="map" size={12} color={Tokens.colors.textMuted} />
-          <Text className="font-inter text-[10px] text-text-muted tabular-nums">
-            GPS: {Number(item.gps_lat).toFixed(6)}, {Number(item.gps_long).toFixed(6)}
+      {activeTab === 'me' ? (
+        <View className="my-2 py-2 border-t border-b border-black/5 gap-1.5">
+          <Text className="font-inter text-xs text-text-muted" numberOfLines={2}>
+            Tujuan: <Text className="font-inter-semibold text-on-surface">{item.reason}</Text>
           </Text>
-        </View>
-        {item.visit_photo_url ? (
-          <Pressable
-            className="flex-row items-center gap-1 bg-primary/10 px-2 py-1 rounded-md active:opacity-60"
-            onPress={() => {
-              setPreviewUrl(item.visit_photo_url!);
-              setPreviewVisible(true);
-            }}
-          >
-            <MaterialIcons name="photo" size={12} color={Tokens.colors.primary} />
-            <Text className="font-inter-bold text-[10px] text-primary">Lihat Foto</Text>
-          </Pressable>
-        ) : (
-          <View className="flex-row items-center gap-1 px-2 py-1 rounded-md">
-            <MaterialIcons name="photo-camera" size={12} color={Tokens.colors.outline} />
-            <Text className="font-inter-medium text-[10px] text-text-muted">Tanpa Foto</Text>
+          <View className="flex-row items-center justify-between mt-1">
+            <Text className="font-inter text-[11px] text-text-muted">
+              {item.visit_photo_url ? 'Foto tersedia' : 'Tanpa foto'}
+            </Text>
+            <View className="flex-row items-center gap-1">
+              <Text className="font-inter-semibold text-[11px] text-primary">Lihat Detail</Text>
+              <MaterialIcons name="chevron-right" size={16} color={Tokens.colors.primary} />
+            </View>
           </View>
-        )}
-      </View>
-    </GlassCard>
+        </View>
+      ) : (
+        <View className="my-2 py-2 border-t border-b border-black/5 gap-1.5">
+          <Text className="font-inter text-xs text-text-muted">
+            Tujuan: <Text className="font-inter-semibold text-on-surface">{item.reason}</Text>
+          </Text>
+          <Text className="font-inter text-xs text-text-muted">
+            Lokasi: <Text className="font-inter-semibold text-on-surface">{item.location_name}</Text>
+          </Text>
+          <Text className="font-inter text-xs text-text-muted">
+            GPS: <Text className="font-inter-semibold text-on-surface">{Number(item.gps_lat).toFixed(6)}, {Number(item.gps_long).toFixed(6)}</Text>
+          </Text>
+          <Text className="font-inter text-xs text-text-muted">
+            Foto: <Text className="font-inter-semibold text-on-surface">{item.visit_photo_url ? 'Tersedia' : 'Tidak ada'}</Text>
+          </Text>
+          {item.visit_photo_url ? (
+            <View className="flex-row items-center mt-0.5">
+              <Text className="font-inter text-xs text-text-muted">Preview: </Text>
+              <Pressable
+                onPress={() => {
+                  setPreviewUrl(item.visit_photo_url!);
+                  setPreviewVisible(true);
+                }}
+              >
+                <Text className="font-inter-semibold text-xs text-primary underline">
+                  Lihat foto
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </View>
+      )}
+
+      {activeTab === 'team' && String(item.status || '').toUpperCase() === 'PENDING' ? (
+        <View className="mt-4 flex-row gap-3">
+          <Pressable
+            className="flex-1 rounded-2xl border border-error bg-white px-4 py-3 items-center active:opacity-60"
+            onPress={() => handleRejectVisit(item)}
+            disabled={visitActionMutation.isPending}
+          >
+            <Text className="font-inter-bold text-sm text-error">Tolak</Text>
+          </Pressable>
+          <Pressable
+            className="flex-1 rounded-2xl bg-primary px-4 py-3 items-center active:opacity-60"
+            onPress={() => handleApproveVisit(item)}
+            disabled={visitActionMutation.isPending}
+          >
+            <Text className="font-inter-bold text-sm text-white">Setujui</Text>
+          </Pressable>
+        </View>
+      ) : null}
+      </GlassCard>
+    </Pressable>
   );
 
   return (
@@ -576,6 +676,145 @@ export default function VisitScreen() {
               resizeMode="contain"
             />
           )}
+        </View>
+      </Modal>
+
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={!!selectedVisitDetail}
+        onRequestClose={() => setSelectedVisitDetail(null)}
+      >
+        <View className="flex-1 bg-black/40 justify-end">
+          <View className="bg-background rounded-t-[32px] p-6 max-h-[85%] shadow-2xl">
+            <View className="flex-row justify-between items-start mb-6">
+              <View className="flex-1 pr-4">
+                <Text className="font-manrope-extrabold text-2xl text-primary">Detail Visit</Text>
+                <Text className="font-inter-medium text-xs text-text-muted mt-0.5">
+                  Informasi lengkap kunjungan Anda.
+                </Text>
+              </View>
+              <Pressable
+                className="w-9 h-9 rounded-full bg-black/5 items-center justify-center"
+                onPress={() => setSelectedVisitDetail(null)}
+              >
+                <MaterialIcons name="close" size={20} color={Tokens.colors.text} />
+              </Pressable>
+            </View>
+
+            {selectedVisitDetail ? (
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <View className="gap-3">
+                  <View className="rounded-2xl border border-black/5 bg-white p-4">
+                    <Text className="font-manrope-bold text-base text-on-surface">{selectedVisitDetail.location_name}</Text>
+                    <Text className="font-inter text-sm text-text-muted mt-1">
+                      {selectedVisitDetail.visit_date} · {selectedVisitDetail.visit_time.substring(0, 5)}
+                    </Text>
+                    <View className="mt-3 self-start">
+                      <StatusBadge label={selectedVisitDetail.status} type={getStatusType(selectedVisitDetail.status)} />
+                    </View>
+                  </View>
+
+                  <View className="rounded-2xl border border-black/5 bg-white p-4 gap-2">
+                    <Text className="font-inter text-xs text-text-muted">
+                      Tujuan: <Text className="font-inter-semibold text-on-surface">{selectedVisitDetail.reason}</Text>
+                    </Text>
+                    <Text className="font-inter text-xs text-text-muted">
+                      GPS: <Text className="font-inter-semibold text-on-surface">
+                        {Number(selectedVisitDetail.gps_lat).toFixed(6)}, {Number(selectedVisitDetail.gps_long).toFixed(6)}
+                      </Text>
+                    </Text>
+                    <Text className="font-inter text-xs text-text-muted">
+                      Foto: <Text className="font-inter-semibold text-on-surface">{selectedVisitDetail.visit_photo_url ? 'Tersedia' : 'Tidak ada'}</Text>
+                    </Text>
+                    {selectedVisitDetail.visit_photo_url ? (
+                      <Pressable
+                        className="mt-1 self-start"
+                        onPress={() => {
+                          setPreviewUrl(selectedVisitDetail.visit_photo_url!);
+                          setPreviewVisible(true);
+                        }}
+                      >
+                        <Text className="font-inter-semibold text-xs text-primary underline">Lihat foto</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                </View>
+                <View className="h-6" />
+              </ScrollView>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={!!selectedVisitAction}
+        onRequestClose={() => {
+          if (!visitActionMutation.isPending) {
+            setSelectedVisitAction(null);
+            setRejectReason('');
+          }
+        }}
+      >
+        <View className="flex-1 bg-black/40 justify-end">
+          <View className="bg-background rounded-t-[32px] p-6 shadow-2xl">
+            <View className="flex-row justify-between items-start mb-6">
+              <View className="flex-1 pr-4">
+                <Text className="font-manrope-extrabold text-2xl text-primary">Tolak Visit</Text>
+                <Text className="font-inter-medium text-xs text-text-muted mt-0.5">Masukkan alasan penolakan visit.</Text>
+              </View>
+              <Pressable
+                className="w-9 h-9 rounded-full bg-black/5 items-center justify-center"
+                onPress={() => {
+                  if (!visitActionMutation.isPending) {
+                    setSelectedVisitAction(null);
+                    setRejectReason('');
+                  }
+                }}
+              >
+                <MaterialIcons name="close" size={20} color={Tokens.colors.text} />
+              </Pressable>
+            </View>
+
+            <Input
+              label="Alasan penolakan"
+              value={rejectReason}
+              onChangeText={setRejectReason}
+              placeholder="Minimal 2 karakter"
+              multiline
+              numberOfLines={3}
+              style={{ height: 90, textAlignVertical: 'top', paddingTop: 12 }}
+            />
+
+            <View className="mt-2 flex-row gap-3">
+              <Pressable
+                className="flex-1 rounded-2xl border border-black/10 bg-white px-4 py-4 items-center active:opacity-60"
+                onPress={() => {
+                  setSelectedVisitAction(null);
+                  setRejectReason('');
+                }}
+                disabled={visitActionMutation.isPending}
+              >
+                <Text className="font-inter-bold text-sm text-text-muted">Batal</Text>
+              </Pressable>
+              <Button
+                title="Kirim Penolakan"
+                onPress={() => {
+                  if (!selectedVisitAction || !canSubmitReject) return;
+                  visitActionMutation.mutate({
+                    visitId: selectedVisitAction.id,
+                    action: 'REJECT',
+                    reason: rejectReason.trim(),
+                  });
+                }}
+                loading={visitActionMutation.isPending}
+                disabled={!canSubmitReject}
+                className="flex-1 bg-error h-14 rounded-2xl"
+              />
+            </View>
+          </View>
         </View>
       </Modal>
     </SafeAreaView>

@@ -9,8 +9,10 @@ import { qk } from '../../src/core/query/query-keys';
 import { Tokens } from '../../src/core/theme/tokens';
 import { buildApprovalActivityItems } from '../../src/features/activity/approval-activity';
 import { buildHomeMenuItems } from '../../src/features/home/home-menu';
+import { filterVisitsByDescendants, findDescendantIds } from '../../src/features/visit/hierarchy';
 import { approvalService } from '../../src/services/approval.service';
 import { attendanceService } from '../../src/services/attendance.service';
+import { employeeService } from '../../src/services/employee.service';
 import { leaveService } from '../../src/services/leave.service';
 import { overtimeService } from '../../src/services/overtime.service';
 import { resignService } from '../../src/services/resign.service';
@@ -82,6 +84,22 @@ export default function HomeScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const name = user?.full_name || 'Employee';
   const [expandedFeedId, setExpandedFeedId] = React.useState<string | null>(null);
+
+  const { data: hierarchy = [] } = useQuery({
+    queryKey: ['employee-hierarchy', user?.company_id, user?.branch_id],
+    queryFn: () => employeeService.getHierarchy({
+      company_id: user?.company_id ?? undefined,
+      branch_id: user?.branch_id ?? undefined,
+    }),
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const subordinateIds = React.useMemo(
+    () => (user?.id ? findDescendantIds(hierarchy, user.id) : []),
+    [hierarchy, user?.id]
+  );
+  const hasSubordinates = subordinateIds.length > 0;
 
   // 1. Fetch Data locally
   const formatLocalDate = React.useCallback((date: Date) => {
@@ -235,6 +253,23 @@ export default function HomeScreen() {
       return approvalService.getPending({ limit: 50 });
     },
     enabled: !!user?.id && !!user?.role && user.role !== 'employee',
+    staleTime: 30 * 1000,
+  });
+
+  const { data: pendingTeamVisits = [] } = useQuery({
+    queryKey: ['home-visit-pending', user?.company_id, user?.branch_id, user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const visits = await attendanceService.listVisits({
+        company_id: user?.company_id ?? undefined,
+        branch_id: user?.branch_id ?? undefined,
+        limit: 50,
+      });
+      return filterVisitsByDescendants(visits, subordinateIds).filter(
+        (item: any) => String(item?.status || '').toUpperCase() === 'PENDING'
+      );
+    },
+    enabled: !!user?.id && hasSubordinates,
     staleTime: 30 * 1000,
   });
 
@@ -507,7 +542,10 @@ export default function HomeScreen() {
       .map((item) => ({ ...item, isExpanded: item.id === expandedFeedId }));
   }, [attendanceFeed, expandedFeedId, leaveRequests, overtimeRecords, resignRequests, attendanceCorrections, approvalHistory, buildDateLabel, toSortTime]);
 
-  const menuItems = React.useMemo<MenuItem[]>(() => buildHomeMenuItems(user?.role, pendingApprovals.length), [user?.role, pendingApprovals.length]);
+  const menuItems = React.useMemo<MenuItem[]>(
+    () => buildHomeMenuItems(user?.role, pendingApprovals.length, pendingTeamVisits.length),
+    [pendingApprovals.length, pendingTeamVisits.length, user?.role]
+  );
   const menuColumns = React.useMemo(() => {
     const paddedItems: MenuSlot[] = [...menuItems];
     if (paddedItems.length % 2 !== 0) {

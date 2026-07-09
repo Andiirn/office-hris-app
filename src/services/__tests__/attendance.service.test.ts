@@ -136,9 +136,39 @@ describe('attendanceService', () => {
         },
       });
       expect(result).toEqual([
-        { id: 'visit-1', visit_date: '2026-06-10', visit_time: '09:00:00' },
-        { id: 'visit-2', visit_date: '2026-05-10', visit_time: '09:00:00' },
+        { id: 'visit-1', visit_date: '2026-06-10', visit_time: '09:00:00', visit_photo_url: null },
+        { id: 'visit-2', visit_date: '2026-05-10', visit_time: '09:00:00', visit_photo_url: null },
       ]);
+    });
+  });
+
+  describe('visit actions', () => {
+    it('approves visit without request body', async () => {
+      (api.post as jest.Mock).mockResolvedValue({
+        data: {
+          data: { id: 'visit-1', status: 'APPROVED' },
+        },
+      });
+
+      const result = await attendanceService.approveVisit('visit-1');
+
+      expect(api.post).toHaveBeenCalledWith('/attendance/visit/visit-1/approve');
+      expect(result).toEqual({ id: 'visit-1', status: 'APPROVED' });
+    });
+
+    it('rejects visit with reason body', async () => {
+      (api.post as jest.Mock).mockResolvedValue({
+        data: {
+          data: { id: 'visit-1', status: 'REJECTED' },
+        },
+      });
+
+      const result = await attendanceService.rejectVisit('visit-1', 'Lokasi tidak valid');
+
+      expect(api.post).toHaveBeenCalledWith('/attendance/visit/visit-1/reject', {
+        reason: 'Lokasi tidak valid',
+      });
+      expect(result).toEqual({ id: 'visit-1', status: 'REJECTED' });
     });
   });
 
