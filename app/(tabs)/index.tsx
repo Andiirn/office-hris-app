@@ -69,44 +69,10 @@ type MenuSlot = MenuItem | null;
 
 function MarqueeName({ text }: { text: string }) {
   return (
-    <View className="w-full overflow-hidden items-center" style={{ height: 36, justifyContent: 'center' }}>
-      <MotiView
-        key={text}
-        className="items-center justify-center"
-        from={{ opacity: 0, translateY: 10 }}
-        animate={{
-          opacity: [1, 0.88, 1],
-          translateY: 0,
-          scale: [1, 1.06, 1],
-        }}
-        transition={{
-          translateY: { type: 'timing', duration: 550 },
-          scale: {
-            type: 'timing',
-            duration: 1800,
-            delay: 500,
-            loop: true,
-            repeatReverse: true,
-          },
-          // ponytail: tie opacity pulse to the same cadence so the effect reads without adding another layer
-          opacity: {
-            type: 'timing',
-            duration: 1800,
-            delay: 500,
-            loop: true,
-            repeatReverse: true,
-          },
-        }}
-      >
-        <Text
-          className="font-manrope-extrabold text-2xl text-white leading-8 text-center"
-          style={{ textShadowColor: 'rgba(255,255,255,0.28)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 12 }}
-          numberOfLines={1}
-          ellipsizeMode="tail"
-        >
-          {text}
-        </Text>
-      </MotiView>
+    <View className="w-full justify-center" style={{ minHeight: 36 }}>
+      <Text className="font-manrope-extrabold text-2xl text-white leading-8" numberOfLines={2}>
+        {text}
+      </Text>
     </View>
   );
 }
@@ -576,11 +542,14 @@ export default function HomeScreen() {
         <View className="absolute -bottom-10 -left-10 w-32 h-32 rounded-full bg-black/10" />
 
         <View className="p-6">
-          {/* Top Row: Welcome & Job Title */}
-          <View className="flex-row justify-between items-center mb-4">
-            <Text className="font-inter-bold text-[10px] text-white/70 uppercase tracking-[0.2em]">
-              Halo, Selamat Datang
-            </Text>
+          {/* Top Row: Welcome & Status */}
+          <View className="flex-row justify-between items-start mb-6">
+            <View className="flex-1 pr-4">
+              <Text className="font-inter-bold text-[10px] text-white/70 uppercase tracking-[0.2em] mb-1">
+                Halo, Selamat Datang
+              </Text>
+              <MarqueeName text={name} />
+            </View>
             <View className="bg-white/20 px-3 py-1.5 rounded-full border border-white/30 items-center justify-center">
               <View className="flex-row items-center gap-1.5">
                 <MaterialIcons name="badge" size={12} color="#fff" />
@@ -589,11 +558,6 @@ export default function HomeScreen() {
                 </Text>
               </View>
             </View>
-          </View>
-
-          {/* Name Component */}
-          <View className="w-full mb-3">
-            <MarqueeName text={name} />
           </View>
 
           {/* Bottom Row: Cute Working Status */}
