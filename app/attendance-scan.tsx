@@ -361,11 +361,23 @@ export default function AttendanceScanScreen() {
       }
 
       try {
-        const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-        setCoords({ lat: position.coords.latitude, long: position.coords.longitude });
-        setIsMocked(position.mocked === true);
-        setStatus('granted');
-        return;
+        // Coba ambil lokasi terakhir (cache) terlebih dahulu
+        let position = await Location.getLastKnownPositionAsync();
+        // Cek apakah lokasi masih baru (misalnya kurang dari 2 menit / 120.000 ms)
+        const isFresh = position && (Date.now() - position.timestamp < 120000);
+
+        if (!isFresh) {
+          // Jika lokasi sudah usang atau tidak ada, ambil lokasi baru
+          // Menggunakan Balanced akan mempercepat penguncian lokasi karena mengombinasikan GPS, Wi-Fi, dan Seluler
+          position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        }
+
+        if (position?.coords) {
+          setCoords({ lat: position.coords.latitude, long: position.coords.longitude });
+          setIsMocked(position.mocked === true);
+          setStatus('granted');
+          return;
+        }
       } catch (err) {
         console.warn('getCurrentPositionAsync failed, trying fallback', err);
         const lastKnown = await Location.getLastKnownPositionAsync();

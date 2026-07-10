@@ -24,8 +24,8 @@ import { GlassCard } from '../src/components/ui/GlassCard';
 import { Input } from '../src/components/ui/Input';
 import { SkeletonCard } from '../src/components/ui/Skeleton';
 import { StatusBadge } from '../src/components/ui/StatusBadge';
-import { filterVisitsByDescendants, findDescendantIds } from '../src/features/visit/hierarchy';
 import { Tokens } from '../src/core/theme/tokens';
+import { filterVisitsByDescendants, findDescendantIds } from '../src/features/visit/hierarchy';
 import { attendanceService } from '../src/services/attendance.service';
 import { employeeService } from '../src/services/employee.service';
 import { useAuthStore } from '../src/stores/auth.store';
@@ -129,8 +129,18 @@ export default function VisitScreen() {
         return;
       }
 
-      const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      setCoords({ lat: position.coords.latitude, long: position.coords.longitude });
+      let position = await Location.getLastKnownPositionAsync();
+      const isFresh = position && (Date.now() - position.timestamp < 120000);
+
+      if (!isFresh) {
+        position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      }
+
+      if (position?.coords) {
+        setCoords({ lat: position.coords.latitude, long: position.coords.longitude });
+      } else {
+        throw new Error('Position not found');
+      }
     } catch (err: any) {
       console.warn('GPS position query failed, trying fallback', err);
       try {
@@ -278,104 +288,104 @@ export default function VisitScreen() {
       }}
     >
       <GlassCard style={{ padding: 16, marginBottom: 16, backgroundColor: 'rgba(255, 255, 255, 0.95)' }}>
-      {activeTab === 'team' && item.employee && (
-        <View className="flex-row items-center flex-1 mr-2 mb-3" style={{ gap: 8 }}>
-          <View className="w-9 h-9 rounded-2xl bg-primary/5 items-center justify-center">
-            <Text className="font-manrope-bold text-primary text-xs">
-              {(item.employee?.name || item.employee?.full_name || '?').charAt(0).toUpperCase()}
-            </Text>
+        {activeTab === 'team' && item.employee && (
+          <View className="flex-row items-center flex-1 mr-2 mb-3" style={{ gap: 8 }}>
+            <View className="w-9 h-9 rounded-2xl bg-primary/5 items-center justify-center">
+              <Text className="font-manrope-bold text-primary text-xs">
+                {(item.employee?.name || item.employee?.full_name || '?').charAt(0).toUpperCase()}
+              </Text>
+            </View>
+            <View className="flex-1">
+              <Text className="font-manrope-bold text-sm text-on-surface" numberOfLines={1}>
+                {item.employee.name || item.employee.full_name || 'Tanpa Nama'}
+              </Text>
+              <Text className="font-inter-medium text-[10px] text-text-muted uppercase tracking-wider">
+                {item.employee.nik || '-'}
+              </Text>
+            </View>
           </View>
-          <View className="flex-1">
+        )}
+
+        <View className="flex-row justify-between items-start mb-3">
+          <View className="flex-1 mr-2">
             <Text className="font-manrope-bold text-sm text-on-surface" numberOfLines={1}>
-              {item.employee.name || item.employee.full_name || 'Tanpa Nama'}
+              {item.location_name}
             </Text>
-            <Text className="font-inter-medium text-[10px] text-text-muted uppercase tracking-wider">
-              {item.employee.nik || '-'}
-            </Text>
-          </View>
-        </View>
-      )}
-
-      <View className="flex-row justify-between items-start mb-3">
-        <View className="flex-1 mr-2">
-          <Text className="font-manrope-bold text-sm text-on-surface" numberOfLines={1}>
-            {item.location_name}
-          </Text>
-          <View className="flex-row items-center mt-1.5 gap-1.5">
-            <MaterialIcons name="event" size={12} color={Tokens.colors.textMuted} />
-            <Text className="font-inter text-[11px] text-text-muted">
-              {item.visit_date} · {item.visit_time.substring(0, 5)}
-            </Text>
-          </View>
-        </View>
-        <StatusBadge label={item.status} type={getStatusType(item.status)} />
-      </View>
-
-      {activeTab === 'me' ? (
-        <View className="my-2 py-2 border-t border-b border-black/5 gap-1.5">
-          <Text className="font-inter text-xs text-text-muted" numberOfLines={2}>
-            Tujuan: <Text className="font-inter-semibold text-on-surface">{item.reason}</Text>
-          </Text>
-          <View className="flex-row items-center justify-between mt-1">
-            <Text className="font-inter text-[11px] text-text-muted">
-              {item.visit_photo_url ? 'Foto tersedia' : 'Tanpa foto'}
-            </Text>
-            <View className="flex-row items-center gap-1">
-              <Text className="font-inter-semibold text-[11px] text-primary">Lihat Detail</Text>
-              <MaterialIcons name="chevron-right" size={16} color={Tokens.colors.primary} />
+            <View className="flex-row items-center mt-1.5 gap-1.5">
+              <MaterialIcons name="event" size={12} color={Tokens.colors.textMuted} />
+              <Text className="font-inter text-[11px] text-text-muted">
+                {item.visit_date} · {item.visit_time.substring(0, 5)}
+              </Text>
             </View>
           </View>
+          <StatusBadge label={item.status} type={getStatusType(item.status)} />
         </View>
-      ) : (
-        <View className="my-2 py-2 border-t border-b border-black/5 gap-1.5">
-          <Text className="font-inter text-xs text-text-muted">
-            Tujuan: <Text className="font-inter-semibold text-on-surface">{item.reason}</Text>
-          </Text>
-          <Text className="font-inter text-xs text-text-muted">
-            Lokasi: <Text className="font-inter-semibold text-on-surface">{item.location_name}</Text>
-          </Text>
-          <Text className="font-inter text-xs text-text-muted">
-            GPS: <Text className="font-inter-semibold text-on-surface">{Number(item.gps_lat).toFixed(6)}, {Number(item.gps_long).toFixed(6)}</Text>
-          </Text>
-          <Text className="font-inter text-xs text-text-muted">
-            Foto: <Text className="font-inter-semibold text-on-surface">{item.visit_photo_url ? 'Tersedia' : 'Tidak ada'}</Text>
-          </Text>
-          {item.visit_photo_url ? (
-            <View className="flex-row items-center mt-0.5">
-              <Text className="font-inter text-xs text-text-muted">Preview: </Text>
-              <Pressable
-                onPress={() => {
-                  setPreviewUrl(item.visit_photo_url!);
-                  setPreviewVisible(true);
-                }}
-              >
-                <Text className="font-inter-semibold text-xs text-primary underline">
-                  Lihat foto
-                </Text>
-              </Pressable>
-            </View>
-          ) : null}
-        </View>
-      )}
 
-      {activeTab === 'team' && String(item.status || '').toUpperCase() === 'PENDING' ? (
-        <View className="mt-4 flex-row gap-3">
-          <Pressable
-            className="flex-1 rounded-2xl border border-error bg-white px-4 py-3 items-center active:opacity-60"
-            onPress={() => handleRejectVisit(item)}
-            disabled={visitActionMutation.isPending}
-          >
-            <Text className="font-inter-bold text-sm text-error">Tolak</Text>
-          </Pressable>
-          <Pressable
-            className="flex-1 rounded-2xl bg-primary px-4 py-3 items-center active:opacity-60"
-            onPress={() => handleApproveVisit(item)}
-            disabled={visitActionMutation.isPending}
-          >
-            <Text className="font-inter-bold text-sm text-white">Setujui</Text>
-          </Pressable>
-        </View>
-      ) : null}
+        {activeTab === 'me' ? (
+          <View className="my-2 py-2 border-t border-b border-black/5 gap-1.5">
+            <Text className="font-inter text-xs text-text-muted" numberOfLines={2}>
+              Tujuan: <Text className="font-inter-semibold text-on-surface">{item.reason}</Text>
+            </Text>
+            <View className="flex-row items-center justify-between mt-1">
+              <Text className="font-inter text-[11px] text-text-muted">
+                {item.visit_photo_url ? 'Foto tersedia' : 'Tanpa foto'}
+              </Text>
+              <View className="flex-row items-center gap-1">
+                <Text className="font-inter-semibold text-[11px] text-primary">Lihat Detail</Text>
+                <MaterialIcons name="chevron-right" size={16} color={Tokens.colors.primary} />
+              </View>
+            </View>
+          </View>
+        ) : (
+          <View className="my-2 py-2 border-t border-b border-black/5 gap-1.5">
+            <Text className="font-inter text-xs text-text-muted">
+              Tujuan: <Text className="font-inter-semibold text-on-surface">{item.reason}</Text>
+            </Text>
+            <Text className="font-inter text-xs text-text-muted">
+              Lokasi: <Text className="font-inter-semibold text-on-surface">{item.location_name}</Text>
+            </Text>
+            <Text className="font-inter text-xs text-text-muted">
+              GPS: <Text className="font-inter-semibold text-on-surface">{Number(item.gps_lat).toFixed(6)}, {Number(item.gps_long).toFixed(6)}</Text>
+            </Text>
+            <Text className="font-inter text-xs text-text-muted">
+              Foto: <Text className="font-inter-semibold text-on-surface">{item.visit_photo_url ? 'Tersedia' : 'Tidak ada'}</Text>
+            </Text>
+            {item.visit_photo_url ? (
+              <View className="flex-row items-center mt-0.5">
+                <Text className="font-inter text-xs text-text-muted">Preview: </Text>
+                <Pressable
+                  onPress={() => {
+                    setPreviewUrl(item.visit_photo_url!);
+                    setPreviewVisible(true);
+                  }}
+                >
+                  <Text className="font-inter-semibold text-xs text-primary underline">
+                    Lihat foto
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
+        )}
+
+        {activeTab === 'team' && String(item.status || '').toUpperCase() === 'PENDING' ? (
+          <View className="mt-4 flex-row gap-3">
+            <Pressable
+              className="flex-1 rounded-2xl border border-error bg-white px-4 py-3 items-center active:opacity-60"
+              onPress={() => handleRejectVisit(item)}
+              disabled={visitActionMutation.isPending}
+            >
+              <Text className="font-inter-bold text-sm text-error">Tolak</Text>
+            </Pressable>
+            <Pressable
+              className="flex-1 rounded-2xl bg-primary px-4 py-3 items-center active:opacity-60"
+              onPress={() => handleApproveVisit(item)}
+              disabled={visitActionMutation.isPending}
+            >
+              <Text className="font-inter-bold text-sm text-white">Setujui</Text>
+            </Pressable>
+          </View>
+        ) : null}
       </GlassCard>
     </Pressable>
   );
@@ -564,7 +574,7 @@ export default function VisitScreen() {
 
                 {/* Photo Upload Section */}
                 <View className="mb-6">
-                  <Text className="font-inter-bold text-[12px] text-text mb-2 ml-1">Foto Kunjungan (Opsional)</Text>
+                  <Text className="font-inter-bold text-[12px] text-text mb-2 ml-1">Foto Kunjungan</Text>
 
                   {photoFile ? (
                     <View className="rounded-2xl overflow-hidden border border-black/10 relative">
@@ -582,7 +592,7 @@ export default function VisitScreen() {
                       className="border border-dashed border-black/20 bg-black/5 rounded-2xl p-6 items-center justify-center flex-row gap-2 active:opacity-60"
                     >
                       <MaterialIcons name="photo-camera" size={20} color={Tokens.colors.primary} />
-                      <Text className="font-inter-bold text-sm text-primary">Ambil Foto Langsung</Text>
+                      <Text className="font-inter-bold text-sm text-primary">Ambil Foto</Text>
                     </Pressable>
                   )}
                 </View>
