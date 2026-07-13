@@ -1,9 +1,9 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -36,16 +36,13 @@ export default function VisitScreen() {
   const queryClient = useQueryClient();
   const router = useRouter();
   const params = useLocalSearchParams<{ tab?: string }>();
-  const cameraRef = useRef<React.ElementRef<typeof CameraView> | null>(null);
 
   const [modalVisible, setModalVisible] = useState(false);
   const [locationName, setLocationName] = useState('');
   const [reason, setReason] = useState('');
   const [photoFile, setPhotoFile] = useState<{ uri: string; name: string; mimeType?: string | null } | null>(null);
-  const [cameraVisible, setCameraVisible] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [selectedVisitAction, setSelectedVisitAction] = useState<VisitItem | null>(null);
   const [selectedVisitDetail, setSelectedVisitDetail] = useState<VisitItem | null>(null);
   const [rejectReason, setRejectReason] = useState('');
@@ -59,8 +56,22 @@ export default function VisitScreen() {
 
   // GPS State
   const [coords, setCoords] = useState<{ lat: number; long: number } | null>(null);
+  const [gpsAddress, setGpsAddress] = useState<string | null>(null);
   const [gpsError, setGpsError] = useState<string | null>(null);
   const [gpsLoading, setGpsLoading] = useState(false);
+
+  const formatGpsAddress = (place: Location.LocationGeocodedAddress | null | undefined) => {
+    if (!place) return null;
+    return [
+      place.street,
+      place.streetNumber,
+      place.district,
+      place.subregion,
+      place.region,
+    ]
+      .filter(Boolean)
+      .join(', ');
+  };
 
   // 1. Fetch Visit History
   const { data: history = [], isLoading: isLoadingMe, refetch: refetchMe, isFetching: isFetchingMe } = useQuery({
@@ -118,9 +129,10 @@ export default function VisitScreen() {
   const isFetching = activeTab === 'me' ? isFetchingMe : isFetchingTeam;
 
   // GPS fetch function
-  const fetchGps = async () => {
+  const fetchGps = useCallback(async () => {
     setGpsLoading(true);
     setGpsError(null);
+    setGpsAddress(null);
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
       if (permission.status !== 'granted') {
@@ -137,7 +149,17 @@ export default function VisitScreen() {
       }
 
       if (position?.coords) {
-        setCoords({ lat: position.coords.latitude, long: position.coords.longitude });
+        const nextCoords = { lat: position.coords.latitude, long: position.coords.longitude };
+        setCoords(nextCoords);
+        const places = await Location.reverseGeocodeAsync({
+          latitude: nextCoords.lat,
+          longitude: nextCoords.long,
+        });
+        const address = formatGpsAddress(places[0]);
+        setGpsAddress(address);
+        if (address && locationName.trim().length === 0) {
+          setLocationName(address);
+        }
       } else {
         throw new Error('Position not found');
       }
@@ -146,7 +168,17 @@ export default function VisitScreen() {
       try {
         const lastKnown = await Location.getLastKnownPositionAsync();
         if (lastKnown?.coords) {
-          setCoords({ lat: lastKnown.coords.latitude, long: lastKnown.coords.longitude });
+          const nextCoords = { lat: lastKnown.coords.latitude, long: lastKnown.coords.longitude };
+          setCoords(nextCoords);
+          const places = await Location.reverseGeocodeAsync({
+            latitude: nextCoords.lat,
+            longitude: nextCoords.long,
+          });
+          const address = formatGpsAddress(places[0]);
+          setGpsAddress(address);
+          if (address && locationName.trim().length === 0) {
+            setLocationName(address);
+          }
         } else {
           setGpsError('Gagal mendapatkan lokasi. Pastikan GPS menyala.');
         }
@@ -156,33 +188,27 @@ export default function VisitScreen() {
     } finally {
       setGpsLoading(false);
     }
-  };
+  }, [locationName]);
 
   const pickPhoto = async () => {
     try {
-      const permission = cameraPermission ?? (await requestCameraPermission());
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
         Alert.alert('Izin Kamera Diperlukan', 'Harap berikan izin kamera untuk mengambil foto kunjungan.');
         return;
       }
-      setCameraVisible(true);
-    } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Gagal membuka kamera');
-    }
-  };
-
-  const capturePhoto = async () => {
-    try {
-      const camera = cameraRef.current;
-      if (!camera) return;
-      const photo = await camera.takePictureAsync({ quality: 0.8, skipProcessing: false });
-      if (!photo?.uri) return;
+      const result = await ImagePicker.launchCameraAsync({
+        cameraType: ImagePicker.CameraType.back,
+        mediaTypes: ['images'],
+        quality: 0.8,
+      });
+      if (result.canceled || !result.assets[0]?.uri) return;
+      const photo = result.assets[0];
       setPhotoFile({
         uri: photo.uri,
         name: `visit_${Date.now()}.jpg`,
-        mimeType: photo.format === 'png' ? 'image/png' : 'image/jpeg',
+        mimeType: photo.mimeType ?? 'image/jpeg',
       });
-      setCameraVisible(false);
     } catch (error: any) {
       Alert.alert('Error', error?.message || 'Gagal mengambil foto');
     }
@@ -193,7 +219,7 @@ export default function VisitScreen() {
     if (modalVisible) {
       fetchGps();
     }
-  }, [modalVisible]);
+  }, [fetchGps, modalVisible]);
 
   // 2. Submit Mutation
   const submitMutation = useMutation({
@@ -207,6 +233,7 @@ export default function VisitScreen() {
       setLocationName('');
       setReason('');
       setCoords(null);
+      setGpsAddress(null);
       setPhotoFile(null);
       Alert.alert('Sukses', 'Laporan kunjungan dinas (visit) berhasil dikirim');
     },
@@ -542,7 +569,9 @@ export default function VisitScreen() {
                           <Text className="font-inter-bold text-sm text-black tabular-nums">
                             {coords.lat.toFixed(6)}, {coords.long.toFixed(6)}
                           </Text>
-                          <Text className="font-inter text-[10px] text-text-muted mt-0.5">GPS terkunci</Text>
+                          <Text className="font-inter text-[10px] text-text-muted mt-0.5">
+                            {gpsAddress || 'GPS terkunci'}
+                          </Text>
                         </View>
                       ) : (
                         <View className="flex-1">
@@ -628,40 +657,6 @@ export default function VisitScreen() {
                 <View className="h-10" />
               </View>
             </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Photo Preview Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={cameraVisible}
-        onRequestClose={() => setCameraVisible(false)}
-      >
-        <View className="flex-1 bg-black">
-          <CameraView
-            ref={cameraRef}
-            style={{ flex: 1 }}
-            facing="back"
-          />
-          <View className="absolute top-0 left-0 right-0 px-5 pt-16 flex-row items-center justify-between">
-            <Pressable
-              className="w-10 h-10 rounded-full bg-black/40 items-center justify-center"
-              onPress={() => setCameraVisible(false)}
-            >
-              <MaterialIcons name="close" size={24} color="#ffffff" />
-            </Pressable>
-            <Text className="font-manrope-bold text-base text-white">Ambil Foto Kunjungan</Text>
-            <View className="w-10" />
-          </View>
-          <View className="absolute bottom-12 left-0 right-0 items-center">
-            <Pressable
-              className="w-20 h-20 rounded-full bg-white items-center justify-center border-4 border-white/40"
-              onPress={capturePhoto}
-            >
-              <View className="w-16 h-16 rounded-full bg-primary" />
-            </Pressable>
           </View>
         </View>
       </Modal>
