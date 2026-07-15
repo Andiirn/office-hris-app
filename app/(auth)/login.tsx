@@ -8,6 +8,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -24,8 +25,8 @@ import { authService } from '../../src/services/auth.service';
 import { useAuthStore } from '../../src/stores/auth.store';
 
 const loginSchema = z.object({
-  nik: z.string().min(1, 'NIK is required'),
-  password: z.string().min(4, 'Password must be at least 6 characters'),
+  nik: z.string().min(1, 'NIK diperlukan'),
+  password: z.string().min(1, 'Password diperlukan'),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -130,6 +131,13 @@ export default function LoginScreen() {
                   </Text>
                 </MotiView>
               </View>
+
+              <View style={styles.infoBox}>
+                <Text style={styles.infoTitle}>Informasi login</Text>
+                <Text style={styles.infoText}>
+                  Kredensial / NIK silahkan minta ke HRD jika belum memiliki akses.
+                </Text>
+              </View>
             </View>
 
             <View style={styles.formCard}>
@@ -147,6 +155,8 @@ export default function LoginScreen() {
                         label="Nomor Induk Karyawan"
                         placeholder="Masukkan NIK Anda"
                         onBlur={onBlur}
+                        autoComplete='username'
+                        textContentType="username"
                         onChangeText={onChange}
                         value={value}
                         error={errors.nik?.message}
@@ -169,6 +179,8 @@ export default function LoginScreen() {
                         label="Password"
                         placeholder="Masukkan Password Anda"
                         onBlur={onBlur}
+                        autoComplete='password'
+                        textContentType="password"
                         onChangeText={onChange}
                         value={value}
                         error={errors.password?.message}
@@ -196,6 +208,10 @@ export default function LoginScreen() {
                     style={styles.button}
                   />
                 </MotiView>
+
+                <Pressable onPress={() => router.push('/(auth)/reset-password')} style={styles.resetLink}>
+                  <Text style={styles.resetLinkText}>Lupa password? Reset di sini</Text>
+                </Pressable>
               </View>
             </View>
           </View>
@@ -301,6 +317,26 @@ const styles = StyleSheet.create({
     color: Tokens.colors.textMuted,
     textAlign: 'center',
   },
+  infoBox: {
+    marginTop: 16,
+    backgroundColor: Tokens.colors.inputBackground,
+    borderRadius: Tokens.radius.lg,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Tokens.colors.outlineVariant,
+  },
+  infoTitle: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 13,
+    color: Tokens.colors.primaryContainer,
+    marginBottom: 6,
+  },
+  infoText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 14,
+    lineHeight: 20,
+    color: Tokens.colors.onSurfaceVariant,
+  },
   formCard: {
     backgroundColor: Tokens.colors.surfaceContainerLowest,
     borderRadius: 28,
@@ -322,5 +358,15 @@ const styles = StyleSheet.create({
   },
   button: {
     marginTop: 4,
+  },
+  resetLink: {
+    alignSelf: 'center',
+    marginTop: 12,
+    paddingVertical: 8,
+  },
+  resetLinkText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 14,
+    color: Tokens.colors.primary,
   },
 });

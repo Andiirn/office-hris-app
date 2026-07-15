@@ -1,8 +1,14 @@
-import axios from 'axios';
 import { tokenStore } from '../../auth/token-store';
 
 // Mock tokenStore
 jest.mock('../../auth/token-store');
+jest.mock('../../../stores/auth.store', () => ({
+  useAuthStore: {
+    getState: jest.fn(() => ({
+      logout: jest.fn(),
+    })),
+  },
+}));
 
 // Mock axios BEFORE importing api
 jest.mock('axios', () => {
@@ -78,9 +84,19 @@ describe('api client interceptors', () => {
 
     it('should propagate 401 error', async () => {
       const error = {
+        config: { url: '/profile' },
         response: { status: 401 },
       };
       
+      await expect(responseInterceptorError(error)).rejects.toEqual(error);
+    });
+
+    it('should not try session refresh for public auth endpoints', async () => {
+      const error = {
+        config: { url: '/auth/login' },
+        response: { status: 401 },
+      };
+
       await expect(responseInterceptorError(error)).rejects.toEqual(error);
     });
 

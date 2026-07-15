@@ -24,6 +24,16 @@ let isRefreshing = false;
 let failedQueue: any[] = [];
 let suppressAuthErrorAlerts = false;
 
+const isAuthPublicEndpoint = (url?: string) =>
+  Boolean(
+    url &&
+    (
+      url.includes('/auth/login') ||
+      url.includes('/auth/forgot-password/') ||
+      url.includes('/auth/forgot-password')
+    )
+  );
+
 export const setSuppressAuthErrorAlerts = (value: boolean) => {
   suppressAuthErrorAlerts = value;
 };
@@ -46,6 +56,10 @@ api.interceptors.response.use(
 
     // Handle 401 Unauthorized
     if (err.response?.status === 401 && originalRequest && !originalRequest._retry) {
+      if (isAuthPublicEndpoint(originalRequest.url)) {
+        return Promise.reject(err);
+      }
+
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });

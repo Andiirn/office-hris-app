@@ -44,6 +44,13 @@ const extractArray = <T>(raw: any): T[] => {
   return [];
 };
 
+const getAttendanceSortTime = (item: AttendanceItem) =>
+  toLocalDateTimeMillis(item.checkin_at || item.checkout_at || item.attendance_date || item.date || (item as any).created_at);
+
+const pickTodayAttendanceRecord = (items: AttendanceItem[]) => {
+  return [...items].sort((a, b) => getAttendanceSortTime(b) - getAttendanceSortTime(a))[0];
+};
+
 const normalizeVisitPhotoUrl = (value?: string | null) => {
   if (!value) return null;
   if (/^https?:\/\//i.test(value)) return value;
@@ -133,15 +140,22 @@ export const attendanceService = {
     const today = new Date();
     const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     const response = await api.get('/attendance/', {
-      params: { date_from: todayString, date_to: todayString, limit: 1, page: 1 },
+      params: { date_from: todayString, date_to: todayString, limit: 1000, page: 1 },
     });
     const data = unwrapData<AttendanceItem[]>(response.data);
     if (!Array.isArray(data) || data.length === 0) return undefined;
-    return [...data].sort((a, b) => {
-      const dateA = toLocalDateTimeMillis(a.checkin_at || a.checkout_at || a.attendance_date || a.date || (a as any).created_at);
-      const dateB = toLocalDateTimeMillis(b.checkin_at || b.checkout_at || b.attendance_date || b.date || (b as any).created_at);
-      return dateB - dateA;
-    })[0];
+    const sorted = [...data].sort((a, b) => getAttendanceSortTime(b) - getAttendanceSortTime(a));
+    return pickTodayAttendanceRecord(sorted);
+  },
+  async getTodayRecords(): Promise<AttendanceItem[]> {
+    const today = new Date();
+    const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const response = await api.get('/attendance/', {
+      params: { date_from: todayString, date_to: todayString, limit: 1000, page: 1 },
+    });
+    const data = unwrapData<AttendanceItem[]>(response.data);
+    if (!Array.isArray(data) || data.length === 0) return [];
+    return [...data].sort((a, b) => getAttendanceSortTime(b) - getAttendanceSortTime(a));
   },
   async getAttendanceHistory(query?: AttendanceListQuery): Promise<AttendanceItem[]> {
     try {
@@ -149,11 +163,11 @@ export const attendanceService = {
       const response = await api.get('/attendance/', {
         params: query,
       });
-      
+
       const baseURL = response.config?.baseURL || '';
       const requestUrl = response.config?.url || '';
       devLog('[AttendanceService] Full URL:', `${baseURL}${requestUrl}`);
-      
+
       const data: any = unwrapData(response.data);
       devLog('[AttendanceService] Unwrapped data sample:', JSON.stringify(Array.isArray(data) ? data.slice(0, 1) : data));
 
@@ -193,7 +207,7 @@ export const attendanceService = {
         params: resolvedQuery,
       });
       const data = unwrapData<any>(response.data);
-      
+
       const rawItems = Array.isArray(data)
         ? data
         : data && Array.isArray(data.items)
@@ -266,7 +280,7 @@ export const attendanceService = {
         params: resolvedQuery,
       });
       const data = unwrapData<any>(response.data);
-      
+
       return extractArray<AttendanceCorrection>(data);
     } catch (error: any) {
       devError('[AttendanceService] listCorrections error:', error?.message);
