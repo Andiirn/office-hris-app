@@ -1,6 +1,7 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import React from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../ui/Button';
 import { GlassCard } from '../ui/GlassCard';
@@ -97,17 +98,14 @@ export function CorrectionCreateModal({
           </View>
         </View>
 
-        <KeyboardAvoidingView
-          className="flex-1"
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
+        <KeyboardAwareScrollView
+          className="flex-1 relative"
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
+          enableOnAndroid={true}
+          extraScrollHeight={Platform.OS === 'ios' ? 24 : 100}
         >
-          <View className="flex-1 relative">
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40 }}
-            >
               <GlassCard style={{ padding: 16, marginBottom: 16 }}>
                 <View className="flex-row items-center justify-between mb-2">
                   <Text className="font-inter-bold text-sm text-primary">Pilih Kehadiran</Text>
@@ -299,9 +297,7 @@ export function CorrectionCreateModal({
                 disabled={isSubmitting || !selectedAttendance}
                 className="h-14 rounded-2xl mt-4"
               />
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
+        </KeyboardAwareScrollView>
       </SafeAreaView>
     </Modal>
   );

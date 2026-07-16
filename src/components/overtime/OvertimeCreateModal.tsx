@@ -1,7 +1,6 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import React from 'react';
 import {
-  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -10,6 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { Calendar } from 'react-native-calendars';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../ui/Button';
@@ -90,19 +90,16 @@ export function OvertimeCreateModal({
           </View>
         </View>
 
-        <KeyboardAvoidingView
-          className="flex-1"
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
-        >
-          <View className="flex-1 relative">
-            <ScrollView
-              className="flex-1"
-              contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 20, paddingBottom: 40 }}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              nestedScrollEnabled
-            >
+        <View className="flex-1 relative">
+          <KeyboardAwareScrollView
+            className="flex-1"
+            contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 20, paddingBottom: 40 }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
+            enableOnAndroid={true}
+            extraScrollHeight={Platform.OS === 'ios' ? 24 : 100}
+          >
               <View className="flex-row gap-2 mb-5">
                 <Pressable
                   onPress={() => setMode('attendance')}
@@ -236,7 +233,7 @@ export function OvertimeCreateModal({
                 disabled={isSubmitting}
                 className="mt-4 h-14 rounded-2xl"
               />
-            </ScrollView>
+          </KeyboardAwareScrollView>
 
             {attendancePickerVisible ? (
               <View className="absolute inset-0">
@@ -311,7 +308,6 @@ export function OvertimeCreateModal({
               </View>
             ) : null}
           </View>
-        </KeyboardAvoidingView>
       </SafeAreaView>
     </Modal>
   );
