@@ -7,7 +7,7 @@ import {
   ScrollView,
   Text,
   TextInput,
-  View
+  View,
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
@@ -49,13 +49,22 @@ type Props = {
   colleagueSearch: string;
   setColleagueSearch: (value: string) => void;
   userId?: string;
-  requiresDocument: boolean;
   documentFile: { uri: string; name: string; mimeType?: string } | null;
   onClearDocument: () => void;
   onPickImage: () => void;
   onPickDocument: () => void;
   onSubmit: () => void;
   isSubmitting: boolean;
+  errorMessage?: string | null;
+  leaveBalance?: {
+    total_days: number;
+    used_days: number;
+    remaining_days: number;
+    leave_type_name: string;
+  };
+  leaveLimit?: number | null;
+  canSubmit?: boolean;
+  balanceMessage?: string | null;
 };
 
 export function LeaveCreateModal({
@@ -83,13 +92,17 @@ export function LeaveCreateModal({
   colleagueSearch,
   setColleagueSearch,
   userId,
-  requiresDocument,
   documentFile,
   onClearDocument,
   onPickImage,
   onPickDocument,
   onSubmit,
   isSubmitting,
+  errorMessage,
+  leaveBalance,
+  leaveLimit,
+  canSubmit = true,
+  balanceMessage,
 }: Props) {
   const insets = useSafeAreaInsets();
   const headerTopPadding = Math.max(insets.top, 12);
@@ -97,6 +110,13 @@ export function LeaveCreateModal({
     () => leaveTypes.filter((type) => !companyId || !type.company_id || type.company_id === companyId),
     [leaveTypes, companyId],
   );
+  const selectedLeaveType = React.useMemo(
+    () => visibleLeaveTypes.find((type) => type.id === form.leave_type_id),
+    [form.leave_type_id, visibleLeaveTypes],
+  );
+  const shouldShowDocument = selectedLeaveType?.requires_document ?? false;
+  const effectiveLimit = selectedLeaveType?.max_days_per_year ?? leaveLimit ?? null;
+  const remainingDaysLabel = leaveBalance?.remaining_days ?? effectiveLimit;
 
   return (
     <Modal animationType="slide" visible={visible} onRequestClose={onClose}>
@@ -124,15 +144,14 @@ export function LeaveCreateModal({
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             nestedScrollEnabled
-            enableOnAndroid={true}
+            enableOnAndroid
             extraScrollHeight={Platform.OS === 'ios' ? 24 : 100}
             contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 20, paddingBottom: 48 }}
           >
             <GlassCard style={{ padding: 16, marginBottom: 20 }}>
-              <View className="flex-row items-center justify-between mb-3">
-                <View>
-                  <Text className="font-manrope-bold text-lg text-primary">Pilih Tipe</Text>
-                </View>
+              <View className="mb-4">
+                <Text className="font-manrope-bold text-lg text-primary">Pilih Tipe</Text>
+                <Text className="font-inter text-sm text-text-muted mt-1">Pilih jenis cuti yang ingin diajukan.</Text>
               </View>
 
               {visibleLeaveTypes.length === 0 ? (
@@ -145,8 +164,8 @@ export function LeaveCreateModal({
                       return (
                         <Pressable
                           key={type.id}
-                          className={`px-4 py-2.5 rounded-full border ${active ? 'bg-primary border-primary' : 'bg-primary/5 border-primary/10'}`}
                           onPress={() => onSelectLeaveType(type.id)}
+                          className={`px-4 py-2.5 rounded-full border ${active ? 'bg-primary border-primary' : 'bg-primary/5 border-primary/10'}`}
                         >
                           <Text className={`font-inter-bold text-[13px] ${active ? 'text-white' : 'text-primary'}`}>
                             {formatLeaveTypeName(type.name)}
@@ -157,14 +176,23 @@ export function LeaveCreateModal({
                   </View>
                 </ScrollView>
               )}
+
+              {form.leave_type_id ? (
+                <GlassCard style={{ padding: 12, marginTop: 12, backgroundColor: Tokens.colors.inputBackground }}>
+                  <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Saldo Cuti</Text>
+                  <Text className="font-inter-bold text-sm text-on-surface mt-1">
+                    {effectiveLimit == null
+                      ? 'Tanpa batas'
+                      : `${remainingDaysLabel ?? 0} hari tersisa dari ${effectiveLimit} hari`}
+                  </Text>
+                </GlassCard>
+              ) : null}
             </GlassCard>
 
             {isHourlyLeave ? (
               <GlassCard style={{ padding: 14, marginBottom: 16 }}>
                 <Text className="font-inter-bold text-sm text-primary mb-2">Izin per jam</Text>
-                <Text className="font-inter text-xs text-text-muted">
-                  Pilih tanggal dulu, lalu isi jam mulai dan selesai.
-                </Text>
+                <Text className="font-inter text-xs text-text-muted">Pilih tanggal dulu, lalu isi jam mulai dan selesai.</Text>
                 <View className="mt-4">
                   <Calendar
                     current={selectedHourlyDate}
@@ -220,7 +248,6 @@ export function LeaveCreateModal({
                     />
                   </View>
                 </View>
-                <Text className="font-inter text-[11px] text-text-muted mt-2">Isi manual format `HH:MM`.</Text>
               </GlassCard>
             ) : (
               <GlassCard style={{ padding: 10, marginBottom: 16 }}>
@@ -254,21 +281,23 @@ export function LeaveCreateModal({
                 <View className="flex-row items-start gap-2 mt-2.5 pt-2.5 border-t border-black/5">
                   <MaterialIcons name="info-outline" size={14} color={Tokens.colors.textMuted} style={{ marginTop: 2 }} />
                   <Text className="font-inter-medium text-[11px] text-text-muted flex-1 leading-4">
-                    Pilih tanggal mulai dan akhir untuk ajukan cuti. Jika hanya <Text className="font-inter-bold">1 hari</Text>, pilih tanggal yang sama (contoh: klik tanggal 17, berarti mulai dan selesai di tanggal 17).
+                    Pilih tanggal mulai dan akhir untuk ajukan cuti. Jika hanya <Text className="font-inter-bold">1 hari</Text>, pilih tanggal yang sama.
                   </Text>
                 </View>
               </GlassCard>
             )}
 
-            <Input
-              label="Alasan"
-              value={form.reason}
-              onChangeText={(text) => setForm({ ...form, reason: text })}
-              placeholder="Masukkan Alasan Cuti?"
-              multiline
-              numberOfLines={3}
-              style={{ height: 100, textAlignVertical: 'top', paddingTop: 12 }}
-            />
+            <GlassCard style={{ padding: 16, marginTop: 12 }}>
+              <Input
+                label="Alasan"
+                value={form.reason}
+                onChangeText={(text) => setForm({ ...form, reason: text })}
+                placeholder="Masukkan Alasan Cuti?"
+                multiline
+                numberOfLines={3}
+                style={{ height: 100, textAlignVertical: 'top', paddingTop: 12 }}
+              />
+            </GlassCard>
 
             {canChooseReplacement ? (
               <GlassCard style={{ padding: 14, marginTop: 12 }}>
@@ -290,7 +319,7 @@ export function LeaveCreateModal({
               </GlassCard>
             ) : null}
 
-            {requiresDocument ? (
+            {shouldShowDocument ? (
               <GlassCard style={{ padding: 14, marginTop: 12 }}>
                 <Text className="font-inter-bold text-sm text-primary mb-2">Dokumen Pendukung</Text>
                 <Text className="font-inter text-xs text-text-muted mb-3">
@@ -324,12 +353,22 @@ export function LeaveCreateModal({
               </GlassCard>
             ) : null}
 
-            <Button
-              title="Kirim Pengajuan Cuti"
-              onPress={onSubmit}
-              loading={isSubmitting}
-              className="mt-5 h-14 rounded-2xl"
-            />
+            {errorMessage ? (
+              <GlassCard style={{ padding: 12, marginTop: 12, backgroundColor: 'rgba(186, 26, 26, 0.06)' }}>
+                <Text className="font-manrope-bold text-sm text-error">Gagal mengajukan cuti</Text>
+                <Text className="font-inter text-xs text-text-muted mt-1">{errorMessage}</Text>
+              </GlassCard>
+            ) : null}
+
+            <GlassCard style={{ padding: 16, marginTop: 12 }}>
+              <Button
+                title="Kirim Pengajuan Cuti"
+                onPress={onSubmit}
+                loading={isSubmitting}
+                disabled={!canSubmit}
+                className="h-14 rounded-2xl"
+              />
+            </GlassCard>
           </KeyboardAwareScrollView>
 
           {replacementModalVisible && canChooseReplacement ? (

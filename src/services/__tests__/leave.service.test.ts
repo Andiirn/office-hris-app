@@ -64,4 +64,83 @@ describe('leaveService', () => {
       },
     });
   });
+
+  it('getTypes returns leave types including requires_document property', async () => {
+    (api.get as jest.Mock).mockResolvedValue({
+      data: {
+        data: [
+          {
+            id: 'type-1',
+            name: 'Cuti Sakit',
+            requires_document: true,
+            max_days_per_year: 3,
+            is_active: true,
+          },
+          {
+            id: 'type-2',
+            name: 'Cuti Tahunan',
+            requires_document: false,
+            max_days_per_year: null,
+            is_active: true,
+          },
+        ],
+      },
+    });
+
+    const result = await leaveService.getTypes('CMP001');
+
+    expect(api.get).toHaveBeenCalledWith('/leave/types', {
+      params: {
+        company_id: 'CMP001',
+        is_active: true,
+        limit: 100,
+      },
+    });
+    expect(result).toEqual([
+      {
+        id: 'type-1',
+        name: 'Cuti Sakit',
+        requires_document: true,
+        max_days_per_year: 3,
+        is_active: true,
+      },
+      {
+        id: 'type-2',
+        name: 'Cuti Tahunan',
+        requires_document: false,
+        max_days_per_year: null,
+        is_active: true,
+      },
+    ]);
+  });
+
+  it('getTypes unwraps nested data arrays returned by the API', async () => {
+    (api.get as jest.Mock).mockResolvedValue({
+      data: {
+        data: {
+          data: [
+            {
+              id: 'type-3',
+              name: 'Cuti Khusus',
+              requires_document: true,
+              max_days_per_year: 5,
+              is_active: true,
+            },
+          ],
+        },
+      },
+    });
+
+    const result = await leaveService.getTypes('CMP001');
+
+    expect(result).toEqual([
+      {
+        id: 'type-3',
+        name: 'Cuti Khusus',
+        requires_document: true,
+        max_days_per_year: 5,
+        is_active: true,
+      },
+    ]);
+  });
 });

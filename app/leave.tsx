@@ -63,6 +63,26 @@ function allowsReplacement(type?: { code?: string | null; name?: string | null; 
   return /khusus|tahunan/.test(haystack);
 }
 
+function isBalanceBypassLeaveType(type?: { code?: string | null; category?: string | null } | null) {
+  const code = String(type?.code || '').toUpperCase();
+  const category = String(type?.category || '').toUpperCase();
+  return code === 'SICK'
+    || category === 'SICK'
+    || category === 'SPECIAL'
+    || category === 'PERMISSION_HOURLY'
+    || category === 'PERMISSION_DAILY';
+}
+
+function getLeaveDayCount(startDate?: string | null, endDate?: string | null) {
+  if (!startDate) return 0;
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${(endDate || startDate)}T00:00:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0;
+  const diffMs = end.getTime() - start.getTime();
+  if (diffMs < 0) return 0;
+  return Math.floor(diffMs / 86_400_000) + 1;
+}
+
 function formatLeaveTypeName(name?: string | null) {
   if (!name) return '';
   // Remove "Cuti " or "cuti " prefix, case-insensitive
@@ -119,11 +139,17 @@ export default function LeaveScreen() {
   });
 
   // 1. Fetch History
-  const { data: history = [], isLoading: isLoadingHistory, refetch: refetchHistory, isFetching: isFetchingHistory } = useQuery({
+  const { data: history = [], isLoading: isLoadingHistory, isError: isHistoryError, refetch: refetchHistory, isFetching: isFetchingHistory } = useQuery({
     queryKey: historyQueryKey,
     queryFn: () => leaveService.getRequests({ employee_id: user?.id, year: selectedYear, month: selectedMonth, limit: 100 }),
     enabled: !!user?.id,
   });
+
+  useEffect(() => {
+    if (isHistoryError) {
+      Alert.alert('Gagal', 'Gagal memuat riwayat cuti. Silakan coba lagi.');
+    }
+  }, [isHistoryError]);
 
   const { data: selectedLeaveDetail, isLoading: isLoadingDetail, isError: isDetailError, refetch: refetchDetail } = useQuery({
     queryKey: ['leave-detail', selectedDetailId],
@@ -153,8 +179,6 @@ export default function LeaveScreen() {
     () => visibleLeaveTypes.find((type) => type.id === form.leave_type_id),
     [form.leave_type_id, visibleLeaveTypes],
   );
-  const isHourlyLeave = isHourlyLeaveType(selectedLeaveType);
-  const canChooseReplacement = allowsReplacement(selectedLeaveType);
 
   const { data: colleagues = [], isLoading: isLoadingColleagues } = useQuery({
     queryKey: ['colleagues', profile?.division_id, debouncedSearch],
@@ -162,7 +186,34 @@ export default function LeaveScreen() {
     enabled: !!profile?.division_id,
   });
 
-  // Leave balances logic removed per HR request
+  const { data: leaveBalances = [] } = useQuery({
+    queryKey: ['leave-balances', user?.id, selectedYear],
+    queryFn: () => leaveService.getBalances(user?.id as string, selectedYear),
+    enabled: !!user?.id,
+    staleTime: 60_000,
+  });
+
+  const selectedLeaveBalance = useMemo(
+    () => leaveBalances.find((balance) => balance.leave_type_id === form.leave_type_id),
+    [form.leave_type_id, leaveBalances],
+  );
+
+  const isHourlyLeave = isHourlyLeaveType(selectedLeaveType);
+  const canChooseReplacement = allowsReplacement(selectedLeaveType);
+  const isBalanceBypassed = isBalanceBypassLeaveType(selectedLeaveType);
+  const requestedLeaveDays = isHourlyLeave ? 1 : getLeaveDayCount(form.start_date, form.end_date);
+  const remainingLeaveDays = selectedLeaveBalance?.remaining_days ?? selectedLeaveType?.max_days_per_year ?? null;
+  const isBalanceExceeded = Boolean(selectedLeaveType?.id)
+    && !isBalanceBypassed
+    && remainingLeaveDays != null
+    && requestedLeaveDays > 0
+    && requestedLeaveDays > remainingLeaveDays;
+  const balanceMessage = selectedLeaveType
+    ? (selectedLeaveType.max_days_per_year == null || isBalanceBypassed
+      ? 'Tipe cuti ini tidak dibatasi oleh saldo tahunan.'
+      : `Sisa cuti ${selectedLeaveType.name} tinggal ${remainingLeaveDays ?? 0} hari.`
+    )
+    : null;
 
   // 3. Create Request Mutation
   const createMutation = useMutation({
@@ -201,17 +252,7 @@ export default function LeaveScreen() {
     onError: (error: any) => {
       const response = error?.response?.data;
       const message = response?.message || 'Gagal mengajukan cuti';
-      const fieldErrors = Array.isArray(response?.errors) ? response.errors : [];
-
-      if (fieldErrors.length > 0) {
-        const normalized = fieldErrors
-          .map((item: any) => `${item.field || 'field'}: ${item.message || 'invalid'}`)
-          .join('\n');
-        Alert.alert('Error', `${message}\n\n${normalized}`);
-        return;
-      }
-
-      Alert.alert('Error', message);
+      Alert.alert('Gagal', message);
     }
   });
 
@@ -353,6 +394,13 @@ export default function LeaveScreen() {
       return;
     }
 
+    if (!isBalanceBypassed && selectedLeaveType?.max_days_per_year != null) {
+      if (isBalanceExceeded) {
+        Alert.alert('Gagal', `Sisa cuti ${selectedLeaveType.name} tinggal ${remainingLeaveDays ?? 0} hari.`);
+        return;
+      }
+    }
+
     if (!payload.reason || payload.reason.trim().length < 5) {
       Alert.alert('Mohon masukkan alasan minimal 5 karakter');
       return;
@@ -379,10 +427,6 @@ export default function LeaveScreen() {
     });
   };
 
-  const requiresDocument = /sakit/i.test(
-    `${selectedLeaveType?.name || ''} ${selectedLeaveType?.description || ''}`,
-  );
-
   useEffect(() => {
     if (!form.leave_type_id) return;
     if (visibleLeaveTypes.some((type) => type.id === form.leave_type_id)) return;
@@ -408,6 +452,9 @@ export default function LeaveScreen() {
     }));
     setSelectedRange({});
     setSelectedHourlyDate(today);
+    if (!nextType?.requires_document) {
+      setDocumentFile(null);
+    }
     if (!nextCanChooseReplacement) {
       setReplacementModalVisible(false);
       setColleagueSearch('');
@@ -559,6 +606,8 @@ export default function LeaveScreen() {
           <RefreshControl refreshing={isFetchingHistory} onRefresh={onRefresh} tintColor={Tokens.colors.primary} />
         }
       >
+
+
         <View className="mb-6">
           <PeriodSelector
             month={selectedMonth}
@@ -675,13 +724,16 @@ export default function LeaveScreen() {
         colleagueSearch={colleagueSearch}
         setColleagueSearch={setColleagueSearch}
         userId={user?.id}
-        requiresDocument={requiresDocument}
         documentFile={documentFile}
         onClearDocument={clearDocument}
         onPickImage={pickImage}
         onPickDocument={pickDocument}
         onSubmit={handleCreate}
         isSubmitting={createMutation.isPending}
+        leaveBalance={selectedLeaveBalance}
+        leaveLimit={selectedLeaveType?.max_days_per_year ?? null}
+        canSubmit={!isBalanceExceeded && !createMutation.isPending}
+        balanceMessage={balanceMessage}
       />
 
       <Modal

@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { MotiView } from 'moti';
-import React from 'react';
+import React, { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
   Alert,
@@ -74,12 +74,12 @@ export default function LoginScreen() {
         router.replace('/(tabs)');
       } catch (err) {
         console.error('[Login] Failed to fetch profile after login:', err);
-        Alert.alert('Error', 'Gagal mengambil profil pengguna');
+        Alert.alert('Gagal', 'Gagal mengambil profil pengguna. Coba lagi.');
       }
     },
     onError: (error: any) => {
       const errorMessage = error.response?.data?.message || error.message || 'Login gagal';
-      Alert.alert('Error', errorMessage);
+      Alert.alert('Login Gagal', errorMessage);
     },
   });
 
@@ -143,8 +143,8 @@ export default function LoginScreen() {
             <View style={styles.formCard}>
               <View style={styles.form}>
                 <MotiView
-                  from={{ opacity: 0, translateX: -20 }}
-                  animate={{ opacity: 1, translateX: 0 }}
+                  from={{ opacity: 0, translateY: 20 }}
+                  animate={{ opacity: 1, translateY: 0 }}
                   transition={{ type: 'spring', delay: 350 }}
                 >
                   <Controller
@@ -152,24 +152,23 @@ export default function LoginScreen() {
                     name="nik"
                     render={({ field: { onChange, onBlur, value } }) => (
                       <Input
-                        label="Nomor Induk Karyawan"
+                        label="Nomor Induk Karyawan (NIK)"
                         placeholder="Masukkan NIK Anda"
                         onBlur={onBlur}
-                        autoComplete='username'
-                        textContentType="username"
+                        autoCapitalize="none"
                         onChangeText={onChange}
                         value={value}
                         error={errors.nik?.message}
-                        autoCapitalize="none"
                       />
                     )}
                   />
                 </MotiView>
 
                 <MotiView
-                  from={{ opacity: 0, translateX: -20 }}
-                  animate={{ opacity: 1, translateX: 0 }}
+                  from={{ opacity: 0, translateY: 20 }}
+                  animate={{ opacity: 1, translateY: 0 }}
                   transition={{ type: 'spring', delay: 450 }}
+                  style={{ marginTop: 16 }}
                 >
                   <Controller
                     control={control}
@@ -197,14 +196,15 @@ export default function LoginScreen() {
                     type: 'spring',
                     delay: 600,
                     damping: 10,
-                    stiffness: 200,
-                    mass: 0.8
                   }}
                 >
                   <Button
-                    title="Sign In"
-                    onPress={handleSubmit(onSubmit)}
+                    title={mutation.isPending ? 'Memproses...' : 'Sign In'}
+                    onPress={handleSubmit((values) => {
+                      onSubmit(values);
+                    })}
                     loading={mutation.isPending}
+                    disabled={mutation.isPending}
                     style={styles.button}
                   />
                 </MotiView>
@@ -355,6 +355,10 @@ const styles = StyleSheet.create({
   },
   form: {
     width: '100%',
+  },
+  errorBox: {
+    marginTop: 4,
+    marginBottom: 8,
   },
   button: {
     marginTop: 4,
