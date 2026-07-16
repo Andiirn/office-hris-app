@@ -246,7 +246,7 @@ export default function HomeScreen() {
     staleTime: 30 * 1000,
   });
 
-  const { data: pendingApprovals = [] } = useQuery({
+  const { data: pendingApprovals = [], refetch: refetchPendingApprovals } = useQuery({
     queryKey: ['home-approvals', user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -256,7 +256,7 @@ export default function HomeScreen() {
     staleTime: 30 * 1000,
   });
 
-  const { data: pendingTeamVisits = [] } = useQuery({
+  const { data: pendingTeamVisits = [], refetch: refetchPendingTeamVisits } = useQuery({
     queryKey: ['home-visit-pending', user?.company_id, user?.branch_id, user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
@@ -333,9 +333,11 @@ export default function HomeScreen() {
       refetchResignFeed(),
       refetchApprovalFeed(),
       refetchCorrectionFeed(),
+      refetchPendingApprovals(),
+      refetchPendingTeamVisits(),
     ]);
     setIsManualRefreshing(false);
-  }, [refetchAttendanceFeed, refetchLeaveFeed, refetchOvertimeFeed, refetchResignFeed, refetchApprovalFeed, refetchCorrectionFeed]);
+  }, [refetchAttendanceFeed, refetchLeaveFeed, refetchOvertimeFeed, refetchResignFeed, refetchApprovalFeed, refetchCorrectionFeed, refetchPendingApprovals, refetchPendingTeamVisits]);
 
   const onRefresh = React.useCallback(() => {
     refetchAttendanceFeed();
@@ -344,7 +346,9 @@ export default function HomeScreen() {
     refetchResignFeed();
     refetchApprovalFeed();
     refetchCorrectionFeed();
-  }, [refetchAttendanceFeed, refetchLeaveFeed, refetchOvertimeFeed, refetchResignFeed, refetchApprovalFeed, refetchCorrectionFeed]);
+    refetchPendingApprovals();
+    refetchPendingTeamVisits();
+  }, [refetchAttendanceFeed, refetchLeaveFeed, refetchOvertimeFeed, refetchResignFeed, refetchApprovalFeed, refetchCorrectionFeed, refetchPendingApprovals, refetchPendingTeamVisits]);
 
   useFocusEffect(
     React.useCallback(() => {

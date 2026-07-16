@@ -174,10 +174,11 @@ describe('attendanceService', () => {
 
   describe('getTodayRecord', () => {
     it('should return the newest record for today', async () => {
+      (api.get as jest.Mock).mockReset();
       (api.get as jest.Mock).mockResolvedValue({
         data: {
           data: [
-            { id: '1', checkin_at: '2026-07-02T02:00:00Z', checkout_at: null },
+            { id: '1', checkin_at: '2026-07-02T02:00:00Z', checkout_at: '2026-07-02T10:00:00Z' },
             { id: '2', checkin_at: '2026-07-02T05:00:00Z', checkout_at: null },
           ],
         },
@@ -186,6 +187,43 @@ describe('attendanceService', () => {
       const result = await attendanceService.getTodayRecord();
 
       expect(result?.id).toBe('2');
+      expect((api.get as jest.Mock).mock.calls.at(-1)).toEqual([
+        '/attendance/',
+        expect.objectContaining({ params: expect.objectContaining({ limit: 1000, page: 1 }) }),
+      ]);
+    });
+
+    it('should fall back to the newest record when no open record exists', async () => {
+      (api.get as jest.Mock).mockReset();
+      (api.get as jest.Mock).mockResolvedValue({
+        data: {
+          data: [
+            { id: '1', checkin_at: '2026-07-02T02:00:00Z', checkout_at: '2026-07-02T10:00:00Z' },
+            { id: '2', checkin_at: '2026-07-02T05:00:00Z', checkout_at: '2026-07-02T11:00:00Z' },
+          ],
+        },
+      });
+
+      const result = await attendanceService.getTodayRecord();
+
+      expect(result?.id).toBe('2');
+    });
+  });
+
+  describe('getTodayRecords', () => {
+    it('should return all today records sorted newest first', async () => {
+      (api.get as jest.Mock).mockResolvedValue({
+        data: {
+          data: [
+            { id: '1', checkin_at: '2026-07-02T02:00:00Z', created_at: '2026-07-02T02:00:00Z' },
+            { id: '2', checkin_at: '2026-07-02T05:00:00Z', created_at: '2026-07-02T05:00:00Z' },
+          ],
+        },
+      });
+
+      const result = await attendanceService.getTodayRecords();
+
+      expect(result.map((item) => item.id)).toEqual(['2', '1']);
     });
   });
 

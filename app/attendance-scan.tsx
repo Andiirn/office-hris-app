@@ -15,6 +15,7 @@ import { getStableDeviceFingerprint } from '../src/core/auth/device-fingerprint'
 import { qk } from '../src/core/query/query-keys';
 import { Tokens } from '../src/core/theme/tokens';
 import { parseAttendanceQrPayload } from '../src/features/attendance/qr';
+import { getAttendanceScanDecision } from '../src/features/attendance/scan-state';
 import { attendanceService, createSelfiePhotoCode } from '../src/services/attendance.service';
 import { useAuthStore } from '../src/stores/auth.store';
 
@@ -27,6 +28,22 @@ type ScanFailure = {
   message: string;
   reasons: string[];
   mode: ScanMode;
+};
+
+type AttendanceRecordLike = {
+  id?: string;
+  attendance_date?: string;
+  date?: string;
+  checkin_at?: string | null;
+  checkin_time?: string | null;
+  checkout_at?: string | null;
+  checkout_time?: string | null;
+  attendance_status?: string;
+  status?: string;
+  attendance_method?: string;
+  branch_name?: string | null;
+  branch?: { name?: string | null } | null;
+  created_at?: string | null;
 };
 
 const SELFIE_INFO_SEEN_KEY = 'attendance_scan_selfie_info_seen';
@@ -109,6 +126,11 @@ const toSelfieUpload = (photo: CameraCapturedPicture, photoCode: string) => ({
   name: `${photoCode}.${photo.format === 'png' ? 'png' : 'jpg'}`,
   type: photo.format === 'png' ? 'image/png' : 'image/jpeg',
 });
+
+const pickOpenAttendanceRecord = (records: AttendanceRecordLike[]) =>
+  records.find((record) => !!record.checkin_at && !record.checkout_at) ?? null;
+
+
 
 function SuccessResultScreen({
   message,
@@ -276,7 +298,7 @@ export default function AttendanceScanScreen() {
   const [coords, setCoords] = useState<{ lat: number; long: number } | null>(null);
   const [address, setAddress] = useState<string | null>(null);
   const [isMocked, setIsMocked] = useState(false);
-  const [todayRecord, setTodayRecord] = useState<any | null>(null);
+  const [todayRecords, setTodayRecords] = useState<AttendanceRecordLike[]>([]);
   const [isSelfieMode, setIsSelfieMode] = useState(false);
   const [scanFailure, setScanFailure] = useState<ScanFailure | null>(null);
   const { width, height } = useWindowDimensions();
@@ -294,11 +316,12 @@ export default function AttendanceScanScreen() {
         throw new Error('Kamera selfie belum siap');
       }
 
-      const hasCheckin = !!todayRecord?.checkin_time || !!todayRecord?.checkin_at;
-      const hasCheckout = !!todayRecord?.checkout_time || !!todayRecord?.checkout_at;
+      const latestRecords = await attendanceService.getTodayRecords();
+      setTodayRecords(latestRecords);
 
-      if (hasCheckin && hasCheckout) {
-        setErrorMessage('Anda sudah check-in dan check-out hari ini.');
+      const decision = getAttendanceScanDecision(latestRecords);
+      if (decision.action === 'blocked') {
+        setErrorMessage(decision.message);
         return;
       }
 
@@ -321,7 +344,7 @@ export default function AttendanceScanScreen() {
       };
       const upload = toSelfieUpload(selfiePhoto, photoCode);
 
-      if (!hasCheckin) {
+      if (decision.action === 'checkin') {
         const result = await attendanceService.checkinSelfie(payload, upload);
         setCheckinMessage(result?.message ?? 'Check-in selfie berhasil');
       } else {
@@ -329,8 +352,8 @@ export default function AttendanceScanScreen() {
         setCheckinMessage(result?.message ?? 'Check-out selfie berhasil');
       }
 
-      const latest = await attendanceService.getTodayRecord();
-      setTodayRecord(latest ?? null);
+      const latest = await attendanceService.getTodayRecords();
+      setTodayRecords(latest);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryRoot() }),
         queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryFullRoot() }),
@@ -361,11 +384,23 @@ export default function AttendanceScanScreen() {
       }
 
       try {
-        const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-        setCoords({ lat: position.coords.latitude, long: position.coords.longitude });
-        setIsMocked(position.mocked === true);
-        setStatus('granted');
-        return;
+        // Coba ambil lokasi terakhir (cache) terlebih dahulu
+        let position = await Location.getLastKnownPositionAsync();
+        // Cek apakah lokasi masih baru (misalnya kurang dari 2 menit / 120.000 ms)
+        const isFresh = position && (Date.now() - position.timestamp < 120000);
+
+        if (!isFresh) {
+          // Jika lokasi sudah usang atau tidak ada, ambil lokasi baru
+          // Menggunakan Balanced akan mempercepat penguncian lokasi karena mengombinasikan GPS, Wi-Fi, dan Seluler
+          position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        }
+
+        if (position?.coords) {
+          setCoords({ lat: position.coords.latitude, long: position.coords.longitude });
+          setIsMocked(position.mocked === true);
+          setStatus('granted');
+          return;
+        }
       } catch (err) {
         console.warn('getCurrentPositionAsync failed, trying fallback', err);
         const lastKnown = await Location.getLastKnownPositionAsync();
@@ -431,11 +466,11 @@ export default function AttendanceScanScreen() {
   useEffect(() => {
     const loadTodayRecord = async () => {
       try {
-        const record = await attendanceService.getTodayRecord();
-        setTodayRecord(record ?? null);
+        const records = await attendanceService.getTodayRecords();
+        setTodayRecords(records);
       } catch (err) {
         console.error(err);
-        setTodayRecord(null);
+        setTodayRecords([]);
       }
     };
     loadTodayRecord();
@@ -455,22 +490,27 @@ export default function AttendanceScanScreen() {
     setCheckinMessage(null);
     setErrorMessage(null);
     try {
-      const hasCheckin = !!todayRecord?.checkin_time || !!todayRecord?.checkin_at;
-      const hasCheckout = !!todayRecord?.checkout_time || !!todayRecord?.checkout_at;
+      const { qrToken } = parseAttendanceQrPayload(rawQrData);
+      const branchId = qrToken.split(':')[0];
+      const latestRecords = await attendanceService.getTodayRecords();
+      setTodayRecords(latestRecords);
+      const decision = getAttendanceScanDecision(latestRecords);
 
-      if (hasCheckin && hasCheckout) {
-        setScanFailure({
-          title: 'Absensi sudah selesai',
-          message: 'Anda sudah check-in dan check-out hari ini.',
-          reasons: [],
-          mode: 'qr',
-        });
+      if (decision.action === 'blocked') {
+        setErrorMessage(decision.message);
         return;
       }
 
-      const { qrToken } = parseAttendanceQrPayload(rawQrData);
-      const branchId = qrToken.split(':')[0];
-      if (!hasCheckin) {
+      if (decision.action === 'checkout') {
+        const result = await attendanceService.checkout({
+          qr_token: qrToken,
+          gps_lat: coords.lat,
+          gps_long: coords.long,
+          location_address: address || '',
+          checkout_photo_url: '',
+        });
+        setCheckinMessage(result.message ?? 'Check-out berhasil');
+      } else {
         const deviceFingerprint = await getStableDeviceFingerprint();
         const payload = {
           qr_token: qrToken,
@@ -479,7 +519,7 @@ export default function AttendanceScanScreen() {
           gps_long: coords.long,
           location_address: address || '',
           device_fingerprint: deviceFingerprint,
-          user_agent: `HRIS/${Device.modelName || 'device'}`,
+          user_agent: `HRIS-Mobile/1.0.0/${Device.modelName || 'device'}`,
           device_os: Device.osName || 'unknown',
           device_model: Device.modelName || Device.deviceName || 'unknown',
           is_mock_location: isMocked,
@@ -492,19 +532,7 @@ export default function AttendanceScanScreen() {
         };
         const result = await attendanceService.checkin(payload);
         setCheckinMessage(result.message ?? 'Check-in berhasil');
-      } else {
-        const result = await attendanceService.checkout({
-          qr_token: qrToken,
-          gps_lat: coords.lat,
-          gps_long: coords.long,
-          location_address: address || '',
-          checkout_photo_url: '',
-        });
-        setCheckinMessage(result.message ?? 'Check-out berhasil');
       }
-
-      const latest = await attendanceService.getTodayRecord();
-      setTodayRecord(latest ?? null);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryRoot() }),
         queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryFullRoot() }),
@@ -517,7 +545,7 @@ export default function AttendanceScanScreen() {
     } finally {
       setSubmitting(false);
     }
-  }, [address, coords, height, isMocked, queryClient, todayRecord, user?.id, width]);
+  }, [address, coords, height, isMocked, queryClient, user?.id, width]);
 
   const handleRetryScanner = () => {
     setScanned(false);
@@ -544,13 +572,13 @@ export default function AttendanceScanScreen() {
               {
                 text: 'Mengerti',
                 onPress: () => {
-                  AsyncStorage.setItem(SELFIE_INFO_SEEN_KEY, 'true').catch(() => {});
+                  AsyncStorage.setItem(SELFIE_INFO_SEEN_KEY, 'true').catch(() => { });
                 },
               },
             ]
           );
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   };
 
@@ -569,9 +597,13 @@ export default function AttendanceScanScreen() {
   const failureTitle = scanFailure?.title ?? 'Gagal memproses absensi';
   const failureMessage = scanFailure?.message ?? errorMessage ?? 'Coba lagi untuk memproses absensi.';
   const failureReasons = scanFailure?.reasons ?? [];
-
-  const hasCheckin = !!todayRecord?.checkin_time || !!todayRecord?.checkin_at;
-  const hasCheckout = !!todayRecord?.checkout_time || !!todayRecord?.checkout_at;
+  const openTodayRecord = pickOpenAttendanceRecord(todayRecords);
+  const completedTodayRecords = todayRecords.filter((record) => !!record.checkin_at && !!record.checkout_at);
+  const recordState = openTodayRecord
+    ? 'open'
+    : completedTodayRecords.length > 0
+      ? 'completed'
+      : 'none';
 
   if (hasSuccessState) {
     return (
@@ -753,13 +785,24 @@ export default function AttendanceScanScreen() {
               </View>
             )}
 
-            {hasCheckin && hasCheckout && !hasSuccessState && !hasFailureState && !submitting && (
-              <View className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 w-full flex-row items-center gap-3 mt-2">
-                <MaterialIcons name="check-circle" size={20} color="#059669" />
-                <Text className="font-inter text-xs text-emerald-800 flex-1 leading-relaxed">
-                  Terima Kasih. Anda telah selesai melakukan absensi hari ini.
-                </Text>
-              </View>
+            {recordState !== 'none' && !hasSuccessState && !hasFailureState && !submitting && (
+              <>
+                {recordState === 'open' ? (
+                  <View className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 w-full flex-row items-center gap-3 mt-2">
+                    <MaterialIcons name="login" size={20} color="#059669" />
+                    <Text className="font-inter text-xs text-emerald-800 flex-1 leading-relaxed">
+                      Record hari ini masih terbuka. Scan berikutnya akan diarahkan ke checkout.
+                    </Text>
+                  </View>
+                ) : (
+                  <View className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 w-full flex-row items-center gap-3 mt-2">
+                    <MaterialIcons name="check-circle" size={20} color="#059669" />
+                    <Text className="font-inter text-xs text-emerald-800 flex-1 leading-relaxed">
+                      Terima Kasih. Sistem membaca record absensi hari ini sudah lengkap.
+                    </Text>
+                  </View>
+                )}
+              </>
             )}
           </View>
         )}

@@ -100,3 +100,46 @@ Admin menekan tombol Approve di dashboard web.
 Server merubah status di database, lalu mengirimkan Push Notification tipe silent (tersembunyi) ke HP karyawan.
 Aplikasi mobile menangkap notifikasi silent tersebut di background, lalu menjalankan perintah refetch() untuk menarik data terbaru.
 UI langsung berubah seketika, voila! Terasa instan seperti sihir.
+
+
+fcm_not_configured di repo ini berarti backend tidak berhasil menemukan kredensial FCM sama sekali.
+
+  Trigger-nya ada di hris-api/app/shared/notifications/push_service.py:56. Alurnya:
+
+  1. Coba baca FCM_SERVICE_ACCOUNT_JSON_B64
+  2. Kalau kosong/gagal decode, coba baca file dari FCM_SERVICE_ACCOUNT_FILE
+  3. Kalau dua-duanya gagal, return:
+
+  {"status": "skipped", "reason": "fcm_not_configured"}
+
+  Jadi penyebab nyatanya biasanya salah satu ini:
+
+  - FCM_SERVICE_ACCOUNT_JSON_B64 memang kosong
+  - FCM_SERVICE_ACCOUNT_JSON_B64 ada tapi bukan base64 JSON service account yang valid
+  - FCM_SERVICE_ACCOUNT_FILE mengarah ke path yang tidak ada di dalam container
+  - file JSON ada, tapi isinya bukan service account Firebase yang valid
+  - env sudah diubah di host, tapi container hris-api / celery-worker belum recreate, jadi worker masih baca env lama
+
+  Di .env.example, default-nya memang:
+
+  FCM_SERVICE_ACCOUNT_JSON_B64=
+  FCM_SERVICE_ACCOUNT_FILE=hris.json
+
+  Kalau kamu cuma isi FCM_SERVICE_ACCOUNT_FILE=hris.json tapi file hris.json itu tidak ada di dalam container, hasilnya
+  tetap fcm_not_configured.
+
+  Cek cepatnya:
+
+  docker compose exec hris-api printenv | grep FCM
+  docker compose exec celery-worker printenv | grep FCM
+  docker compose exec hris-api ls -l /app/hris.json
+  docker compose exec celery-worker ls -l /app/hris.json
+
+  Kalau worker yang kirim push, yang paling penting justru env dan file di celery-worker, bukan cuma hris-api.
+
+  Kalau mau paling aman:
+
+  - isi FCM_SERVICE_ACCOUNT_JSON_B64 dengan base64 dari file service account JSON
+  - lalu recreate hris-api dan celery-worker
+
+  Kalau mau, saya bisa cek env/container kamu sekarang dan kasih tahu persis yang mana yang missing.

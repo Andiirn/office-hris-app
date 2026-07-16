@@ -2,7 +2,14 @@ import { Platform } from 'react-native';
 import * as Device from 'expo-device';
 import { api } from '../core/api/client';
 import { unwrapData } from '../core/api/envelope';
-import { LoginResponse } from '../types/auth';
+import {
+  ForgotPasswordRequestPayload,
+  ForgotPasswordRequestResponse,
+  ForgotPasswordResetPayload,
+  ForgotPasswordVerifyOtpPayload,
+  ForgotPasswordVerifyOtpResponse,
+  LoginResponse
+} from '../types/auth';
 import { ProfileData } from '../types/profile';
 import { normalizeRole } from '../core/auth/rbac';
 import { getStableDeviceFingerprint } from '../core/auth/device-fingerprint';
@@ -53,5 +60,24 @@ export const authService = {
       console.warn('[AuthService] Update Password failed:', error.response?.data?.message || error.message);
       throw error;
     }
+  },
+
+  async requestForgotPassword(payload: ForgotPasswordRequestPayload): Promise<ForgotPasswordRequestResponse> {
+    const response = await api.post('/auth/forgot-password/request', payload);
+    return unwrapData<ForgotPasswordRequestResponse>(response.data);
+  },
+
+  async verifyForgotPasswordOtp(payload: ForgotPasswordVerifyOtpPayload): Promise<ForgotPasswordVerifyOtpResponse> {
+    const response = await api.post('/auth/forgot-password/verify-otp', payload);
+    return unwrapData<ForgotPasswordVerifyOtpResponse>(response.data);
+  },
+
+  async resendForgotPasswordOtp(nik: string): Promise<ForgotPasswordRequestResponse> {
+    const response = await api.post('/auth/forgot-password/resend-otp', { nik });
+    return unwrapData<ForgotPasswordRequestResponse>(response.data);
+  },
+
+  async resetForgotPassword(payload: ForgotPasswordResetPayload): Promise<void> {
+    await api.post('/auth/forgot-password/reset', payload);
   },
 };
