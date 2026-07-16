@@ -144,10 +144,14 @@ export default function LeaveScreen() {
     queryKey: ['leave-types', user?.company_id],
     queryFn: () => leaveService.getTypes(user?.company_id || null),
   });
+  const visibleLeaveTypes = useMemo(
+    () => leaveTypes.filter((type) => !user?.company_id || !type.company_id || type.company_id === user.company_id),
+    [leaveTypes, user?.company_id],
+  );
 
   const selectedLeaveType = useMemo(
-    () => leaveTypes.find((type) => type.id === form.leave_type_id),
-    [form.leave_type_id, leaveTypes],
+    () => visibleLeaveTypes.find((type) => type.id === form.leave_type_id),
+    [form.leave_type_id, visibleLeaveTypes],
   );
   const isHourlyLeave = isHourlyLeaveType(selectedLeaveType);
   const canChooseReplacement = allowsReplacement(selectedLeaveType);
@@ -379,10 +383,17 @@ export default function LeaveScreen() {
     `${selectedLeaveType?.name || ''} ${selectedLeaveType?.description || ''}`,
   );
 
+  useEffect(() => {
+    if (!form.leave_type_id) return;
+    if (visibleLeaveTypes.some((type) => type.id === form.leave_type_id)) return;
+
+    setForm((prev) => ({ ...prev, leave_type_id: '' }));
+  }, [form.leave_type_id, setForm, visibleLeaveTypes]);
+
   const today = new Date().toISOString().slice(0, 10);
 
   const handleSelectLeaveType = (typeId: string) => {
-    const nextType = leaveTypes.find((type) => type.id === typeId);
+    const nextType = visibleLeaveTypes.find((type) => type.id === typeId);
     const nextIsHourly = isHourlyLeaveType(nextType);
     const nextCanChooseReplacement = allowsReplacement(nextType);
 
@@ -642,7 +653,8 @@ export default function LeaveScreen() {
       <LeaveCreateModal
         visible={modalVisible}
         onClose={resetAndCloseCreate}
-        leaveTypes={leaveTypes}
+        leaveTypes={visibleLeaveTypes}
+        companyId={user?.company_id}
         form={form}
         onSelectLeaveType={handleSelectLeaveType}
         formatLeaveTypeName={formatLeaveTypeName}

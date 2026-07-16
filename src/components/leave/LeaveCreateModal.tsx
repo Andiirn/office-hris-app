@@ -28,6 +28,7 @@ type Props = {
   visible: boolean;
   onClose: () => void;
   leaveTypes: LeaveType[];
+  companyId?: string | null;
   form: CreateLeaveRequest;
   onSelectLeaveType: (typeId: string) => void;
   formatLeaveTypeName: (name?: string | null) => string;
@@ -61,6 +62,7 @@ export function LeaveCreateModal({
   visible,
   onClose,
   leaveTypes,
+  companyId,
   form,
   onSelectLeaveType,
   formatLeaveTypeName,
@@ -91,6 +93,10 @@ export function LeaveCreateModal({
 }: Props) {
   const insets = useSafeAreaInsets();
   const headerTopPadding = Math.max(insets.top, 12);
+  const visibleLeaveTypes = React.useMemo(
+    () => leaveTypes.filter((type) => !companyId || !type.company_id || type.company_id === companyId),
+    [leaveTypes, companyId],
+  );
 
   return (
     <Modal animationType="slide" visible={visible} onRequestClose={onClose}>
@@ -114,10 +120,17 @@ export function LeaveCreateModal({
 
         <KeyboardAvoidingView
           className="flex-1"
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 24 : 0}
         >
           <View className="flex-1 relative">
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 48 }}>
+            <ScrollView
+              className="flex-1"
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled
+              contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 20, paddingBottom: 48 }}
+            >
               <GlassCard style={{ padding: 16, marginBottom: 20 }}>
                 <View className="flex-row items-center justify-between mb-3">
                   <View>
@@ -125,12 +138,12 @@ export function LeaveCreateModal({
                   </View>
                 </View>
 
-                {leaveTypes.length === 0 ? (
+                {visibleLeaveTypes.length === 0 ? (
                   <Text className="font-inter text-sm text-text-muted">Memuat tipe pengajuan...</Text>
                 ) : (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 4 }}>
                     <View className="flex-row gap-2.5">
-                      {leaveTypes.map((type) => {
+                      {visibleLeaveTypes.map((type) => {
                         const active = form.leave_type_id === type.id;
                         return (
                           <Pressable
