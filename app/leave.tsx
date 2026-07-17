@@ -1,8 +1,9 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
+import * as Sharing from 'expo-sharing';
 import { useRouter } from 'expo-router';
 import { MotiView } from 'moti';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -89,6 +90,20 @@ function formatLeaveTypeName(name?: string | null) {
   return name.replace(/^Cuti\s+/i, '');
 }
 
+function resolveDocumentUrl(rawUrl?: string | null) {
+  if (!rawUrl) return null;
+  return rawUrl.startsWith('http')
+    ? rawUrl
+    : `${process.env.EXPO_PUBLIC_API_URL || 'https://hris.javasuperfood.com'}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`;
+}
+
+function getFileNameFromUrl(rawUrl?: string | null) {
+  if (!rawUrl) return 'Lampiran';
+  const clean = rawUrl.split('?')[0].split('#')[0];
+  const lastPart = clean.split('/').filter(Boolean).pop();
+  return lastPart || 'Lampiran';
+}
+
 function getLeaveStatus(item: { status?: string | null; is_approved?: boolean; approved_at?: string | null }) {
   const rawStatus = String(item?.status || '').toUpperCase();
   if (rawStatus === 'APPROVED' || item?.is_approved || item?.approved_at) return 'APPROVED';
@@ -110,6 +125,7 @@ export default function LeaveScreen() {
   const [selectedRange, setSelectedRange] = useState<{ start?: string, end?: string }>({});
   const [selectedHourlyDate, setSelectedHourlyDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [documentFile, setDocumentFile] = useState<{ uri: string; name: string; mimeType?: string } | null>(null);
+  const [openingDocument, setOpeningDocument] = useState(false);
   const [showSuccessAnim, setShowSuccessAnim] = useState(false);
   const [form, setForm] = useState<CreateLeaveRequest>({
     leave_type_id: '',
@@ -481,27 +497,26 @@ export default function LeaveScreen() {
     }
   };
 
-  const pickDocument = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: '*/*',
-        copyToCacheDirectory: true,
-        multiple: false,
-      });
+  const clearDocument = () => setDocumentFile(null);
 
-      if (result.canceled || !result.assets?.length) return;
-      const asset = result.assets[0];
-      setDocumentFile({
-        uri: asset.uri,
-        name: asset.name,
-        mimeType: asset.mimeType,
-      });
+  const openLeaveDocument = async (rawUrl?: string | null) => {
+    if (!rawUrl) return;
+
+    const fullUrl = resolveDocumentUrl(rawUrl);
+    if (!fullUrl) return;
+
+    try {
+      setOpeningDocument(true);
+      const fileName = getFileNameFromUrl(rawUrl);
+      const localUri = `${FileSystem.cacheDirectory}${fileName}`;
+      const result = await FileSystem.downloadAsync(fullUrl, localUri);
+      await Sharing.shareAsync(result.uri);
     } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Gagal memilih file');
+      Alert.alert('Gagal', error?.message || 'Gagal membuka dokumen');
+    } finally {
+      setOpeningDocument(false);
     }
   };
-
-  const clearDocument = () => setDocumentFile(null);
 
   const resetAndCloseCreate = () => {
     setModalVisible(false);
@@ -727,7 +742,6 @@ export default function LeaveScreen() {
         documentFile={documentFile}
         onClearDocument={clearDocument}
         onPickImage={pickImage}
-        onPickDocument={pickDocument}
         onSubmit={handleCreate}
         isSubmitting={createMutation.isPending}
         leaveBalance={selectedLeaveBalance}
@@ -868,13 +882,13 @@ export default function LeaveScreen() {
                     <View className="mt-3">
                       {(() => {
                         const rawUrl = selectedLeaveDetail.document_url as string;
-                        const fullUrl = rawUrl.startsWith('http')
-                          ? rawUrl
-                          : `${process.env.EXPO_PUBLIC_API_URL || 'https://hris.javasuperfood.com'}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}`;
+                        const fullUrl = resolveDocumentUrl(rawUrl);
+                        const fileName = getFileNameFromUrl(rawUrl);
+                        const isImage = !!fullUrl?.match(/\.(jpeg|jpg|gif|png|webp)$/i);
 
                         return (
                           <>
-                            {fullUrl.match(/\.(jpeg|jpg|gif|png)$/i) ? (
+                            {isImage && fullUrl ? (
                               <View className="w-full h-48 rounded-xl overflow-hidden mb-3 bg-black/5 border border-black/5">
                                 <Image
                                   source={{ uri: fullUrl }}
@@ -882,7 +896,27 @@ export default function LeaveScreen() {
                                   resizeMode="cover"
                                 />
                               </View>
-                            ) : null}
+                            ) : (
+                              <View className="flex-row items-center justify-between bg-black/5 px-3 py-3 rounded-xl">
+                                <View className="flex-1 pr-3">
+                                  <Text className="font-inter-bold text-sm text-on-surface" numberOfLines={1}>
+                                    {fileName}
+                                  </Text>
+                                  <Text className="font-inter text-[10px] text-text-muted mt-1" numberOfLines={1}>
+                                    {fullUrl || rawUrl}
+                                  </Text>
+                                </View>
+                                <Pressable
+                                  onPress={() => openLeaveDocument(rawUrl)}
+                                  disabled={openingDocument}
+                                  className="h-9 px-3 rounded-full bg-primary items-center justify-center disabled:opacity-60"
+                                >
+                                  <Text className="font-inter-bold text-[11px] text-white">
+                                    {openingDocument ? 'Membuka...' : 'Buka'}
+                                  </Text>
+                                </Pressable>
+                              </View>
+                            )}
                           </>
                         );
                       })()}

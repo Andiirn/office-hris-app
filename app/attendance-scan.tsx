@@ -130,13 +130,17 @@ const toSelfieUpload = (photo: CameraCapturedPicture, photoCode: string) => ({
 const pickOpenAttendanceRecord = (records: AttendanceRecordLike[]) =>
   records.find((record) => !!record.checkin_at && !record.checkout_at) ?? null;
 
+const formatSuccessTime = (date = new Date()) =>
+  `${date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB`;
 
 
 function SuccessResultScreen({
   message,
+  successTime,
   onDone,
 }: {
   message: string;
+  successTime: string;
   onDone: () => void;
 }) {
   const bubbles = [
@@ -186,7 +190,10 @@ function SuccessResultScreen({
             <MaterialIcons name="check" size={54} color="#fff" />
           </MotiView>
 
-          <Text className="font-manrope-extrabold text-3xl text-primary text-center">
+          <Text className="font-manrope-extrabold text-4xl text-primary text-center">
+            {successTime}
+          </Text>
+          <Text className="font-manrope-extrabold text-3xl text-primary text-center mt-1">
             Berhasil!
           </Text>
           <Text className="font-inter text-base text-on-surface-variant text-center mt-3 px-6 leading-6">
@@ -293,6 +300,7 @@ export default function AttendanceScanScreen() {
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [checkinMessage, setCheckinMessage] = useState<string | null>(null);
+  const [successTime, setSuccessTime] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [coords, setCoords] = useState<{ lat: number; long: number } | null>(null);
@@ -307,6 +315,7 @@ export default function AttendanceScanScreen() {
     if (!coords) return;
     setSubmitting(true);
     setCheckinMessage(null);
+    setSuccessTime(null);
     setErrorMessage(null);
     setScanFailure(null);
 
@@ -347,9 +356,11 @@ export default function AttendanceScanScreen() {
       if (decision.action === 'checkin') {
         const result = await attendanceService.checkinSelfie(payload, upload);
         setCheckinMessage(result?.message ?? 'Check-in selfie berhasil');
+        setSuccessTime(formatSuccessTime());
       } else {
         const result = await attendanceService.checkoutSelfie(payload, upload);
         setCheckinMessage(result?.message ?? 'Check-out selfie berhasil');
+        setSuccessTime(formatSuccessTime());
       }
 
       const latest = await attendanceService.getTodayRecords();
@@ -488,6 +499,7 @@ export default function AttendanceScanScreen() {
     if (!coords) return;
     setSubmitting(true);
     setCheckinMessage(null);
+    setSuccessTime(null);
     setErrorMessage(null);
     try {
       const { qrToken } = parseAttendanceQrPayload(rawQrData);
@@ -510,6 +522,7 @@ export default function AttendanceScanScreen() {
           checkout_photo_url: '',
         });
         setCheckinMessage(result.message ?? 'Check-out berhasil');
+        setSuccessTime(formatSuccessTime());
       } else {
         const deviceFingerprint = await getStableDeviceFingerprint();
         const payload = {
@@ -532,6 +545,7 @@ export default function AttendanceScanScreen() {
         };
         const result = await attendanceService.checkin(payload);
         setCheckinMessage(result.message ?? 'Check-in berhasil');
+        setSuccessTime(formatSuccessTime());
       }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryRoot() }),
@@ -551,6 +565,7 @@ export default function AttendanceScanScreen() {
     setScanned(false);
     setErrorMessage(null);
     setCheckinMessage(null);
+    setSuccessTime(null);
     setScanFailure(null);
   };
 
@@ -558,6 +573,7 @@ export default function AttendanceScanScreen() {
     setIsSelfieMode(mode === 'selfie');
     setScanned(false);
     setCheckinMessage(null);
+    setSuccessTime(null);
     setErrorMessage(null);
     setScanFailure(null);
 
@@ -608,7 +624,11 @@ export default function AttendanceScanScreen() {
   if (hasSuccessState) {
     return (
       <SafeAreaView className="flex-1 bg-background">
-        <SuccessResultScreen message={checkinMessage || 'Check-in berhasil'} onDone={() => router.replace('/(tabs)')} />
+        <SuccessResultScreen
+          message={checkinMessage || 'Check-in berhasil'}
+          successTime={successTime || formatSuccessTime()}
+          onDone={() => router.replace('/(tabs)')}
+        />
       </SafeAreaView>
     );
   }
@@ -729,11 +749,18 @@ export default function AttendanceScanScreen() {
                       style={{ flex: 1 }}
                       facing="front"
                     />
+                    {submitting && (
+                      <View className="absolute inset-0 items-center justify-center bg-black/45">
+                        <View className="items-center rounded-3xl bg-white/92 px-5 py-4 shadow-lg">
+                          <ActivityIndicator size="large" color={Tokens.colors.primary} />
+                          <Text className="font-inter-bold text-sm text-primary mt-3 text-center">
+                            Mengirim payload selfie
+                          </Text>
+                        </View>
+                      </View>
+                    )}
                     <View className="absolute bottom-4 left-4 right-4 bg-black/60 p-4 rounded-xl border border-white/30">
-                      <Text className="font-inter-bold text-base text-white">
-                        {new Date().toLocaleString('id-ID')}
-                      </Text>
-                      <Text className="font-inter text-xs text-white/90 mt-1.5 leading-relaxed">
+                      <Text className="font-inter text-xs text-white/90 leading-relaxed">
                         {address ? `${address}\n` : ''}Lat: {coords?.lat.toFixed(6)}, Long: {coords?.long.toFixed(6)}
                       </Text>
                     </View>
@@ -773,37 +800,6 @@ export default function AttendanceScanScreen() {
               </>
             )}
 
-            {submitting && (
-              <View className="w-full max-w-[320px] rounded-3xl bg-white border border-white/80 shadow-sm p-6 items-center gap-3">
-                <ActivityIndicator size="large" color={Tokens.colors.primary} />
-                <Text className="font-inter-bold text-lg text-primary text-center">
-                  Mengirim payload selfie
-                </Text>
-                <Text className="font-inter text-sm text-text-muted text-center">
-                  Data selfie sedang diproses oleh server.
-                </Text>
-              </View>
-            )}
-
-            {recordState !== 'none' && !hasSuccessState && !hasFailureState && !submitting && (
-              <>
-                {recordState === 'open' ? (
-                  <View className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 w-full flex-row items-center gap-3 mt-2">
-                    <MaterialIcons name="login" size={20} color="#059669" />
-                    <Text className="font-inter text-xs text-emerald-800 flex-1 leading-relaxed">
-                      Record hari ini masih terbuka. Scan berikutnya akan diarahkan ke checkout.
-                    </Text>
-                  </View>
-                ) : (
-                  <View className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 w-full flex-row items-center gap-3 mt-2">
-                    <MaterialIcons name="check-circle" size={20} color="#059669" />
-                    <Text className="font-inter text-xs text-emerald-800 flex-1 leading-relaxed">
-                      Terima Kasih. Sistem membaca record absensi hari ini sudah lengkap.
-                    </Text>
-                  </View>
-                )}
-              </>
-            )}
           </View>
         )}
       </View>

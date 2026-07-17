@@ -52,7 +52,6 @@ type Props = {
   documentFile: { uri: string; name: string; mimeType?: string } | null;
   onClearDocument: () => void;
   onPickImage: () => void;
-  onPickDocument: () => void;
   onSubmit: () => void;
   isSubmitting: boolean;
   errorMessage?: string | null;
@@ -95,7 +94,6 @@ export function LeaveCreateModal({
   documentFile,
   onClearDocument,
   onPickImage,
-  onPickDocument,
   onSubmit,
   isSubmitting,
   errorMessage,
@@ -323,7 +321,7 @@ export function LeaveCreateModal({
               <GlassCard style={{ padding: 14, marginTop: 12 }}>
                 <Text className="font-inter-bold text-sm text-primary mb-2">Dokumen Pendukung</Text>
                 <Text className="font-inter text-xs text-text-muted mb-3">
-                  Jika tidak melampirkan dokumen, akan dikenakan potongan gaji
+                  Hanya mendukung upload gambar. Jika tidak melampirkan dokumen, akan dikenakan potongan gaji.
                 </Text>
 
                 {documentFile ? (
@@ -345,9 +343,6 @@ export function LeaveCreateModal({
                 <View className="flex-row gap-2 mt-3">
                   <Pressable onPress={onPickImage} className="flex-1 py-3 rounded-xl bg-secondary-container items-center">
                     <Text className="font-inter-bold text-[12px] text-primary">Pilih Galeri</Text>
-                  </Pressable>
-                  <Pressable onPress={onPickDocument} className="flex-1 py-3 rounded-xl bg-primary/5 border border-primary/10 items-center">
-                    <Text className="font-inter-bold text-[12px] text-primary">Pilih Dokumen</Text>
                   </Pressable>
                 </View>
               </GlassCard>
