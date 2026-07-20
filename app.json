@@ -13,8 +13,11 @@
       "bundleIdentifier": "com.hris.employee.app",
       "buildNumber": "1",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "Allow $(PRODUCT_NAME) to access your photo library to upload profile pictures or documents.",
-        "NSPhotoLibraryAddUsageDescription": "Allow $(PRODUCT_NAME) to save photos to your library.",
+        "NSPhotoLibraryUsageDescription": "Allow $(PRODUCT_NAME) to access your photo library so you can choose and upload your profile picture or submit supporting attachments for leave requests (e.g., uploading a doctor's sick note).",
+        "NSPhotoLibraryAddUsageDescription": "Allow $(PRODUCT_NAME) to save photos and generated documents, such as downloaded payslips or attendance receipts, to your photo library.",
+        "NSCameraUsageDescription": "Allow $(PRODUCT_NAME) to access your camera to scan office QR codes and take a verification selfie when performing check-in or check-out (e.g. taking a selfie at the start of your shift).",
+        "NSLocationWhenInUseUsageDescription": "Allow $(PRODUCT_NAME) to access your location. This is required to verify that you are within the designated geofence area when checking in or checking out (e.g. verifying you are at the Head Office).",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Allow $(PRODUCT_NAME) to access your location. This is required to verify that you are within the designated geofence area when checking in or checking out (e.g. verifying you are at the Head Office).",
         "UIFileSharingEnabled": true,
         "LSSupportsOpeningDocumentsInPlace": true,
         "ITSAppUsesNonExemptEncryption": false
@@ -64,13 +67,14 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera for scanning QR and taking selfies."
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to scan office QR codes and take a verification selfie when performing check-in or check-out (e.g. taking a selfie at the start of your shift)."
         }
       ],
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location for attendance verification."
+          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to access your location. This is required to verify that you are within the designated geofence area when checking in or checking out (e.g. verifying you are at the Head Office).",
+          "locationWhenInUsePermission": "Allow $(PRODUCT_NAME) to access your location. This is required to verify that you are within the designated geofence area when checking in or checking out (e.g. verifying you are at the Head Office)."
         }
       ],
       [

@@ -58,6 +58,21 @@ const normalizeVisitPhotoUrl = (value?: string | null) => {
   return `${baseUrl}${value.startsWith('/') ? '' : '/'}${value}`;
 };
 
+const JAKARTA_TIME_ZONE = 'Asia/Jakarta';
+
+const getJakartaDateString = (date = new Date()) => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: JAKARTA_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const year = parts.find((part) => part.type === 'year')?.value ?? '';
+  const month = parts.find((part) => part.type === 'month')?.value ?? '';
+  const day = parts.find((part) => part.type === 'day')?.value ?? '';
+  return `${year}-${month}-${day}`;
+};
+
 export const createSelfiePhotoCode = () => {
   const prefix = Date.now().toString(36).toUpperCase();
   const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -137,8 +152,7 @@ export const attendanceService = {
     return unwrapData<AttendanceActionResponse>(response.data);
   },
   async getTodayRecord() {
-    const today = new Date();
-    const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const todayString = getJakartaDateString();
     const response = await api.get('/attendance/', {
       params: { date_from: todayString, date_to: todayString, limit: 1000, page: 1 },
     });
@@ -148,10 +162,9 @@ export const attendanceService = {
     return pickTodayAttendanceRecord(sorted);
   },
   async getTodayRecords(): Promise<AttendanceItem[]> {
-    const today = new Date();
-    const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const todayString = getJakartaDateString();
     const response = await api.get('/attendance/', {
-      params: { date_from: todayString, date_to: todayString, limit: 1000, page: 1 },
+      params: { date_from: todayString, date_to: todayString, limit: 100, page: 1 },
     });
     const data = unwrapData<AttendanceItem[]>(response.data);
     if (!Array.isArray(data) || data.length === 0) return [];

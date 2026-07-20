@@ -47,6 +47,7 @@ type AttendanceRecordLike = {
 };
 
 const SELFIE_INFO_SEEN_KEY = 'attendance_scan_selfie_info_seen';
+const JAKARTA_TIME_ZONE = 'Asia/Jakarta';
 
 const FRAUD_REASON_LABELS: Record<string, string> = {
   TAMPERED_TOKEN: 'Token selfie tidak valid atau berubah',
@@ -313,6 +314,7 @@ export default function AttendanceScanScreen() {
 
   const submitSelfieAttendance = async () => {
     if (!coords) return;
+    const scanMode: ScanMode = 'selfie';
     setSubmitting(true);
     setCheckinMessage(null);
     setSuccessTime(null);
@@ -341,24 +343,24 @@ export default function AttendanceScanScreen() {
       }
 
       const deviceFingerprint = await getStableDeviceFingerprint();
-      const payload = {
+      const selfiePayload = {
         photoCode,
         lat: coords.lat,
         lng: coords.long,
         address: address || '',
         deviceID: deviceFingerprint,
         deviceModel: Device.modelName || Device.deviceName || 'unknown',
-        timezoneID: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        timezoneID: JAKARTA_TIME_ZONE,
         timestamp: Math.floor(Date.now() / 1000),
       };
       const upload = toSelfieUpload(selfiePhoto, photoCode);
 
       if (decision.action === 'checkin') {
-        const result = await attendanceService.checkinSelfie(payload, upload);
+        const result = await attendanceService.checkinSelfie(selfiePayload, upload);
         setCheckinMessage(result?.message ?? 'Check-in selfie berhasil');
         setSuccessTime(formatSuccessTime());
       } else {
-        const result = await attendanceService.checkoutSelfie(payload, upload);
+        const result = await attendanceService.checkoutSelfie(selfiePayload, upload);
         setCheckinMessage(result?.message ?? 'Check-out selfie berhasil');
         setSuccessTime(formatSuccessTime());
       }
@@ -373,7 +375,7 @@ export default function AttendanceScanScreen() {
         queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryInfiniteRoot() }),
       ]);
     } catch (error: any) {
-      setScanFailure(formatScanFailure(error, isSelfieMode ? 'selfie' : 'qr'));
+      setScanFailure(formatScanFailure(error, scanMode));
     } finally {
       setSubmitting(false);
     }
@@ -497,6 +499,7 @@ export default function AttendanceScanScreen() {
 
   const submitAttendance = useCallback(async (rawQrData: string) => {
     if (!coords) return;
+    const scanMode: ScanMode = 'qr';
     setSubmitting(true);
     setCheckinMessage(null);
     setSuccessTime(null);
@@ -525,7 +528,7 @@ export default function AttendanceScanScreen() {
         setSuccessTime(formatSuccessTime());
       } else {
         const deviceFingerprint = await getStableDeviceFingerprint();
-        const payload = {
+        const qrPayload = {
           qr_token: qrToken,
           branch_id: branchId,
           gps_lat: coords.lat,
@@ -539,11 +542,9 @@ export default function AttendanceScanScreen() {
           is_rooted: false,
           battery_level: null,
           screen_resolution: `${Math.round(width)}x${Math.round(height)}`,
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          device_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          checkin_photo_url: '',
+          timezone: JAKARTA_TIME_ZONE,
         };
-        const result = await attendanceService.checkin(payload);
+        const result = await attendanceService.checkin(qrPayload);
         setCheckinMessage(result.message ?? 'Check-in berhasil');
         setSuccessTime(formatSuccessTime());
       }
@@ -555,7 +556,7 @@ export default function AttendanceScanScreen() {
         queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryInfiniteRoot() }),
       ]);
     } catch (error: any) {
-      setScanFailure(formatScanFailure(error, 'qr'));
+      setScanFailure(formatScanFailure(error, scanMode));
     } finally {
       setSubmitting(false);
     }
