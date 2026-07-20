@@ -131,6 +131,9 @@ const toSelfieUpload = (photo: CameraCapturedPicture, photoCode: string) => ({
 const pickOpenAttendanceRecord = (records: AttendanceRecordLike[]) =>
   records.find((record) => !!record.checkin_at && !record.checkout_at) ?? null;
 
+const getAttendanceIsLate = (record: AttendanceRecordLike | null | undefined) =>
+  String(record?.attendance_status || record?.status || '').toUpperCase() === 'LATE';
+
 const formatSuccessTime = (date = new Date()) =>
   `${date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB`;
 
@@ -138,10 +141,12 @@ const formatSuccessTime = (date = new Date()) =>
 function SuccessResultScreen({
   message,
   successTime,
+  isLate,
   onDone,
 }: {
   message: string;
   successTime: string;
+  isLate: boolean;
   onDone: () => void;
 }) {
   const bubbles = [
@@ -200,6 +205,13 @@ function SuccessResultScreen({
           <Text className="font-inter text-base text-on-surface-variant text-center mt-3 px-6 leading-6">
             {message}
           </Text>
+          {isLate && (
+            <View className="mt-4 rounded-full bg-error/10 px-4 py-2">
+              <Text className="font-inter-bold text-sm text-error">
+                Terlambat
+              </Text>
+            </View>
+          )}
         </MotiView>
 
         <MotiView
@@ -302,6 +314,7 @@ export default function AttendanceScanScreen() {
   const [scanned, setScanned] = useState(false);
   const [checkinMessage, setCheckinMessage] = useState<string | null>(null);
   const [successTime, setSuccessTime] = useState<string | null>(null);
+  const [successIsLate, setSuccessIsLate] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [coords, setCoords] = useState<{ lat: number; long: number } | null>(null);
@@ -318,6 +331,7 @@ export default function AttendanceScanScreen() {
     setSubmitting(true);
     setCheckinMessage(null);
     setSuccessTime(null);
+    setSuccessIsLate(false);
     setErrorMessage(null);
     setScanFailure(null);
 
@@ -350,7 +364,7 @@ export default function AttendanceScanScreen() {
         address: address || '',
         deviceID: deviceFingerprint,
         deviceModel: Device.modelName || Device.deviceName || 'unknown',
-        timezoneID: JAKARTA_TIME_ZONE,
+        timezoneID: Intl.DateTimeFormat().resolvedOptions().timeZone,
         timestamp: Math.floor(Date.now() / 1000),
       };
       const upload = toSelfieUpload(selfiePhoto, photoCode);
@@ -367,6 +381,7 @@ export default function AttendanceScanScreen() {
 
       const latest = await attendanceService.getTodayRecords();
       setTodayRecords(latest);
+      setSuccessIsLate(getAttendanceIsLate(latest.find((record) => record.checkin_at || record.checkout_at)));
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryRoot() }),
         queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryFullRoot() }),
@@ -503,6 +518,7 @@ export default function AttendanceScanScreen() {
     setSubmitting(true);
     setCheckinMessage(null);
     setSuccessTime(null);
+    setSuccessIsLate(false);
     setErrorMessage(null);
     try {
       const { qrToken } = parseAttendanceQrPayload(rawQrData);
@@ -548,6 +564,9 @@ export default function AttendanceScanScreen() {
         setCheckinMessage(result.message ?? 'Check-in berhasil');
         setSuccessTime(formatSuccessTime());
       }
+      const latest = await attendanceService.getTodayRecords();
+      setTodayRecords(latest);
+      setSuccessIsLate(getAttendanceIsLate(latest.find((record) => record.checkin_at || record.checkout_at)));
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryRoot() }),
         queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryFullRoot() }),
@@ -628,6 +647,7 @@ export default function AttendanceScanScreen() {
         <SuccessResultScreen
           message={checkinMessage || 'Check-in berhasil'}
           successTime={successTime || formatSuccessTime()}
+          isLate={successIsLate}
           onDone={() => router.replace('/(tabs)')}
         />
       </SafeAreaView>
