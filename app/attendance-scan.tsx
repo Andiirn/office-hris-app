@@ -47,7 +47,6 @@ type AttendanceRecordLike = {
 };
 
 const SELFIE_INFO_SEEN_KEY = 'attendance_scan_selfie_info_seen';
-const JAKARTA_TIME_ZONE = 'Asia/Jakarta';
 
 const FRAUD_REASON_LABELS: Record<string, string> = {
   TAMPERED_TOKEN: 'Token selfie tidak valid atau berubah',
@@ -364,7 +363,7 @@ export default function AttendanceScanScreen() {
         address: address || '',
         deviceID: deviceFingerprint,
         deviceModel: Device.modelName || Device.deviceName || 'unknown',
-        timezoneID: 'Asia/Jakarta',
+        timezoneID: Intl.DateTimeFormat().resolvedOptions().timeZone,
         timestamp: Math.floor(Date.now() / 1000),
       };
       const upload = toSelfieUpload(selfiePhoto, photoCode);
@@ -558,7 +557,7 @@ export default function AttendanceScanScreen() {
           is_rooted: false,
           battery_level: null,
           screen_resolution: `${Math.round(width)}x${Math.round(height)}`,
-          timezone: 'Asia/Jakarta',
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         };
         const result = await attendanceService.checkin(qrPayload);
         setCheckinMessage(result.message ?? 'Check-in berhasil');
