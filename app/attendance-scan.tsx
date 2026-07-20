@@ -364,7 +364,7 @@ export default function AttendanceScanScreen() {
         address: address || '',
         deviceID: deviceFingerprint,
         deviceModel: Device.modelName || Device.deviceName || 'unknown',
-        timezoneID: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        timezoneID: 'Asia/Jakarta',
         timestamp: Math.floor(Date.now() / 1000),
       };
       const upload = toSelfieUpload(selfiePhoto, photoCode);
@@ -558,7 +558,7 @@ export default function AttendanceScanScreen() {
           is_rooted: false,
           battery_level: null,
           screen_resolution: `${Math.round(width)}x${Math.round(height)}`,
-          timezone: JAKARTA_TIME_ZONE,
+          timezone: 'Asia/Jakarta',
         };
         const result = await attendanceService.checkin(qrPayload);
         setCheckinMessage(result.message ?? 'Check-in berhasil');
