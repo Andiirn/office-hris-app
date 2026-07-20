@@ -341,7 +341,7 @@ export default function AttendanceScanScreen() {
         throw new Error('Kamera selfie belum siap');
       }
 
-      const latestRecords = await attendanceService.getTodayRecords();
+      const latestRecords = await attendanceService.getTodayRecords(user?.id);
       setTodayRecords(latestRecords);
 
       const decision = getAttendanceScanDecision(latestRecords);
@@ -379,7 +379,7 @@ export default function AttendanceScanScreen() {
         setSuccessTime(formatSuccessTime());
       }
 
-      const latest = await attendanceService.getTodayRecords();
+      const latest = await attendanceService.getTodayRecords(user?.id);
       setTodayRecords(latest);
       setSuccessIsLate(getAttendanceIsLate(latest.find((record) => record.checkin_at || record.checkout_at)));
       await Promise.all([
@@ -494,7 +494,7 @@ export default function AttendanceScanScreen() {
   useEffect(() => {
     const loadTodayRecord = async () => {
       try {
-        const records = await attendanceService.getTodayRecords();
+        const records = await attendanceService.getTodayRecords(user?.id);
         setTodayRecords(records);
       } catch (err) {
         console.error(err);
@@ -523,7 +523,7 @@ export default function AttendanceScanScreen() {
     try {
       const { qrToken } = parseAttendanceQrPayload(rawQrData);
       const branchId = qrToken.split(':')[0];
-      const latestRecords = await attendanceService.getTodayRecords();
+      const latestRecords = await attendanceService.getTodayRecords(user?.id);
       setTodayRecords(latestRecords);
       const decision = getAttendanceScanDecision(latestRecords);
 
@@ -564,7 +564,7 @@ export default function AttendanceScanScreen() {
         setCheckinMessage(result.message ?? 'Check-in berhasil');
         setSuccessTime(formatSuccessTime());
       }
-      const latest = await attendanceService.getTodayRecords();
+      const latest = await attendanceService.getTodayRecords(user?.id);
       setTodayRecords(latest);
       setSuccessIsLate(getAttendanceIsLate(latest.find((record) => record.checkin_at || record.checkout_at)));
       await Promise.all([

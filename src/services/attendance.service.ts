@@ -151,20 +151,32 @@ export const attendanceService = {
     });
     return unwrapData<AttendanceActionResponse>(response.data);
   },
-  async getTodayRecord() {
+  async getTodayRecord(employeeId?: string) {
     const todayString = getJakartaDateString();
     const response = await api.get('/attendance/', {
-      params: { date_from: todayString, date_to: todayString, limit: 1000, page: 1 },
+      params: {
+        employee_id: employeeId,
+        date_from: todayString,
+        date_to: todayString,
+        limit: 1000,
+        page: 1,
+      },
     });
     const data = unwrapData<AttendanceItem[]>(response.data);
     if (!Array.isArray(data) || data.length === 0) return undefined;
     const sorted = [...data].sort((a, b) => getAttendanceSortTime(b) - getAttendanceSortTime(a));
     return pickTodayAttendanceRecord(sorted);
   },
-  async getTodayRecords(): Promise<AttendanceItem[]> {
+  async getTodayRecords(employeeId?: string): Promise<AttendanceItem[]> {
     const todayString = getJakartaDateString();
     const response = await api.get('/attendance/', {
-      params: { date_from: todayString, date_to: todayString, limit: 100, page: 1 },
+      params: {
+        employee_id: employeeId,
+        date_from: todayString,
+        date_to: todayString,
+        limit: 100,
+        page: 1,
+      },
     });
     const data = unwrapData<AttendanceItem[]>(response.data);
     if (!Array.isArray(data) || data.length === 0) return [];
