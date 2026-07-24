@@ -3,8 +3,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
-import * as Sharing from 'expo-sharing';
 import { useRouter } from 'expo-router';
+import * as Sharing from 'expo-sharing';
 import { MotiView } from 'moti';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -18,8 +18,8 @@ import {
   View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LeaveCreateModal } from '../src/components/leave/LeaveCreateModal';
 import { PeriodSelector } from '../src/components/common/PeriodSelector';
+import { LeaveCreateModal } from '../src/components/leave/LeaveCreateModal';
 import { Button } from '../src/components/ui/Button';
 import { GlassCard } from '../src/components/ui/GlassCard';
 import { SkeletonCard } from '../src/components/ui/Skeleton';
@@ -125,6 +125,7 @@ export default function LeaveScreen() {
   const [selectedRange, setSelectedRange] = useState<{ start?: string, end?: string }>({});
   const [selectedHourlyDate, setSelectedHourlyDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [documentFile, setDocumentFile] = useState<{ uri: string; name: string; mimeType?: string } | null>(null);
+  const [previewImageUri, setPreviewImageUri] = useState<string | null>(null);
   const [openingDocument, setOpeningDocument] = useState(false);
   const [showSuccessAnim, setShowSuccessAnim] = useState(false);
   const [form, setForm] = useState<CreateLeaveRequest>({
@@ -889,13 +890,16 @@ export default function LeaveScreen() {
                         return (
                           <>
                             {isImage && fullUrl ? (
-                              <View className="w-full h-48 rounded-xl overflow-hidden mb-3 bg-black/5 border border-black/5">
+                              <Pressable
+                                onPress={() => setPreviewImageUri(fullUrl)}
+                                className="relative w-full h-48 rounded-xl overflow-hidden mb-3 bg-black/5 border border-black/5 active:opacity-90"
+                              >
                                 <Image
                                   source={{ uri: fullUrl }}
                                   className="w-full h-full"
                                   resizeMode="cover"
                                 />
-                              </View>
+                              </Pressable>
                             ) : (
                               <View className="flex-row items-center justify-between bg-black/5 px-3 py-3 rounded-xl">
                                 <View className="flex-1 pr-3">
@@ -942,6 +946,40 @@ export default function LeaveScreen() {
                 )}
               </ScrollView>
             )}
+
+            {/* Image Preview / Zoom Modal */}
+            <Modal
+              visible={!!previewImageUri}
+              transparent={true}
+              animationType="fade"
+              onRequestClose={() => setPreviewImageUri(null)}
+            >
+              <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' }}>
+                <Pressable
+                  onPress={() => setPreviewImageUri(null)}
+                  style={{ position: 'absolute', top: 50, right: 20, zIndex: 50, width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <MaterialIcons name="close" size={28} color="#FFFFFF" />
+                </Pressable>
+
+                {previewImageUri ? (
+                  <ScrollView
+                    contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}
+                    minimumZoomScale={1}
+                    maximumZoomScale={4}
+                    showsHorizontalScrollIndicator={false}
+                    showsVerticalScrollIndicator={false}
+                    style={{ width: '100%', height: '100%' }}
+                  >
+                    <Image
+                      source={{ uri: previewImageUri }}
+                      style={{ width: '100%', height: '80%' }}
+                      resizeMode="contain"
+                    />
+                  </ScrollView>
+                ) : null}
+              </View>
+            </Modal>
           </View>
         </View>
       </Modal>
