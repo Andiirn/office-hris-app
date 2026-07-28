@@ -28,6 +28,8 @@ type ScanFailure = {
   message: string;
   reasons: string[];
   mode: ScanMode;
+  actionLabel: string;
+  actionHint?: string;
 };
 
 type AttendanceRecordLike = {
@@ -53,7 +55,12 @@ const FRAUD_REASON_LABELS: Record<string, string> = {
   HIGH_PRECISION_GPS: 'Presisi GPS belum cukup untuk verifikasi',
   OUTSIDE_RADIUS: 'Lokasi berada di luar radius cabang',
   EMULATOR_DETECTED: 'Perangkat terdeteksi sebagai emulator atau lingkungan virtual',
+  MOCK_LOCATION: 'Lokasi palsu / mock location terdeteksi',
+  QR_REPLAY: 'QR sudah pernah dipakai, tunggu QR di tablet berubah.',
+  QR_EXPIRED: 'QR sudah kedaluwarsa, tunggu QR di tablet berubah.',
 };
+
+const LOCATION_FLAGS = new Set(['OUTSIDE_RADIUS', 'HIGH_PRECISION_GPS', 'MOCK_LOCATION']);
 
 const normalizeErrorItems = (value: unknown) => {
   if (!Array.isArray(value)) return [];
@@ -69,6 +76,16 @@ const normalizeErrorItems = (value: unknown) => {
     .map((item) => item.trim())
     .filter(Boolean);
 };
+
+const isLocationRelatedFlag = (flag: string) => LOCATION_FLAGS.has(flag);
+
+const isLocationRelatedFailure = (failure: ScanFailure | null) =>
+  !!failure?.reasons?.some((reason) =>
+    /lokasi berada di luar radius cabang|presisi gps belum cukup untuk verifikasi|lokasi palsu/i.test(reason)
+  );
+
+const getFailureActionLabel = (failure: ScanFailure | null) =>
+  isLocationRelatedFailure(failure) ? 'Dapatkan Lokasi Tinggi' : 'Coba Lagi';
 
 const formatScanFailure = (error: any, mode: ScanMode): ScanFailure => {
   const response = error?.response?.data ?? {};
@@ -93,7 +110,9 @@ const formatScanFailure = (error: any, mode: ScanMode): ScanFailure => {
     ...normalizeErrorItems(response.detail),
   ];
 
-  const flags = Array.from(new Set([...embeddedFlags, ...errorItems]));
+  const flags = Array.from(new Set([...embeddedFlags, ...errorItems]))
+    .map((flag) => String(flag).trim().toUpperCase())
+    .filter(Boolean);
   const isFraud = /anti-fraud|fraud/i.test(rawMessage) || flags.length > 0;
 
   if (!isFraud) {
@@ -102,22 +121,32 @@ const formatScanFailure = (error: any, mode: ScanMode): ScanFailure => {
       message: rawMessage,
       reasons: [],
       mode,
+      actionLabel: 'Coba Lagi',
     };
   }
 
   const formattedReasons = flags.length > 0
     ? flags.map((flag) => FRAUD_REASON_LABELS[flag] ?? flag)
     : [rawMessage];
+  const isLocationIssue = flags.some(isLocationRelatedFlag);
 
   return {
-    title: mode === 'selfie'
-      ? 'Selfie ditolak sistem anti-fraud'
-      : 'QR ditolak sistem anti-fraud',
-    message: mode === 'selfie'
-      ? 'Foto berhasil terkirim, tetapi server menolak absensi karena alasan berikut:'
-      : 'QR berhasil dipindai, tetapi server menolak absensi karena alasan berikut:',
+    title: isLocationIssue
+      ? 'Lokasi belum valid'
+      : mode === 'selfie'
+        ? 'Selfie ditolak sistem anti-fraud'
+        : 'QR ditolak sistem anti-fraud',
+    message: isLocationIssue
+      ? 'Lokasi yang terdeteksi belum memenuhi syarat absensi. Coba ambil lokasi yang lebih akurat.'
+      : mode === 'selfie'
+        ? 'Foto berhasil terkirim, tetapi server menolak absensi karena alasan berikut:'
+        : 'QR berhasil dipindai, tetapi server menolak absensi karena alasan berikut:',
     reasons: formattedReasons,
     mode,
+    actionLabel: isLocationIssue ? 'Ambil Lokasi Lebih Akurat' : 'Coba Lagi',
+    actionHint: isLocationIssue
+      ? 'Gunakan tombol ini untuk memaksa ambil ulang lokasi dengan presisi lebih tinggi.'
+      : undefined,
   };
 };
 
@@ -134,7 +163,13 @@ const getAttendanceIsLate = (record: AttendanceRecordLike | null | undefined) =>
   String(record?.attendance_status || record?.status || '').toUpperCase() === 'LATE';
 
 const formatSuccessTime = (date = new Date()) =>
-  `${date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB`;
+  `${date.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} ${Intl.DateTimeFormat().resolvedOptions().timeZone === 'Asia/Jakarta'
+    ? 'WIB'
+    : Intl.DateTimeFormat().resolvedOptions().timeZone === 'Asia/Makassar'
+      ? 'WITA'
+      : Intl.DateTimeFormat().resolvedOptions().timeZone === 'Asia/Jayapura'
+        ? 'WIT'
+        : Intl.DateTimeFormat().resolvedOptions().timeZone}`;
 
 
 function SuccessResultScreen({
@@ -235,11 +270,15 @@ function FailureResultScreen({
   title,
   message,
   reasons,
+  actionLabel,
+  actionHint,
   onRetry,
 }: {
   title: string;
   message: string;
   reasons: string[];
+  actionLabel: string;
+  actionHint?: string;
   onRetry: () => void;
 }) {
   return (
@@ -269,6 +308,11 @@ function FailureResultScreen({
           <Text className="font-inter text-base text-on-surface-variant text-center mt-3 leading-6 px-4">
             {message}
           </Text>
+          {actionHint ? (
+            <Text className="font-inter text-xs text-text-muted text-center mt-2 leading-5 px-4">
+              {actionHint}
+            </Text>
+          ) : null}
 
           {!!reasons.length && (
             <View className="w-full mt-6 gap-3">
@@ -289,7 +333,7 @@ function FailureResultScreen({
             className="w-full mt-8"
           >
             <Button
-              title="Coba Lagi"
+              title={actionLabel}
               onPress={onRetry}
               className="w-full h-14 rounded-2xl bg-primary"
               textStyle={{ color: '#ffffff', fontSize: 16 }}
@@ -395,7 +439,7 @@ export default function AttendanceScanScreen() {
     }
   };
 
-  const requestLocationPermission = useCallback(async () => {
+  const requestLocationPermission = useCallback(async (accuracy: Location.LocationAccuracy = Location.Accuracy.Balanced) => {
     setStatus('loading');
     setErrorMessage(null);
     setCoords(null);
@@ -417,9 +461,8 @@ export default function AttendanceScanScreen() {
         const isFresh = position && (Date.now() - position.timestamp < 120000);
 
         if (!isFresh) {
-          // Jika lokasi sudah usang atau tidak ada, ambil lokasi baru
-          // Menggunakan Balanced akan mempercepat penguncian lokasi karena mengombinasikan GPS, Wi-Fi, dan Seluler
-          position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          // Default tetap Balanced; High dipakai hanya saat user minta retry lokasi lebih akurat.
+          position = await Location.getCurrentPositionAsync({ accuracy });
         }
 
         if (position?.coords) {
@@ -580,7 +623,13 @@ export default function AttendanceScanScreen() {
     }
   }, [address, coords, height, isMocked, queryClient, user?.id, width]);
 
-  const handleRetryScanner = () => {
+  const handleRetryScanner = async () => {
+    if (isLocationRelatedFailure(scanFailure)) {
+      await requestLocationPermission(Location.Accuracy.High);
+      setScanned(false);
+      setScanFailure(null);
+      return;
+    }
     setScanned(false);
     setErrorMessage(null);
     setCheckinMessage(null);
@@ -632,6 +681,8 @@ export default function AttendanceScanScreen() {
   const failureTitle = scanFailure?.title ?? 'Gagal memproses absensi';
   const failureMessage = scanFailure?.message ?? errorMessage ?? 'Coba lagi untuk memproses absensi.';
   const failureReasons = scanFailure?.reasons ?? [];
+  const failureActionLabel = getFailureActionLabel(scanFailure);
+  const failureActionHint = scanFailure?.actionHint;
   const openTodayRecord = pickOpenAttendanceRecord(todayRecords);
   const completedTodayRecords = todayRecords.filter((record) => !!record.checkin_at && !!record.checkout_at);
   const recordState = openTodayRecord
@@ -660,6 +711,8 @@ export default function AttendanceScanScreen() {
           title={failureTitle}
           message={failureMessage}
           reasons={failureReasons}
+          actionLabel={failureActionLabel}
+          actionHint={failureActionHint}
           onRetry={handleRetryScanner}
         />
       </SafeAreaView>
@@ -704,7 +757,7 @@ export default function AttendanceScanScreen() {
             <Text className="font-inter text-sm text-on-surface-variant text-center px-2">
               {errorMessage || 'Aplikasi memerlukan izin lokasi untuk melakukan absensi.'}
             </Text>
-            <Button title="Coba Lagi" onPress={requestLocationPermission} className="w-full mt-2" />
+            <Button title="Coba Lagi" onPress={() => requestLocationPermission()} className="w-full mt-2" />
           </View>
         )}
 
@@ -717,7 +770,7 @@ export default function AttendanceScanScreen() {
             <Text className="font-inter text-sm text-on-surface-variant text-center px-2">
               Matikan fake GPS atau lokasi palsu terlebih dahulu, lalu coba lagi.
             </Text>
-            <Button title="Coba Lagi" onPress={requestLocationPermission} className="w-full mt-2" />
+            <Button title="Coba Lagi" onPress={() => requestLocationPermission()} className="w-full mt-2" />
           </View>
         )}
 
@@ -789,7 +842,7 @@ export default function AttendanceScanScreen() {
 
                 <Text className="font-inter text-xs text-text-muted italic text-center mt-2 px-6">
                   {!isSelfieMode
-                    ? 'Arahkan kamera ke QR Code cabang untuk check-in atau check-out'
+                    ? 'Arahkan kamera ke QR Code tablet untuk Check-in/Out'
                     : 'Posisikan wajah Anda di kamera, lalu tekan tombol foto di bawah.'}
                 </Text>
 
