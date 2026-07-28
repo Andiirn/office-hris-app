@@ -5,6 +5,7 @@ jest.mock('../../core/api/client', () => ({
   api: {
     get: jest.fn(),
     post: jest.fn(),
+    put: jest.fn(),
   },
 }));
 
@@ -98,6 +99,38 @@ describe('overtimeService', () => {
       overtime_type: 'REGULAR',
       is_approved: true,
       approved_at: '2026-06-06T08:00:00Z',
+    });
+  });
+
+  it('updateRecord sends a PUT request and unwraps the response', async () => {
+    (api.put as jest.Mock).mockResolvedValue({
+      data: {
+        data: {
+          id: 'overtime-1',
+          overtime_type: 'SATURDAY',
+          notes: 'Updated reason',
+        },
+      },
+    });
+
+    const result = await overtimeService.updateRecord('overtime-1', {
+      start_time: '2026-06-05T05:00:00.000Z',
+      end_time: '2026-06-05T07:00:00.000Z',
+      overtime_type: 'SATURDAY',
+      reason: 'Updated reason',
+    });
+
+    expect(api.put).toHaveBeenCalledWith('/overtime/records/overtime-1', {
+      start_time: '2026-06-05T05:00:00.000Z',
+      end_time: '2026-06-05T07:00:00.000Z',
+      overtime_type: 'SATURDAY',
+      reason: 'Updated reason',
+      notes: 'Updated reason',
+    });
+    expect(result).toEqual({
+      id: 'overtime-1',
+      overtime_type: 'SATURDAY',
+      notes: 'Updated reason',
     });
   });
 });

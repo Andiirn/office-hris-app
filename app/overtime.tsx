@@ -55,6 +55,23 @@ function toTimeValue(value: string) {
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 }
 
+function toTimeInputValue(value?: string | null) {
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    });
+  }
+
+  if (value.includes('T')) return value.split('T')[1].slice(0, 5);
+  if (value.includes(' ')) return value.split(' ')[1].slice(0, 5);
+  return value.slice(0, 5);
+}
+
 function getOvertimeStatus(item: any) {
   const rawStatus = String(item?.status || item?.overtime_status || '').toUpperCase();
   if (rawStatus === 'APPROVED' || item?.is_approved || item?.approved_at) return 'APPROVED';
@@ -95,6 +112,7 @@ export default function OvertimeScreen() {
   const [mode, setMode] = useState<OvertimeMode>('attendance');
   const [showSuccessAnim, setShowSuccessAnim] = useState(false);
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
+  const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [form, setForm] = useState<CreateOvertimeRequest>({
@@ -183,6 +201,31 @@ export default function OvertimeScreen() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: ({ recordId, payload }: { recordId: string; payload: CreateOvertimeRequest }) => overtimeService.updateRecord(recordId, {
+      start_time: toLocalDateTimeString(payload.overtime_date, toTimeValue(payload.start_time) || '00:00'),
+      end_time: toLocalDateTimeString(payload.overtime_date, toTimeValue(payload.end_time) || '00:00'),
+      overtime_type: payload.overtime_type,
+      reason: payload.reason || null,
+    }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['overtime-history', user?.id, selectedYear, selectedMonth] }),
+        queryClient.invalidateQueries({ queryKey: ['overtime-summary', user?.id, selectedYear, selectedMonth] }),
+        queryClient.invalidateQueries({ queryKey: ['home-overtime-feed'] }),
+        queryClient.invalidateQueries({ queryKey: ['activity-overtime-feed'] }),
+        queryClient.refetchQueries({ queryKey: ['overtime-history', user?.id, selectedYear, selectedMonth], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: ['overtime-summary', user?.id, selectedYear, selectedMonth], type: 'active' }),
+      ]);
+      setModalVisible(false);
+      setEditingRecordId(null);
+      setShowSuccessAnim(true);
+    },
+    onError: (error: any) => {
+      Alert.alert('Error', getSubmissionErrorMessage(error));
+    },
+  });
+
   const onRefresh = () => {
     refetchHistory();
   };
@@ -191,6 +234,7 @@ export default function OvertimeScreen() {
     setModalVisible(false);
     setAttendancePickerVisible(false);
     setShowSuccessAnim(false);
+    setEditingRecordId(null);
   };
 
   const openDetail = (recordId: string) => {
@@ -213,6 +257,7 @@ export default function OvertimeScreen() {
   };
 
   const resetForm = () => {
+    setEditingRecordId(null);
     setMode('attendance');
     setForm({
       attendance_id: null,
@@ -222,6 +267,26 @@ export default function OvertimeScreen() {
       overtime_type: 'REGULAR',
       reason: '',
     });
+  };
+
+  const openEdit = () => {
+    if (!selectedRecordDetail) return;
+    if (getOvertimeStatus(selectedRecordDetail) !== 'PENDING') return;
+    const selectedAttendanceId = selectedRecordDetail.attendance_id || null;
+    const selectedAttendanceExists = !!selectedAttendanceId
+      && selectableAttendanceHistory.some((item) => item.id === selectedAttendanceId);
+    setEditingRecordId(selectedRecordDetail.id);
+    setForm({
+      attendance_id: selectedAttendanceExists ? selectedAttendanceId : null,
+      overtime_date: selectedRecordDetail.overtime_date || selectedRecordDetail.attendance_date || new Date().toISOString().slice(0, 10),
+      start_time: toTimeInputValue(selectedRecordDetail.start_time),
+      end_time: toTimeInputValue(selectedRecordDetail.end_time),
+      overtime_type: (selectedRecordDetail.overtime_type as OvertimeType) || 'REGULAR',
+      reason: selectedRecordDetail.reason || '',
+    });
+    setMode(selectedAttendanceExists ? 'attendance' : 'pre_submit');
+    setDetailModalVisible(false);
+    setModalVisible(true);
   };
 
   const handleCreate = () => {
@@ -245,13 +310,20 @@ export default function OvertimeScreen() {
       return;
     }
 
-    createMutation.mutate({
+    const payload = {
       ...form,
       attendance_id: mode === 'attendance' ? form.attendance_id : null,
       overtime_date: form.overtime_date,
       start_time: toLocalDateTimeString(form.overtime_date, startTime),
       end_time: toLocalDateTimeString(form.overtime_date, endTime),
-    });
+    };
+
+    if (editingRecordId) {
+      updateMutation.mutate({ recordId: editingRecordId, payload });
+      return;
+    }
+
+    createMutation.mutate(payload);
   };
 
   const markedAttendanceDate = useMemo(() => {
@@ -477,6 +549,9 @@ export default function OvertimeScreen() {
       <OvertimeCreateModal
         visible={modalVisible}
         onClose={resetAndClose}
+        title={editingRecordId ? 'Edit Lembur' : 'Pengajuan Lembur'}
+        subtitle={editingRecordId ? 'Perbarui pengajuan yang masih PENDING' : 'Pilih mode pengajuan'}
+        submitLabel={editingRecordId ? 'Simpan Perubahan' : 'Kirim Pengajuan'}
         mode={mode}
         setMode={setMode}
         selectedAttendance={selectedAttendance}
@@ -491,7 +566,7 @@ export default function OvertimeScreen() {
         overtimeTypeLabels={OVERTIME_TYPE_LABELS}
         normalizeTimeInput={normalizeTimeInput}
         onSubmit={handleCreate}
-        isSubmitting={createMutation.isPending}
+        isSubmitting={createMutation.isPending || updateMutation.isPending}
         attendancePickerVisible={attendancePickerVisible}
         setAttendancePickerVisible={setAttendancePickerVisible}
         isLoadingAttendance={isLoadingAttendance}
@@ -626,6 +701,10 @@ export default function OvertimeScreen() {
 
                 {isLoadingFeedback ? (
                   <Text className="font-inter text-sm text-text-muted mt-2">Memuat approver...</Text>
+                ) : null}
+
+                {getOvertimeStatus(selectedRecordDetail) === 'PENDING' ? (
+                  <Button title="Edit Pengajuan" onPress={openEdit} className="mt-4 h-12 rounded-2xl" />
                 ) : null}
               </ScrollView>
             )}

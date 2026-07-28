@@ -26,6 +26,9 @@ type OvertimeMode = 'attendance' | 'pre_submit';
 type Props = {
   visible: boolean;
   onClose: () => void;
+  title?: string;
+  subtitle?: string;
+  submitLabel?: string;
   mode: OvertimeMode;
   setMode: (value: OvertimeMode) => void;
   selectedAttendance: AttendanceItem | null;
@@ -48,6 +51,9 @@ type Props = {
 export function OvertimeCreateModal({
   visible,
   onClose,
+  title = 'Pengajuan Lembur',
+  subtitle = 'Pilih mode pengajuan',
+  submitLabel = 'Kirim Pengajuan',
   mode,
   setMode,
   selectedAttendance,
@@ -84,8 +90,8 @@ export function OvertimeCreateModal({
               <MaterialIcons name="arrow-back" size={22} color={Tokens.colors.primary} />
             </Pressable>
             <View className="flex-1">
-              <Text className="font-manrope-extrabold text-3xl text-primary">Pengajuan Lembur</Text>
-              <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Pilih mode pengajuan</Text>
+              <Text className="font-manrope-extrabold text-3xl text-primary">{title}</Text>
+              <Text className="font-inter-medium text-sm text-text-muted mt-0.5">{subtitle}</Text>
             </View>
           </View>
         </View>
@@ -227,7 +233,7 @@ export function OvertimeCreateModal({
               />
 
               <Button
-                title="Kirim Pengajuan"
+                title={submitLabel}
                 onPress={onSubmit}
                 loading={isSubmitting}
                 disabled={isSubmitting}

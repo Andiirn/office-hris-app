@@ -4,7 +4,8 @@ import {
   CreateOvertimeRequest, 
   OvertimeHistoryQuery, 
   OvertimeRecord, 
-  OvertimeSummary 
+  OvertimeSummary,
+  UpdateOvertimeRequest,
 } from '../types/overtime';
 
 function stripNullishFields<T extends object>(payload: T): T {
@@ -40,6 +41,14 @@ export const overtimeService = {
 
   async createRecord(payload: CreateOvertimeRequest): Promise<OvertimeRecord> {
     const response = await api.post('/overtime/records', stripNullishFields(payload));
+    return unwrapData<OvertimeRecord>(response.data);
+  },
+
+  async updateRecord(recordId: string, payload: UpdateOvertimeRequest): Promise<OvertimeRecord> {
+    const response = await api.put(`/overtime/records/${recordId}`, stripNullishFields({
+      ...payload,
+      notes: payload.reason ?? undefined,
+    }));
     return unwrapData<OvertimeRecord>(response.data);
   },
 

@@ -40,6 +40,13 @@ export interface CreateOvertimeRequest {
   reason?: string;
 }
 
+export interface UpdateOvertimeRequest {
+  start_time?: string | null;
+  end_time?: string | null;
+  overtime_type?: OvertimeType | null;
+  reason?: string | null;
+}
+
 export interface OvertimeHistoryQuery {
   employee_id?: string;
   month?: number;
