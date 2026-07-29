@@ -6,7 +6,6 @@ import {
   OvertimeHistoryQuery,
   OvertimeRecord,
   OvertimeSummary,
-  OvertimeSegment,
   UpdateOvertimeRequest,
   UpdateOvertimeSegmentRequest,
 } from '../types/overtime';
@@ -60,6 +59,10 @@ export const overtimeService = {
     return unwrapData<OvertimeRecord>(response.data);
   },
 
+  async deleteSegment(recordId: string, segmentId: string): Promise<OvertimeRecord> {
+    const response = await api.delete(`/overtime/records/${recordId}/segments/${segmentId}`);
+    return unwrapData<OvertimeRecord>(response.data);
+  },
 
   async updateRecord(recordId: string, payload: UpdateOvertimeRequest): Promise<OvertimeRecord> {
     const response = await api.put(`/overtime/records/${recordId}`, stripNullishFields({

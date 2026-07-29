@@ -6,6 +6,7 @@ jest.mock('../../core/api/client', () => ({
     get: jest.fn(),
     post: jest.fn(),
     put: jest.fn(),
+    delete: jest.fn(),
   },
 }));
 
@@ -176,5 +177,19 @@ describe('overtimeService', () => {
       start_time: '2026-06-05T09:00:00.000Z',
       end_time: '2026-06-05T11:00:00.000Z',
     });
+  });
+
+  it('deleteSegment sends a DELETE request for the segment', async () => {
+    (api.delete as jest.Mock).mockResolvedValue({
+      data: {
+        data: {
+          id: 'overtime-1',
+        },
+      },
+    });
+
+    await overtimeService.deleteSegment('overtime-1', 'segment-1');
+
+    expect(api.delete).toHaveBeenCalledWith('/overtime/records/overtime-1/segments/segment-1');
   });
 });
