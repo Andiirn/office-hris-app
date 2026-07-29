@@ -10,9 +10,11 @@ import {
   RefreshControl,
   ScrollView,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { PeriodSelector } from '../src/components/common/PeriodSelector';
 import { OvertimeCreateModal } from '../src/components/overtime/OvertimeCreateModal';
 import { Button } from '../src/components/ui/Button';
@@ -26,8 +28,7 @@ import { attendanceService } from '../src/services/attendance.service';
 import { overtimeService } from '../src/services/overtime.service';
 import { useAuthStore } from '../src/stores/auth.store';
 import { AttendanceItem } from '../src/types/attendance';
-import { CreateOvertimeRequest, OvertimeType } from '../src/types/overtime';
-import { getAttendanceBadgeProps } from '../src/utils/status';
+import { AddOvertimeSegmentRequest, CreateOvertimeRequest, OvertimeType, UpdateOvertimeSegmentRequest } from '../src/types/overtime';
 
 type OvertimeMode = 'attendance' | 'pre_submit';
 
@@ -109,10 +110,13 @@ export default function OvertimeScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [attendancePickerVisible, setAttendancePickerVisible] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [segmentModalVisible, setSegmentModalVisible] = useState(false);
   const [mode, setMode] = useState<OvertimeMode>('attendance');
   const [showSuccessAnim, setShowSuccessAnim] = useState(false);
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
   const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
+  const [editingSegmentId, setEditingSegmentId] = useState<string | null>(null);
+  const [segmentForm, setSegmentForm] = useState({ start_time: '', end_time: '' });
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [form, setForm] = useState<CreateOvertimeRequest>({
@@ -183,7 +187,7 @@ export default function OvertimeScreen() {
 
   const createMutation = useMutation({
     mutationFn: (payload: CreateOvertimeRequest) => overtimeService.createRecord(payload),
-    onSuccess: async () => {
+    onSuccess: async (createdRecord) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['overtime-history', user?.id, selectedYear, selectedMonth] }),
         queryClient.invalidateQueries({ queryKey: ['overtime-summary', user?.id, selectedYear, selectedMonth] }),
@@ -192,6 +196,7 @@ export default function OvertimeScreen() {
         queryClient.refetchQueries({ queryKey: ['overtime-history', user?.id, selectedYear, selectedMonth], type: 'active' }),
         queryClient.refetchQueries({ queryKey: ['overtime-summary', user?.id, selectedYear, selectedMonth], type: 'active' }),
       ]);
+      await refetchSelectedRecordDetail(createdRecord?.id);
       setModalVisible(false);
       setAttendancePickerVisible(false);
       setShowSuccessAnim(true);
@@ -217,9 +222,46 @@ export default function OvertimeScreen() {
         queryClient.refetchQueries({ queryKey: ['overtime-history', user?.id, selectedYear, selectedMonth], type: 'active' }),
         queryClient.refetchQueries({ queryKey: ['overtime-summary', user?.id, selectedYear, selectedMonth], type: 'active' }),
       ]);
+      await refetchSelectedRecordDetail(selectedRecordDetail?.id);
       setModalVisible(false);
       setEditingRecordId(null);
       setShowSuccessAnim(true);
+    },
+    onError: (error: any) => {
+      Alert.alert('Error', getSubmissionErrorMessage(error));
+    },
+  });
+
+  const addSegmentMutation = useMutation({
+    mutationFn: ({ recordId, payload }: { recordId: string; payload: AddOvertimeSegmentRequest }) =>
+      overtimeService.addSegment(recordId, payload),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['overtime-history', user?.id, selectedYear, selectedMonth] }),
+        queryClient.invalidateQueries({ queryKey: ['overtime-summary', user?.id, selectedYear, selectedMonth] }),
+        queryClient.invalidateQueries({ queryKey: ['home-overtime-feed'] }),
+        queryClient.invalidateQueries({ queryKey: ['activity-overtime-feed'] }),
+      ]);
+      await refetchSelectedRecordDetail(selectedRecordId);
+      resetSegmentModal();
+    },
+    onError: (error: any) => {
+      Alert.alert('Error', getSubmissionErrorMessage(error));
+    },
+  });
+
+  const editSegmentMutation = useMutation({
+    mutationFn: ({ recordId, segmentId, payload }: { recordId: string; segmentId: string; payload: UpdateOvertimeSegmentRequest }) =>
+      overtimeService.editSegment(recordId, segmentId, payload),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['overtime-history', user?.id, selectedYear, selectedMonth] }),
+        queryClient.invalidateQueries({ queryKey: ['overtime-summary', user?.id, selectedYear, selectedMonth] }),
+        queryClient.invalidateQueries({ queryKey: ['home-overtime-feed'] }),
+        queryClient.invalidateQueries({ queryKey: ['activity-overtime-feed'] }),
+      ]);
+      await refetchSelectedRecordDetail(selectedRecordId);
+      resetSegmentModal();
     },
     onError: (error: any) => {
       Alert.alert('Error', getSubmissionErrorMessage(error));
@@ -230,11 +272,29 @@ export default function OvertimeScreen() {
     refetchHistory();
   };
 
+  const refetchSelectedRecordDetail = async (recordId?: string | null) => {
+    if (!recordId) return;
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['overtime-record-detail', recordId] }),
+      queryClient.refetchQueries({ queryKey: ['overtime-record-detail', recordId], type: 'active' }),
+      queryClient.fetchQuery({
+        queryKey: ['overtime-record-detail', recordId],
+        queryFn: () => overtimeService.getRecordDetail(recordId),
+      }),
+    ]);
+  };
+
   const resetAndClose = () => {
     setModalVisible(false);
     setAttendancePickerVisible(false);
     setShowSuccessAnim(false);
     setEditingRecordId(null);
+  };
+
+  const resetSegmentModal = () => {
+    setSegmentModalVisible(false);
+    setEditingSegmentId(null);
+    setSegmentForm({ start_time: '', end_time: '' });
   };
 
   const openDetail = (recordId: string) => {
@@ -287,6 +347,54 @@ export default function OvertimeScreen() {
     setMode(selectedAttendanceExists ? 'attendance' : 'pre_submit');
     setDetailModalVisible(false);
     setModalVisible(true);
+  };
+
+  const openAddSegment = () => {
+    if (!selectedRecordDetail || getOvertimeStatus(selectedRecordDetail) !== 'PENDING') return;
+    setEditingSegmentId(null);
+    setSegmentModalVisible(true);
+    const start = selectedRecordDetail.end_time || selectedRecordDetail.start_time;
+    const time = toTimeInputValue(start);
+    setSegmentForm({ start_time: time, end_time: time });
+  };
+
+  const openEditSegment = (segment: { id: string; start_time: string; end_time: string }) => {
+    if (!selectedRecordDetail || getOvertimeStatus(selectedRecordDetail) !== 'PENDING') return;
+    setEditingSegmentId(segment.id);
+    setSegmentModalVisible(true);
+    setSegmentForm({
+      start_time: toTimeInputValue(segment.start_time),
+      end_time: toTimeInputValue(segment.end_time),
+    });
+  };
+
+  const submitSegment = () => {
+    if (!selectedRecordDetail) return;
+    const startTime = toTimeValue(segmentForm.start_time);
+    const endTime = toTimeValue(segmentForm.end_time);
+    if (!startTime || !endTime) {
+      Alert.alert('Error', 'Format jam harus HH:MM');
+      return;
+    }
+
+    const baseDate = selectedRecordDetail.overtime_date || selectedRecordDetail.attendance_date || new Date().toISOString().slice(0, 10);
+    const payload = {
+      start_time: toLocalDateTimeString(baseDate, startTime),
+      end_time: toLocalDateTimeString(baseDate, endTime),
+    };
+
+    if (editingSegmentId) {
+      editSegmentMutation.mutate({
+        recordId: selectedRecordDetail.id,
+        segmentId: editingSegmentId,
+        payload,
+      });
+    } else {
+      addSegmentMutation.mutate({
+        recordId: selectedRecordDetail.id,
+        payload,
+      });
+    }
   };
 
   const handleCreate = () => {
@@ -604,7 +712,14 @@ export default function OvertimeScreen() {
                 <Button title="Retry" onPress={() => refetchDetail()} className="mt-5 h-12 rounded-2xl" />
               </View>
             ) : (
-              <ScrollView showsVerticalScrollIndicator={false}>
+              <KeyboardAwareScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                nestedScrollEnabled
+                enableOnAndroid
+                extraScrollHeight={24}
+                contentContainerStyle={{ paddingBottom: 24 }}
+              >
                 <GlassCard style={{ padding: 16, marginBottom: 14 }}>
                   <View className="flex-row items-start justify-between gap-3">
                     <View className="flex-1">
@@ -699,6 +814,101 @@ export default function OvertimeScreen() {
                   </GlassCard>
                 ) : null}
 
+                <GlassCard style={{ padding: 14, marginBottom: 14 }}>
+                  <View className="flex-row items-center justify-between">
+                    <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Segment</Text>
+                    {getOvertimeStatus(selectedRecordDetail) === 'PENDING' ? (
+                      <Pressable
+                        onPress={openAddSegment}
+                        className="w-9 h-9 rounded-full bg-primary items-center justify-center"
+                        accessibilityRole="button"
+                        accessibilityLabel="Tambah segment"
+                      >
+                        <MaterialIcons name="add" size={20} color="#fff" />
+                      </Pressable>
+                    ) : null}
+                  </View>
+                  {segmentModalVisible ? (
+                    <View className="mt-4 rounded-2xl bg-white p-4 border border-outline/20">
+                      <Text className="font-manrope-bold text-base text-on-surface mb-1">
+                        {editingSegmentId ? 'Edit Segment' : 'Tambah Segment'}
+                      </Text>
+                      <Text className="font-inter text-xs text-text-muted mb-3">
+                        {editingSegmentId
+                          ? 'Ubah jam mulai dan selesai untuk segment lembur ini.'
+                          : 'Isi jam mulai dan selesai untuk sesi lembur tambahan.'}
+                      </Text>
+                      <View className="flex-row gap-3">
+                        <View className="flex-1 px-4 py-3 rounded-xl bg-[#f8f8f8]">
+                          <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Mulai</Text>
+                          <TextInput
+                            autoFocus
+                            value={segmentForm.start_time}
+                            onChangeText={(text) => setSegmentForm((prev) => ({ ...prev, start_time: normalizeTimeInput(text) }))}
+                            placeholder="20:00"
+                            keyboardType="number-pad"
+                            maxLength={5}
+                            className="font-inter-bold text-sm text-on-surface mt-1 p-0"
+                          />
+                        </View>
+                        <View className="flex-1 px-4 py-3 rounded-xl bg-[#f8f8f8]">
+                          <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Selesai</Text>
+                          <TextInput
+                            value={segmentForm.end_time}
+                            onChangeText={(text) => setSegmentForm((prev) => ({ ...prev, end_time: normalizeTimeInput(text) }))}
+                            placeholder="22:00"
+                            keyboardType="number-pad"
+                            maxLength={5}
+                            className="font-inter-bold text-sm text-on-surface mt-1 p-0"
+                          />
+                        </View>
+                      </View>
+                      <View className="flex-row gap-3 mt-4">
+                        <Button
+                          title="Batal"
+                          onPress={resetSegmentModal}
+                          className="flex-1 h-12 rounded-2xl bg-black/5"
+                        />
+                        <Button
+                          title="Simpan Segment"
+                          onPress={submitSegment}
+                          loading={addSegmentMutation.isPending || editSegmentMutation.isPending}
+                          disabled={addSegmentMutation.isPending || editSegmentMutation.isPending}
+                          className="flex-1 h-12 rounded-2xl"
+                        />
+                      </View>
+                    </View>
+                  ) : null}
+                  {selectedRecordDetail.segments?.length ? (
+                    <View className="mt-3 gap-2">
+                      {selectedRecordDetail.segments.map((segment) => (
+                        <View key={segment.id} className="rounded-2xl bg-black/5 px-4 py-3 flex-row items-center justify-between">
+                          <View className="flex-1">
+                            <Text className="font-inter-bold text-sm text-on-surface">
+                              {formatOvertimeTime(segment.start_time)} - {formatOvertimeTime(segment.end_time)}
+                            </Text>
+                            <Text className="font-inter text-[11px] text-text-muted mt-1">
+                              {segment.overtime_hours ? `${segment.overtime_hours} jam` : `${segment.overtime_minutes} menit`}
+                            </Text>
+                          </View>
+                          {getOvertimeStatus(selectedRecordDetail) === 'PENDING' ? (
+                            <Pressable
+                              onPress={() => openEditSegment(segment)}
+                              className="w-8 h-8 rounded-full bg-black/5 items-center justify-center ml-2"
+                              accessibilityRole="button"
+                              accessibilityLabel="Edit segment"
+                            >
+                              <MaterialIcons name="edit" size={16} color={Tokens.colors.primary} />
+                            </Pressable>
+                          ) : null}
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <Text className="font-inter text-sm text-text-muted mt-2">Belum ada segment tambahan.</Text>
+                  )}
+                </GlassCard>
+
                 {isLoadingFeedback ? (
                   <Text className="font-inter text-sm text-text-muted mt-2">Memuat approver...</Text>
                 ) : null}
@@ -706,7 +916,7 @@ export default function OvertimeScreen() {
                 {getOvertimeStatus(selectedRecordDetail) === 'PENDING' ? (
                   <Button title="Edit Pengajuan" onPress={openEdit} className="mt-4 h-12 rounded-2xl" />
                 ) : null}
-              </ScrollView>
+              </KeyboardAwareScrollView>
             )}
           </View>
         </View>

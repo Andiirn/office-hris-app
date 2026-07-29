@@ -22865,6 +22865,479 @@
         }
       }
     },
+    "/api/v1/overtime/records/{record_id}/segments": {
+      "post": {
+        "tags": [
+          "Overtime"
+        ],
+        "summary": "Add Segment",
+        "operationId": "add_segment_api_v1_overtime_records__record_id__segments_post",
+        "parameters": [
+          {
+            "name": "record_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Record Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OvertimeAddSegmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_OvertimeRecordResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Bad request — business rule violation",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Resource not found",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Conflict — resource already exists",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Validation error",
+                  "errors": [
+                    {
+                      "field": "nik",
+                      "message": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Not authenticated — missing or invalid token",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Access denied — insufficient permissions",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/overtime/records/{record_id}/segments/{segment_id}": {
+      "put": {
+        "tags": [
+          "Overtime"
+        ],
+        "summary": "Update Segment",
+        "operationId": "update_segment_api_v1_overtime_records__record_id__segments__segment_id__put",
+        "parameters": [
+          {
+            "name": "record_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Record Id"
+            }
+          },
+          {
+            "name": "segment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Segment Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OvertimeUpdateSegmentRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_OvertimeRecordResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Bad request — business rule violation",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Resource not found",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Conflict — resource already exists",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Validation error",
+                  "errors": [
+                    {
+                      "field": "nik",
+                      "message": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Not authenticated — missing or invalid token",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Access denied — insufficient permissions",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Overtime"
+        ],
+        "summary": "Delete Segment",
+        "operationId": "delete_segment_api_v1_overtime_records__record_id__segments__segment_id__delete",
+        "parameters": [
+          {
+            "name": "record_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Record Id"
+            }
+          },
+          {
+            "name": "segment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Segment Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_OvertimeRecordResponse_"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Bad request — business rule violation",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Resource not found",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Conflict — resource already exists",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Validation error",
+                  "errors": [
+                    {
+                      "field": "nik",
+                      "message": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Not authenticated — missing or invalid token",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Access denied — insufficient permissions",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
     "/api/v1/overtime/dashboard": {
       "get": {
         "tags": [
@@ -46839,6 +47312,26 @@
         "type": "object",
         "title": "NotificationSettingsResponse"
       },
+      "OvertimeAddSegmentRequest": {
+        "properties": {
+          "start_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Time"
+          },
+          "end_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Time"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_time",
+          "end_time"
+        ],
+        "title": "OvertimeAddSegmentRequest"
+      },
       "OvertimeApprovalAction": {
         "properties": {
           "action": {
@@ -46937,13 +47430,27 @@
             "title": "Overtime Date"
           },
           "start_time": {
-            "type": "string",
-            "format": "date-time",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Start Time"
           },
           "end_time": {
-            "type": "string",
-            "format": "date-time",
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "End Time"
           },
           "overtime_type": {
@@ -46959,12 +47466,24 @@
               }
             ],
             "title": "Notes"
+          },
+          "segments": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/OvertimeSegmentInput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Segments"
           }
         },
         "type": "object",
         "required": [
-          "start_time",
-          "end_time",
           "overtime_type"
         ],
         "title": "OvertimeCreateRequest"
@@ -47145,6 +47664,14 @@
             "format": "date-time",
             "title": "Created At"
           },
+          "segments": {
+            "items": {
+              "$ref": "#/components/schemas/OvertimeSegmentResponse"
+            },
+            "type": "array",
+            "title": "Segments",
+            "default": []
+          },
           "employee": {
             "anyOf": [
               {
@@ -47186,6 +47713,67 @@
           "created_at"
         ],
         "title": "OvertimeRecordResponse"
+      },
+      "OvertimeSegmentInput": {
+        "properties": {
+          "start_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Time"
+          },
+          "end_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Time"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_time",
+          "end_time"
+        ],
+        "title": "OvertimeSegmentInput"
+      },
+      "OvertimeSegmentResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "start_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Time"
+          },
+          "end_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Time"
+          },
+          "overtime_minutes": {
+            "type": "integer",
+            "title": "Overtime Minutes"
+          },
+          "overtime_hours": {
+            "type": "number",
+            "title": "Overtime Hours"
+          },
+          "sort_order": {
+            "type": "integer",
+            "title": "Sort Order"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "start_time",
+          "end_time",
+          "overtime_minutes",
+          "overtime_hours",
+          "sort_order"
+        ],
+        "title": "OvertimeSegmentResponse"
       },
       "OvertimeSettingResponse": {
         "properties": {
@@ -47393,30 +47981,6 @@
       },
       "OvertimeUpdateRequest": {
         "properties": {
-          "start_time": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Start Time"
-          },
-          "end_time": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "End Time"
-          },
           "overtime_type": {
             "anyOf": [
               {
@@ -47441,6 +48005,36 @@
         },
         "type": "object",
         "title": "OvertimeUpdateRequest"
+      },
+      "OvertimeUpdateSegmentRequest": {
+        "properties": {
+          "start_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Time"
+          },
+          "end_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Time"
+          }
+        },
+        "type": "object",
+        "title": "OvertimeUpdateSegmentRequest"
       },
       "PaginatedData_ActiveQRSessionResponse_": {
         "properties": {

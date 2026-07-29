@@ -16,10 +16,21 @@ export interface OvertimeRecord {
   approved_at?: string;
   status?: OvertimeStatus | string;
   reason?: string;
+  notes?: string;
   start_time?: string;
   end_time?: string;
   created_at: string;
   attendance_date?: string;
+  segments?: OvertimeSegment[];
+}
+
+export interface OvertimeSegment {
+  id: string;
+  start_time: string;
+  end_time: string;
+  overtime_minutes: number;
+  overtime_hours: number;
+  sort_order: number;
 }
 
 export interface OvertimeSummary {
@@ -37,15 +48,27 @@ export interface CreateOvertimeRequest {
   start_time: string;
   end_time: string;
   overtime_type: OvertimeType;
+  notes?: string;
   reason?: string;
+  segments?: OvertimeSegmentInput[];
 }
 
 export interface UpdateOvertimeRequest {
   start_time?: string | null;
   end_time?: string | null;
   overtime_type?: OvertimeType | null;
+  notes?: string | null;
   reason?: string | null;
 }
+
+export interface OvertimeSegmentInput {
+  start_time: string;
+  end_time: string;
+}
+
+export interface AddOvertimeSegmentRequest extends OvertimeSegmentInput {}
+
+export interface UpdateOvertimeSegmentRequest extends Partial<OvertimeSegmentInput> {}
 
 export interface OvertimeHistoryQuery {
   employee_id?: string;
