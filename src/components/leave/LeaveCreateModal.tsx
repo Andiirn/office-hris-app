@@ -287,10 +287,10 @@ export function LeaveCreateModal({
 
             <GlassCard style={{ padding: 16, marginTop: 12 }}>
               <Input
-                label="Alasan"
+                label="Alasan (Wajib)"
                 value={form.reason}
                 onChangeText={(text) => setForm({ ...form, reason: text })}
-                placeholder="Masukkan Alasan Cuti?"
+                placeholder="Masukkan Alasan Cuti..."
                 multiline
                 numberOfLines={3}
                 style={{ height: 100, textAlignVertical: 'top', paddingTop: 12 }}

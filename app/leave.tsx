@@ -859,6 +859,16 @@ export default function LeaveScreen() {
                       </Text>
                     </GlassCard>
                   </View>
+                  {(isHourlyLeaveType(selectedLeaveDetail.leave_type) || selectedLeaveDetail.start_time || selectedLeaveDetail.end_time) ? (
+                    <View className="w-full px-1.5 mb-3">
+                      <GlassCard style={{ padding: 14, minHeight: 84 }}>
+                        <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Jam Sesi (Izin Jam)</Text>
+                        <Text className="font-inter-bold text-sm text-on-surface mt-2">
+                          {formatTime(selectedLeaveDetail.start_time)} - {formatTime(selectedLeaveDetail.end_time)}
+                        </Text>
+                      </GlassCard>
+                    </View>
+                  ) : null}
                 </View>
 
                 <GlassCard style={{ padding: 14, marginBottom: 14 }}>

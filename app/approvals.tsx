@@ -34,6 +34,11 @@ import {
   getResignApprovalDetail,
 } from '../src/types/approval';
 
+function isHourlyLeaveType(type?: { code?: string | null; name?: string | null; category?: string | null } | null) {
+  const haystack = `${type?.code || ''} ${type?.name || ''} ${type?.category || ''}`.toLowerCase();
+  return /hour|jam|per\s*jam|hourly/.test(haystack);
+}
+
 export default function ApprovalsScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
@@ -297,6 +302,8 @@ export default function ApprovalsScreen() {
           : null;
         const hasImageDocument = !!documentUrl && /\.(jpeg|jpg|gif|png)$/i.test(documentUrl);
         const replacementLabel = detail.replacement?.full_name || detail.replacement_name || detail.replacement_id || null;
+        const isHourly = isHourlyLeaveType(detail.leave_type || { name: detail.leave_type_name, code: detail.leave_type_code, category: detail.leave_type_category });
+
         return (
           <View className="gap-1 mt-1">
             <Text className="font-inter text-xs text-text-muted">
@@ -318,6 +325,11 @@ export default function ApprovalsScreen() {
                 </Text>
               )}
             </Text>
+            {isHourly || detail.start_time || detail.end_time ? (
+              <Text className="font-inter text-xs text-text-muted">
+                Jam: <Text className="font-inter-semibold text-on-surface">{formatOvertimeTime(detail.start_time)} - {formatOvertimeTime(detail.end_time)}</Text>
+              </Text>
+            ) : null}
             {replacementLabel ? (
               <Text className="font-inter text-xs text-text-muted">
                 Pengganti: <Text className="font-inter-semibold text-on-surface">{replacementLabel}</Text>
