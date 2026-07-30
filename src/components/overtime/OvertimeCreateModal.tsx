@@ -246,7 +246,7 @@ export function OvertimeCreateModal({
 
             <GlassCard style={{ padding: 14, marginBottom: 14 }}>
               <View className="flex-row items-center justify-between">
-                <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Segment</Text>
+                <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Tambah Jam Lembur</Text>
                 <Pressable
                   onPress={onAddSegment}
                   className="w-9 h-9 rounded-full bg-primary items-center justify-center"
@@ -259,11 +259,11 @@ export function OvertimeCreateModal({
               {segmentModalVisible ? (
                 <View className="mt-4 rounded-2xl bg-white p-4 border border-outline/20">
                   <Text className="font-manrope-bold text-base text-on-surface mb-1">
-                    {editingSegmentId ? 'Edit Segment' : 'Tambah Segment'}
+                    {editingSegmentId ? 'Edit Segment' : 'Tambah Lembur'}
                   </Text>
                   <Text className="font-inter text-xs text-text-muted mb-3">
                     {editingSegmentId
-                      ? 'Ubah jam mulai dan selesai untuk segment lembur ini.'
+                      ? 'Ubah jam mulai dan selesai untuk sesi lembur tambahan.'
                       : 'Isi jam mulai dan selesai untuk sesi lembur tambahan.'}
                   </Text>
                   <View className="flex-row gap-3">
@@ -298,11 +298,11 @@ export function OvertimeCreateModal({
                       className="flex-1 h-12 rounded-2xl bg-black/5"
                     />
                     <Button
-                      title="Simpan Segment"
+                      title="Simpan"
                       onPress={onSubmitSegment}
                       loading={segmentLoading}
                       disabled={segmentLoading}
-                      className="flex-1 h-12 rounded-2xl"
+                      className="flex-1 size-full rounded-2xl bg-primary"
                     />
                   </View>
                 </View>
@@ -344,7 +344,7 @@ export function OvertimeCreateModal({
             </GlassCard>
 
             <Input
-              label="Alasan Lembur (Opsional)"
+              label="Alasan Lembur (Wajib)"
               value={form.reason}
               onChangeText={(text) => setForm((prev) => ({ ...prev, reason: text }))}
               placeholder="Selesaikan laporan bulanan..."

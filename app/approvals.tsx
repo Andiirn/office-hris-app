@@ -6,7 +6,9 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -14,10 +16,12 @@ import {
   TextInput,
   View
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GlassCard } from '../src/components/ui/GlassCard';
 import { StatusBadge } from '../src/components/ui/StatusBadge';
 import { Tokens } from '../src/core/theme/tokens';
+import { buildApprovalHistoryLines, getApprovalStatusBadgeType, getApprovalStatusLabel, isApprovalInHistoryForUser, isApprovalPendingForUser } from '../src/features/approvals/status';
 import { formatOvertimeTime } from '../src/features/overtime/time';
 import { approvalService } from '../src/services/approval.service';
 import { useAuthStore } from '../src/stores/auth.store';
@@ -73,15 +77,23 @@ export default function ApprovalsScreen() {
     }, [approvalSource, refetch, user?.id])
   );
 
+  // State Modal Konfirmasi Alasan Approver
+  const [actionModalVisible, setActionModalVisible] = useState(false);
+  const [pendingAction, setPendingAction] = useState<{ id: string; action: 'APPROVE' | 'REJECT' } | null>(null);
+  const [actionComment, setActionComment] = useState('');
+
   // 2. Process Approval/Rejection Mutation
   const processMutation = useMutation({
-    mutationFn: ({ id, action }: { id: string; action: 'APPROVE' | 'REJECT' }) =>
-      approvalService.processAction(id, action),
+    mutationFn: ({ id, action, comment }: { id: string; action: 'APPROVE' | 'REJECT'; comment?: string }) =>
+      approvalService.processAction(id, action, comment),
     onSuccess: async (_, variables) => {
       Alert.alert(
         'Sukses',
         variables.action === 'APPROVE' ? 'Permintaan berhasil disetujui' : 'Permintaan berhasil ditolak'
       );
+      setActionModalVisible(false);
+      setPendingAction(null);
+      setActionComment('');
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['approvals', 'pending', user?.id] }),
         queryClient.invalidateQueries({ queryKey: ['approvals', 'history', user?.id] }),
@@ -95,18 +107,18 @@ export default function ApprovalsScreen() {
   });
 
   const handleAction = (id: string, action: 'APPROVE' | 'REJECT') => {
-    Alert.alert(
-      action === 'APPROVE' ? 'Setujui Permintaan' : 'Tolak Permintaan',
-      `Apakah Anda yakin ingin ${action === 'APPROVE' ? 'menyetujui' : 'menolak'} pengajuan ini?`,
-      [
-        { text: 'Batal', style: 'cancel' },
-        {
-          text: action === 'APPROVE' ? 'Setujui' : 'Tolak',
-          style: action === 'APPROVE' ? 'default' : 'destructive',
-          onPress: () => processMutation.mutate({ id, action }),
-        }
-      ]
-    );
+    setPendingAction({ id, action });
+    setActionComment('');
+    setActionModalVisible(true);
+  };
+
+  const confirmAction = () => {
+    if (!pendingAction) return;
+    processMutation.mutate({
+      id: pendingAction.id,
+      action: pendingAction.action,
+      comment: actionComment.trim() || undefined,
+    });
   };
 
   const onRefresh = () => {
@@ -157,36 +169,44 @@ export default function ApprovalsScreen() {
 
   const filteredApprovals = useMemo(() => {
     const list = approvals;
-    const getApprovalState = (item: ApprovalItem) => String(item.action || item.status || '').toUpperCase();
 
     const byModule = selectedModule === 'all'
       ? list
       : list.filter((item) => String(item.module_name || '').toUpperCase() === selectedModule);
 
     const byTab = tab === 'pending'
-      ? byModule.filter((item) => getApprovalState(item) === 'PENDING')
-      : byModule.filter((item) => getApprovalState(item) !== 'PENDING');
+      ? byModule.filter((item) => isApprovalPendingForUser(item, user?.id))
+      : byModule.filter((item) => isApprovalInHistoryForUser(item, user?.id));
 
     const term = searchQuery.trim().toLowerCase();
-    if (!term) return byTab;
+    const searchFiltered = !term
+      ? byTab
+      : byTab.filter((item) => {
+        const haystack = [
+          item.requester_name,
+          item.module_name,
+          item.reference_type,
+          item.status,
+          item.action,
+          item.comment,
+          item.approved_at,
+          item.description,
+          item.reference_detail?.reason,
+          item.level_order
+        ]
+          .filter(Boolean)
+          .map((val) => String(val).toLowerCase());
 
-    return byTab.filter((item) => {
-      const haystack = [
-        item.requester_name,
-        item.module_name,
-        item.reference_type,
-        item.status,
-        item.action,
-        item.comment,
-        item.approved_at,
-        item.description,
-        item.reference_detail?.reason,
-        item.level_order
-      ]
-        .filter(Boolean)
-        .map((val) => String(val).toLowerCase());
+        return haystack.some((val) => val.includes(term));
+      });
 
-      return haystack.some((val) => val.includes(term));
+    // Urutkan selalu paling baru di paling atas (Descending berdasarkan timestamp terbaru)
+    return [...searchFiltered].sort((a, b) => {
+      const getTime = (item: ApprovalItem) => {
+        const rawDate = item.requested_at || item.created_at || item.approved_at;
+        return rawDate ? new Date(rawDate).getTime() : 0;
+      };
+      return getTime(b) - getTime(a);
     });
   }, [approvals, selectedModule, searchQuery, tab]);
 
@@ -252,17 +272,11 @@ export default function ApprovalsScreen() {
     const detail = getApprovalReferenceDetail(item);
     const createdDate = item.requested_at || item.created_at;
     const approvalDate = item.approved_at || createdDate;
-    const createdAtField = (
-      <Text className="font-inter text-xs text-text-muted">
-        Diajukan Pada: <Text className="font-inter-semibold text-on-surface">{formatDate(createdDate)}</Text>
-      </Text>
-    );
 
     if (!detail) {
       const timestampLabel = tab === 'pending' ? 'Diajukan pada' : 'Diproses pada';
       return (
         <View className="gap-1 mt-1">
-          {createdAtField}
           <Text className="font-inter text-xs text-text-muted">
             {timestampLabel}: <Text className="font-inter-semibold text-on-surface">{formatDate(approvalDate)}</Text>
           </Text>
@@ -285,7 +299,6 @@ export default function ApprovalsScreen() {
         const replacementLabel = detail.replacement?.full_name || detail.replacement_name || detail.replacement_id || null;
         return (
           <View className="gap-1 mt-1">
-            {createdAtField}
             <Text className="font-inter text-xs text-text-muted">
               Tipe: <Text className="font-inter-semibold text-on-surface">{detail.leave_type_name || detail.leave_type?.name || '-'}</Text>
             </Text>
@@ -327,9 +340,19 @@ export default function ApprovalsScreen() {
       }
       case 'OVERTIME': {
         const detail = ((getOvertimeApprovalDetail(item) || getApprovalReferenceDetail(item) || {}) as Record<string, any>);
+        const segments: any[] = Array.isArray(detail.segments) ? detail.segments : [];
+        const additionalSegments = segments.filter((seg: any) => typeof seg.sort_order === 'number' ? seg.sort_order > 0 : true);
+        const reasonText =
+          detail.reason ||
+          (detail as any).notes ||
+          (item as any).reason ||
+          (item as any).notes ||
+          (item.reference_detail as any)?.reason ||
+          (item.reference_detail as any)?.notes ||
+          null;
+
         return (
           <View className="gap-1 mt-1">
-            {createdAtField}
             <Text className="font-inter text-xs text-text-muted">
               Tanggal Lembur:{' '}
               <Text className="font-inter-semibold text-on-surface">
@@ -348,9 +371,16 @@ export default function ApprovalsScreen() {
             </Text>
             {(detail.start_time || detail.end_time) ? (
               <Text className="font-inter text-xs text-text-muted">
-                Jam: <Text className="font-inter-semibold text-on-surface">{formatOvertimeTime(detail.start_time)} - {formatOvertimeTime(detail.end_time)}</Text>
+                Sesi Utama: <Text className="font-inter-semibold text-on-surface">{formatOvertimeTime(detail.start_time)} - {formatOvertimeTime(detail.end_time)}</Text>
               </Text>
             ) : null}
+
+            {additionalSegments.map((seg, idx) => (
+              <Text key={seg.id || idx} className="font-inter text-xs text-text-muted">
+                Sesi Tambahan {idx + 1}: <Text className="font-inter-semibold text-on-surface">{formatOvertimeTime(seg.start_time)} - {formatOvertimeTime(seg.end_time)}</Text>
+              </Text>
+            ))}
+
             <Text className="font-inter text-xs text-text-muted">
               Tipe: <Text className="font-inter-semibold text-on-surface">{detail.overtime_type || '-'}</Text>
             </Text>
@@ -359,7 +389,7 @@ export default function ApprovalsScreen() {
                 {typeof detail.overtime_amount === 'number' ? `Rp ${detail.overtime_amount.toLocaleString('id-ID')}` : detail.overtime_amount || '-'}
               </Text>
             </Text>
-            {detail.reason ? <Text className="font-inter text-xs text-text-muted italic mt-0.5">Alasan: &quot;{detail.reason}&quot;</Text> : null}
+            {reasonText ? <Text className="font-inter text-xs text-text-muted italic mt-0.5">Alasan: &quot;{reasonText}&quot;</Text> : null}
           </View>
         );
       }
@@ -367,7 +397,6 @@ export default function ApprovalsScreen() {
         const detail = ((getCorrectionApprovalDetail(item) || getApprovalReferenceDetail(item) || {}) as Record<string, any>);
         return (
           <View className="gap-1 mt-1">
-            {createdAtField}
             <Text className="font-inter text-xs text-text-muted">
               Koreksi Masuk: <Text className="font-inter-semibold text-on-surface">{detail.corrected_checkin || '-'}</Text>
             </Text>
@@ -383,7 +412,6 @@ export default function ApprovalsScreen() {
         const detail = ((getApprovalReferenceDetail(item) || {}) as Record<string, any>);
         return (
           <View className="gap-1 mt-1">
-            {createdAtField}
             <Text className="font-inter text-xs text-text-muted">
               Kunjungan Ke: <Text className="font-inter-semibold text-on-surface">{detail.location_name || '-'}</Text>
             </Text>
@@ -395,7 +423,6 @@ export default function ApprovalsScreen() {
         const detail = ((getResignApprovalDetail(item) || getApprovalReferenceDetail(item) || {}) as Record<string, any>);
         return (
           <View className="gap-1 mt-1">
-            {createdAtField}
             <Text className="font-inter text-xs text-text-muted">
               Efektif Resign: <Text className="font-inter-semibold text-on-surface">{detail.resign_date || '-'}</Text>
             </Text>
@@ -406,7 +433,6 @@ export default function ApprovalsScreen() {
       default:
         return (
           <View className="gap-1 mt-1">
-            {createdAtField}
             {detail.reason ? <Text className="font-inter text-xs text-text-muted italic">Catatan: &quot;{detail.reason}&quot;</Text> : null}
           </View>
         );
@@ -417,24 +443,23 @@ export default function ApprovalsScreen() {
     const histories = [...(item.histories ?? [])].sort((a, b) => (a.level_order ?? 0) - (b.level_order ?? 0));
     const lastAction = histories.length > 0 ? histories[histories.length - 1] : null;
     const hasRejected = histories.some((history) => String(history.action || '').toUpperCase() === 'REJECT');
-    const previousApproverNames = histories
-      .map((history) => history.approver?.full_name)
-      .filter((name): name is string => Boolean(name))
-      .join(', ');
+    const historyLines = buildApprovalHistoryLines(item);
 
     return (
       <View className="mt-2 rounded-xl bg-primary/5 px-3 py-2">
         <Text className="font-inter-semibold text-[11px] text-primary">
           {hasRejected ? 'Pengajuan sudah ditolak' : 'Menunggu persetujuan kamu'}
         </Text>
-        {previousApproverNames ? (
+        {historyLines.length > 0 ? (
           <View className="mt-1.5">
-            <Text className="font-inter text-[11px] text-text-muted">
-              Diproses sebelumnya: <Text className="font-inter-semibold text-on-surface">{previousApproverNames}</Text>
-            </Text>
+            {historyLines.map((line) => (
+              <Text key={line} className="font-inter text-[11px] text-text-muted">
+                {line}
+              </Text>
+            ))}
             {lastAction?.comment ? (
               <Text className="font-inter text-[11px] text-text-muted italic mt-1">
-                Catatan: &quot;{lastAction.comment}&quot;
+                Catatan : &quot;{lastAction.comment}&quot;
               </Text>
             ) : null}
           </View>
@@ -561,6 +586,7 @@ export default function ApprovalsScreen() {
           <View style={{ gap: 12 }}>
             {filteredApprovals.map((item) => {
               const status = item.status || 'PENDING';
+              const statusLabel = getApprovalStatusLabel(item, user?.id);
               const isPending = tab === 'pending' && (status === 'PENDING' || status === 'IN_PROGRESS');
 
               return (
@@ -579,10 +605,15 @@ export default function ApprovalsScreen() {
                         </Text>
                       </View>
                     </View>
-                    <StatusBadge
-                      label={status}
-                      type={status === 'APPROVED' ? 'secondary' : status === 'REJECTED' ? 'error' : 'warning'}
-                    />
+                    <View className="items-end">
+                      <StatusBadge
+                        label={statusLabel}
+                        type={getApprovalStatusBadgeType(item, user?.id)}
+                      />
+                      <Text className="font-inter text-[11px] text-text-muted mt-1">
+                        Dibuat: {formatDate(item.requested_at || item.created_at)}
+                      </Text>
+                    </View>
                   </View>
 
                   {tab === 'history' ? (
@@ -594,6 +625,17 @@ export default function ApprovalsScreen() {
                         </Text>
                       </View>
                       {renderDetailFields(item)}
+                      {(() => {
+                        const histories = item.histories ?? [];
+                        const userHistory = histories.find((h) => h.approver_id === user?.id) || histories[histories.length - 1];
+                        const commentText = userHistory?.comment || item.comment;
+                        if (!commentText) return null;
+                        return (
+                          <View className="mt-1.5 p-2.5 rounded-xl bg-primary/5 border border-primary/10">
+                            <Text className="font-inter-bold text-[11px] text-primary mb-0.5">Catatan Saya: {commentText}</Text>
+                          </View>
+                        );
+                      })()}
                     </View>
                   ) : null}
 
@@ -674,6 +716,101 @@ export default function ApprovalsScreen() {
             ) : null}
           </View>
         </View>
+      </Modal>
+
+      {/* Modal Alasan Persetujuan / Penolakan */}
+      <Modal
+        visible={actionModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!processMutation.isPending) {
+            setActionModalVisible(false);
+            setPendingAction(null);
+          }
+        }}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          className="flex-1"
+        >
+          <View className="flex-1 bg-black/45 justify-end">
+            <KeyboardAwareScrollView
+              bounces={false}
+              keyboardShouldPersistTaps="handled"
+              enableOnAndroid
+              extraScrollHeight={Platform.OS === 'ios' ? 24 : 60}
+              contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}
+            >
+              <View className="bg-background rounded-t-[32px] p-6 pb-10 shadow-2xl">
+                <View className="flex-row justify-between items-start mb-4">
+                  <View className="flex-1 pr-3">
+                    <Text className="font-manrope-extrabold text-2xl text-primary">
+                      {pendingAction?.action === 'APPROVE' ? 'Setujui Pengajuan' : 'Tolak Pengajuan'}
+                    </Text>
+                    <Text className="font-inter text-xs text-text-muted mt-1">
+                      {pendingAction?.action === 'APPROVE'
+                        ? 'Tambahkan alasan atau catatan persetujuan (opsional).'
+                        : 'Tambahkan alasan atau catatan penolakan.'}
+                    </Text>
+                  </View>
+                  <Pressable
+                    disabled={processMutation.isPending}
+                    onPress={() => {
+                      setActionModalVisible(false);
+                      setPendingAction(null);
+                    }}
+                    className="w-9 h-9 rounded-full bg-black/5 items-center justify-center"
+                  >
+                    <MaterialIcons name="close" size={20} color={Tokens.colors.text} />
+                  </Pressable>
+                </View>
+
+                <View className="mb-4">
+                  <Text className="font-inter-bold text-xs text-on-surface mb-2">
+                    Catatan / Alasan {pendingAction?.action === 'REJECT' ? '(Disarankan)' : '(Opsional)'}
+                  </Text>
+                  <TextInput
+                    value={actionComment}
+                    onChangeText={setActionComment}
+                    placeholder={pendingAction?.action === 'APPROVE' ? 'Contoh: Disetujui, sesuai rencana kerja' : 'Contoh: Kurang dokumen pendukung / jadwal belum sesuai'}
+                    multiline
+                    numberOfLines={3}
+                    className="bg-white border border-black/10 rounded-2xl p-3 font-inter text-sm text-on-surface"
+                    style={{ height: 90, textAlignVertical: 'top' }}
+                  />
+                </View>
+
+                <View className="flex-row gap-3">
+                  <Pressable
+                    disabled={processMutation.isPending}
+                    onPress={() => {
+                      setActionModalVisible(false);
+                      setPendingAction(null);
+                    }}
+                    className="flex-1 h-12 rounded-2xl bg-black/5 items-center justify-center"
+                  >
+                    <Text className="font-inter-bold text-sm text-on-surface">Batal</Text>
+                  </Pressable>
+                  <Pressable
+                    disabled={processMutation.isPending}
+                    onPress={confirmAction}
+                    className={`flex-1 h-12 rounded-2xl items-center justify-center ${pendingAction?.action === 'APPROVE' ? 'bg-primary' : 'bg-error'
+                      }`}
+                  >
+                    {processMutation.isPending ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text className="font-inter-bold text-sm text-white">
+                        {pendingAction?.action === 'APPROVE' ? 'Ya, Setujui' : 'Ya, Tolak'}
+                      </Text>
+                    )}
+                  </Pressable>
+                </View>
+              </View>
+            </KeyboardAwareScrollView>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

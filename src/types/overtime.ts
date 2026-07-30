@@ -45,8 +45,8 @@ export interface OvertimeSummary {
 export interface CreateOvertimeRequest {
   attendance_id: string | null;
   overtime_date: string;
-  start_time: string;
-  end_time: string;
+  start_time?: string;
+  end_time?: string;
   overtime_type: OvertimeType;
   notes?: string;
   reason?: string;

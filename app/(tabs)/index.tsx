@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { qk } from '../../src/core/query/query-keys';
 import { Tokens } from '../../src/core/theme/tokens';
 import { buildApprovalActivityItems } from '../../src/features/activity/approval-activity';
+import { isApprovalPendingForUser } from '../../src/features/approvals/status';
 import { buildHomeMenuItems } from '../../src/features/home/home-menu';
 import { filterVisitsByDescendants, findDescendantIds } from '../../src/features/visit/hierarchy';
 import { approvalService } from '../../src/services/approval.service';
@@ -255,6 +256,10 @@ export default function HomeScreen() {
     enabled: !!user?.id && !!user?.role && user.role !== 'employee',
     staleTime: 30 * 1000,
   });
+  const actionableApprovalCount = React.useMemo(
+    () => pendingApprovals.filter((item) => isApprovalPendingForUser(item, user?.id)).length,
+    [pendingApprovals, user?.id]
+  );
 
   const { data: pendingTeamVisits = [], refetch: refetchPendingTeamVisits } = useQuery({
     queryKey: ['home-visit-pending', user?.company_id, user?.branch_id, user?.id],
@@ -547,8 +552,8 @@ export default function HomeScreen() {
   }, [attendanceFeed, expandedFeedId, leaveRequests, overtimeRecords, resignRequests, attendanceCorrections, approvalHistory, buildDateLabel, toSortTime]);
 
   const menuItems = React.useMemo<MenuItem[]>(
-    () => buildHomeMenuItems(user?.role, pendingApprovals.length, pendingTeamVisits.length),
-    [pendingApprovals.length, pendingTeamVisits.length, user?.role]
+    () => buildHomeMenuItems(user?.role, actionableApprovalCount, pendingTeamVisits.length),
+    [actionableApprovalCount, pendingTeamVisits.length, user?.role]
   );
   const menuColumns = React.useMemo(() => {
     const paddedItems: MenuSlot[] = [...menuItems];

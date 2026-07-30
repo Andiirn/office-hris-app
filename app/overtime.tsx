@@ -217,8 +217,8 @@ export default function OvertimeScreen() {
 
   const updateMutation = useMutation({
     mutationFn: ({ recordId, payload }: { recordId: string; payload: CreateOvertimeRequest }) => overtimeService.updateRecord(recordId, {
-      start_time: toLocalDateTimeString(payload.overtime_date, toTimeValue(payload.start_time) || '00:00'),
-      end_time: toLocalDateTimeString(payload.overtime_date, toTimeValue(payload.end_time) || '00:00'),
+      start_time: payload.start_time ? toLocalDateTimeString(payload.overtime_date, toTimeValue(payload.start_time) || '00:00') : undefined,
+      end_time: payload.end_time ? toLocalDateTimeString(payload.overtime_date, toTimeValue(payload.end_time) || '00:00') : undefined,
       overtime_type: payload.overtime_type,
       reason: payload.reason || null,
     }),
@@ -449,29 +449,41 @@ export default function OvertimeScreen() {
       Alert.alert('Error', 'Pilih tanggal lembur');
       return;
     }
-    if (!form.start_time || !form.end_time) {
-      Alert.alert('Error', 'Pilih start time dan end time');
+    if (!form.reason || !form.reason.trim()) {
+      Alert.alert('Upss', 'Alasan lembur wajib diisi');
       return;
     }
 
-    const startTime = toTimeValue(form.start_time);
-    const endTime = toTimeValue(form.end_time);
+    const startTime = toTimeValue(form.start_time || '');
+    const endTime = toTimeValue(form.end_time || '');
+    const hasSegments = draftSegments.length > 0;
+
     if (!startTime || !endTime) {
-      Alert.alert('Error', 'Format jam harus HH:MM');
+      Alert.alert('Error', 'Waktu lembur utama (Mulai & Selesai) wajib diisi dengan format HH:MM');
       return;
     }
 
-    const payload = {
-      ...form,
+    const baseStartTime = toLocalDateTimeString(form.overtime_date, startTime);
+    const baseEndTime = toLocalDateTimeString(form.overtime_date, endTime);
+
+    const payload: CreateOvertimeRequest = {
       attendance_id: mode === 'attendance' ? form.attendance_id : null,
       overtime_date: form.overtime_date,
-      start_time: toLocalDateTimeString(form.overtime_date, startTime),
-      end_time: toLocalDateTimeString(form.overtime_date, endTime),
-      segments: draftSegments.length
-        ? draftSegments.map((segment) => ({
-          start_time: segment.start_time,
-          end_time: segment.end_time,
-        }))
+      overtime_type: form.overtime_type,
+      reason: form.reason || undefined,
+      start_time: hasSegments ? undefined : baseStartTime,
+      end_time: hasSegments ? undefined : baseEndTime,
+      segments: hasSegments
+        ? [
+          {
+            start_time: baseStartTime,
+            end_time: baseEndTime,
+          },
+          ...draftSegments.map((segment) => ({
+            start_time: segment.start_time,
+            end_time: segment.end_time,
+          })),
+        ]
         : undefined,
     };
 
@@ -870,10 +882,10 @@ export default function OvertimeScreen() {
                   return (
                     <GlassCard style={{ padding: 14, marginBottom: 14 }}>
                       <View className="flex-row items-center justify-between">
-                        <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Segment</Text>
+                        <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Lembur Tambahan</Text>
                         <View className="rounded-full bg-primary/10 px-2.5 py-1">
                           <Text className="font-inter-bold text-[10px] text-primary">
-                            {actualSegments.length} Item
+                            {actualSegments.length} Sesi
                           </Text>
                         </View>
                       </View>
@@ -892,7 +904,7 @@ export default function OvertimeScreen() {
                         </View>
                       ) : (
                         <Text className="font-inter text-sm text-text-muted mt-3">
-                          Pengajuan ini tidak memiliki segment tambahan.
+                          Pengajuan ini tidak memiliki sesi lembur tambahan.
                         </Text>
                       )}
                     </GlassCard>
