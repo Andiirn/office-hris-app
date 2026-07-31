@@ -112,7 +112,10 @@ export function LeaveCreateModal({
     () => visibleLeaveTypes.find((type) => type.id === form.leave_type_id),
     [form.leave_type_id, visibleLeaveTypes],
   );
-  const shouldShowDocument = selectedLeaveType?.requires_document ?? false;
+  const isDocumentRequired = selectedLeaveType?.requires_document ?? false;
+  const isDocumentOptional = selectedLeaveType?.optional_document ?? false;
+  const shouldShowDocument = isDocumentRequired;
+  const isStrictlyRequired = isDocumentRequired && !isDocumentOptional;
   const effectiveLimit = selectedLeaveType?.max_days_per_year ?? leaveLimit ?? null;
   const remainingDaysLabel = leaveBalance?.remaining_days ?? effectiveLimit;
 
@@ -319,9 +322,14 @@ export function LeaveCreateModal({
 
             {shouldShowDocument ? (
               <GlassCard style={{ padding: 14, marginTop: 12 }}>
-                <Text className="font-inter-bold text-sm text-primary mb-2">Dokumen Pendukung</Text>
+                <Text className="font-inter-bold text-sm text-primary mb-2">
+                  Dokumen Pendukung {isStrictlyRequired ? '(Wajib)' : '(Opsional)'}
+                </Text>
+
                 <Text className="font-inter text-xs text-text-muted mb-3">
-                  Hanya mendukung upload gambar. Jika tidak melampirkan dokumen, akan dikenakan potongan gaji.
+                  {isStrictlyRequired
+                    ? 'Hanya mendukung upload gambar. Pengajuan ini mewajibkan dokumen lampiran.'
+                    : 'Hanya mendukung upload gambar. Melampirkan dokumen bersifat opsional.'}
                 </Text>
 
                 {documentFile ? (

@@ -7,6 +7,7 @@ export interface LeaveType {
   category?: string;
   company_id?: string;
   requires_document?: boolean;
+  optional_document?: boolean;
   max_days_per_year?: number | null;
   description?: string;
   is_active: boolean;

@@ -411,6 +411,12 @@ export default function LeaveScreen() {
       return;
     }
 
+    const isDocRequired = selectedLeaveType?.requires_document ?? false;
+    if (isDocRequired && !documentFile) {
+      Alert.alert('Gagal', `Pengajuan ${selectedLeaveType?.name || 'izin'} ini mewajibkan Anda melampirkan dokumen pendukung.`);
+      return;
+    }
+
     if (!isBalanceBypassed && selectedLeaveType?.max_days_per_year != null) {
       if (isBalanceExceeded) {
         Alert.alert('Gagal', `Sisa cuti ${selectedLeaveType.name} tinggal ${remainingLeaveDays ?? 0} hari.`);
@@ -469,7 +475,7 @@ export default function LeaveScreen() {
     }));
     setSelectedRange({});
     setSelectedHourlyDate(today);
-    if (!nextType?.requires_document) {
+    if (!nextType?.requires_document && !nextType?.optional_document) {
       setDocumentFile(null);
     }
     if (!nextCanChooseReplacement) {
