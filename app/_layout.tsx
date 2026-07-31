@@ -18,6 +18,7 @@ import { sessionManager } from '../src/core/auth/session-manager';
 import { qk } from '../src/core/query/query-keys';
 import { notificationService } from '../src/services/notification.service';
 import { useAuthStore } from '../src/stores/auth.store';
+import { handleNotificationNavigation } from '../src/utils/notification-router';
 import './../src/core/theme/global.css';
 
 SplashScreen.preventAutoHideAsync();
@@ -45,7 +46,7 @@ function onAppStateChange(status: AppStateStatus) {
   }
 }
 
-export default function RootLayout() {
+function RootLayoutNav() {
   const { isInitialized, isLoggedIn, hasSeenOnboarding, checkOnboarding, bootstrapError, setBootstrapError } = useAuthStore();
   const segments = useSegments();
   const router = useRouter();
@@ -127,10 +128,12 @@ export default function RootLayout() {
             queryClient.invalidateQueries({ queryKey: qk.homeApprovalsRoot() });
           },
           (response) => {
-            // Route user to a specific screen if payload contains screen name
+            // Route user based on FCM payload (action_url, reference_type, screen)
             const data = response.notification.request.content.data;
-            if (data && data.screen) {
-              router.push(data.screen as any);
+            try {
+              handleNotificationNavigation(data, router);
+            } catch (err) {
+              console.warn('[RootLayout] Notification navigation error:', err);
             }
           }
         );
@@ -168,23 +171,29 @@ export default function RootLayout() {
   }
 
   return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+      <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
+      <Stack.Screen name="(auth)/reset-password" options={{ headerShown: false }} />
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="approvals" options={{ headerShown: false }} />
+      <Stack.Screen name="leave" options={{ headerShown: false }} />
+      <Stack.Screen name="overtime" options={{ headerShown: false }} />
+      <Stack.Screen name="payroll" options={{ headerShown: false }} />
+      <Stack.Screen name="resign" options={{ headerShown: false }} />
+      <Stack.Screen name="attendance-scan" options={{ headerShown: false }} />
+      <Stack.Screen name="visit" options={{ headerShown: false }} />
+      <Stack.Screen name="correction" options={{ headerShown: false }} />
+      <Stack.Screen name="activity" options={{ headerShown: false }} />
+    </Stack>
+  );
+}
+
+export default function RootLayout() {
+  return (
     <QueryClientProvider client={queryClient}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-        <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
-        <Stack.Screen name="(auth)/reset-password" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="approvals" options={{ headerShown: false }} />
-        <Stack.Screen name="leave" options={{ headerShown: false }} />
-        <Stack.Screen name="overtime" options={{ headerShown: false }} />
-        <Stack.Screen name="payroll" options={{ headerShown: false }} />
-        <Stack.Screen name="resign" options={{ headerShown: false }} />
-        <Stack.Screen name="attendance-scan" options={{ headerShown: false }} />
-        <Stack.Screen name="visit" options={{ headerShown: false }} />
-        <Stack.Screen name="correction" options={{ headerShown: false }} />
-        <Stack.Screen name="activity" options={{ headerShown: false }} />
-      </Stack>
+      <RootLayoutNav />
     </QueryClientProvider>
   );
 }
