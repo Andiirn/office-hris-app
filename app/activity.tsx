@@ -15,6 +15,7 @@ import { overtimeService } from '../src/services/overtime.service';
 import { resignService } from '../src/services/resign.service';
 import { useAuthStore } from '../src/stores/auth.store';
 import { getAttendanceBadgeProps } from '../src/utils/status';
+import { goBackOrTabs } from '../src/utils/navigation';
 
 type FeedType =
   | 'attendance.checkin'
@@ -376,7 +377,7 @@ export default function ActivityScreen() {
       <View className="px-5 pt-2 pb-4">
         <View className="flex-row items-center gap-3">
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => goBackOrTabs(router)}
             className="w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm active:opacity-60"
             accessibilityRole="button"
             accessibilityLabel="Kembali"

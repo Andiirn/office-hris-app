@@ -15,7 +15,7 @@ export default function RootIndex() {
         router.replace('/(auth)/login');
       }
     }
-  }, [isInitialized, isLoggedIn]);
+  }, [isInitialized, isLoggedIn, router]);
 
   return (
     <View style={{ flex: 1, backgroundColor: '#FBFAF8', alignItems: 'center', justifyContent: 'center' }}>

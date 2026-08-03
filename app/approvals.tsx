@@ -25,6 +25,7 @@ import { buildApprovalHistoryLines, getApprovalStatusBadgeType, getApprovalStatu
 import { formatOvertimeTime } from '../src/features/overtime/time';
 import { approvalService } from '../src/services/approval.service';
 import { useAuthStore } from '../src/stores/auth.store';
+import { goBackOrTabs } from '../src/utils/navigation';
 import {
   ApprovalItem,
   getApprovalReferenceDetail,
@@ -512,7 +513,7 @@ export default function ApprovalsScreen() {
       {/* Header */}
       <View className="px-5 pt-2 pb-4 flex-row items-center gap-3 z-10">
         <Pressable
-          onPress={() => router.back()}
+            onPress={() => goBackOrTabs(router)}
           className="w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm active:opacity-60"
           accessibilityRole="button"
           accessibilityLabel="Kembali"
@@ -776,78 +777,88 @@ export default function ApprovalsScreen() {
               }
             }}
           />
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={Platform.OS === 'android' ? 24 : 0}
+          <KeyboardAwareScrollView
+            contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}
+            keyboardShouldPersistTaps="handled"
+            enableOnAndroid
+            extraScrollHeight={Platform.OS === 'ios' ? 24 : 100}
+            keyboardOpeningTime={0}
+            scrollEnabled={false}
             style={{ width: '100%' }}
           >
-            <View className="bg-background rounded-t-[32px] p-6 pb-10 shadow-2xl">
-              <View className="flex-row justify-between items-start mb-4">
-                <View className="flex-1 pr-3">
-                  <Text className="font-manrope-extrabold text-2xl text-primary">
-                    {pendingAction?.action === 'APPROVE' ? 'Setujui Pengajuan' : 'Tolak Pengajuan'}
-                  </Text>
-                  <Text className="font-inter text-xs text-text-muted mt-1">
-                    {pendingAction?.action === 'APPROVE'
-                      ? 'Tambahkan alasan atau catatan persetujuan (opsional).'
-                      : 'Tambahkan alasan atau catatan penolakan.'}
-                  </Text>
-                </View>
-                <Pressable
-                  disabled={processMutation.isPending}
-                  onPress={() => {
-                    setActionModalVisible(false);
-                    setPendingAction(null);
-                  }}
-                  className="w-9 h-9 rounded-full bg-black/5 items-center justify-center"
-                >
-                  <MaterialIcons name="close" size={20} color={Tokens.colors.text} />
-                </Pressable>
-              </View>
-
-              <View className="mb-4">
-                <Text className="font-inter-bold text-xs text-on-surface mb-2">
-                  Catatan / Alasan {pendingAction?.action === 'REJECT' ? '(Disarankan)' : '(Opsional)'}
-                </Text>
-                <TextInput
-                  value={actionComment}
-                  onChangeText={setActionComment}
-                  placeholder={pendingAction?.action === 'APPROVE' ? 'Contoh: Disetujui, sesuai rencana kerja' : 'Contoh: Kurang dokumen pendukung / jadwal belum sesuai'}
-                  multiline
-                  numberOfLines={3}
-                  className="bg-white border border-black/10 rounded-2xl p-3 font-inter text-sm text-on-surface"
-                  style={{ height: 90, textAlignVertical: 'top' }}
-                />
-              </View>
-
-              <View className="flex-row gap-3">
-                <Pressable
-                  disabled={processMutation.isPending}
-                  onPress={() => {
-                    setActionModalVisible(false);
-                    setPendingAction(null);
-                  }}
-                  className="flex-1 h-12 rounded-2xl bg-black/5 items-center justify-center"
-                >
-                  <Text className="font-inter-bold text-sm text-on-surface">Batal</Text>
-                </Pressable>
-                <Pressable
-                  disabled={processMutation.isPending}
-                  onPress={confirmAction}
-                  className={`flex-1 h-12 rounded-2xl items-center justify-center ${pendingAction?.action === 'APPROVE' ? 'bg-primary' : 'bg-error'
-                    }`}
-                >
-                  {processMutation.isPending ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Text className="font-inter-bold text-sm text-white">
-                      {pendingAction?.action === 'APPROVE' ? 'Ya, Setujui' : 'Ya, Tolak'}
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              keyboardVerticalOffset={Platform.OS === 'android' ? 24 : 0}
+              style={{ width: '100%' }}
+            >
+              <View className="bg-background rounded-t-[32px] p-6 pb-10 shadow-2xl">
+                <View className="flex-row justify-between items-start mb-4">
+                  <View className="flex-1 pr-3">
+                    <Text className="font-manrope-extrabold text-2xl text-primary">
+                      {pendingAction?.action === 'APPROVE' ? 'Setujui Pengajuan' : 'Tolak Pengajuan'}
                     </Text>
-                  )}
-                </Pressable>
+                    <Text className="font-inter text-xs text-text-muted mt-1">
+                      {pendingAction?.action === 'APPROVE'
+                        ? 'Tambahkan alasan atau catatan persetujuan (opsional).'
+                        : 'Tambahkan alasan atau catatan penolakan.'}
+                    </Text>
+                  </View>
+                  <Pressable
+                    disabled={processMutation.isPending}
+                    onPress={() => {
+                      setActionModalVisible(false);
+                      setPendingAction(null);
+                    }}
+                    className="w-9 h-9 rounded-full bg-black/5 items-center justify-center"
+                  >
+                    <MaterialIcons name="close" size={20} color={Tokens.colors.text} />
+                  </Pressable>
+                </View>
+
+                <View className="mb-4">
+                  <Text className="font-inter-bold text-xs text-on-surface mb-2">
+                    Catatan / Alasan {pendingAction?.action === 'REJECT' ? '(Disarankan)' : '(Opsional)'}
+                  </Text>
+                  <TextInput
+                    value={actionComment}
+                    onChangeText={setActionComment}
+                    placeholder={pendingAction?.action === 'APPROVE' ? 'Contoh: Disetujui, sesuai rencana kerja' : 'Contoh: Kurang dokumen pendukung / jadwal belum sesuai'}
+                    multiline
+                    numberOfLines={3}
+                    className="bg-white border border-black/10 rounded-2xl p-3 font-inter text-sm text-on-surface"
+                    style={{ height: 90, textAlignVertical: 'top' }}
+                  />
+                </View>
+
+                <View className="flex-row gap-3">
+                  <Pressable
+                    disabled={processMutation.isPending}
+                    onPress={() => {
+                      setActionModalVisible(false);
+                      setPendingAction(null);
+                    }}
+                    className="flex-1 h-12 rounded-2xl bg-black/5 items-center justify-center"
+                  >
+                    <Text className="font-inter-bold text-sm text-on-surface">Batal</Text>
+                  </Pressable>
+                  <Pressable
+                    disabled={processMutation.isPending}
+                    onPress={confirmAction}
+                    className={`flex-1 h-12 rounded-2xl items-center justify-center ${pendingAction?.action === 'APPROVE' ? 'bg-primary' : 'bg-error'
+                      }`}
+                  >
+                    {processMutation.isPending ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text className="font-inter-bold text-sm text-white">
+                        {pendingAction?.action === 'APPROVE' ? 'Ya, Setujui' : 'Ya, Tolak'}
+                      </Text>
+                    )}
+                  </Pressable>
+                </View>
               </View>
-            </View>
-          </KeyboardAvoidingView>
+            </KeyboardAvoidingView>
+          </KeyboardAwareScrollView>
         </View>
       </Modal>
     </View>

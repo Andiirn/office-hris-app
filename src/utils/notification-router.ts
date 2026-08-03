@@ -1,5 +1,7 @@
 import type { Router } from 'expo-router';
 
+let pendingNotificationRoute: string | null = null;
+
 /**
  * Interface representing FCM or Push Notification data payload from backend.
  */
@@ -104,40 +106,54 @@ export function sanitizeActionUrl(actionUrl?: string): string | null {
  * Evaluates action_url, reference_type, screen in order of priority.
  */
 export function handleNotificationNavigation(data: NotificationPayloadData | undefined, router: Router): boolean {
-  if (!data) return false;
+  const route = resolveNotificationRoute(data);
+  if (!route) return false;
+
+  router.push(route as any);
+  return true;
+}
+
+export function resolveNotificationRoute(data: NotificationPayloadData | undefined): string | null {
+  if (!data) return null;
 
   console.log('[NotificationNavigation] Handling notification data payload:', data);
 
-  // 1. Try action_url first
   if (data.action_url) {
     const route = sanitizeActionUrl(data.action_url);
     if (route) {
       console.log(`[NotificationNavigation] Navigating via action_url "${data.action_url}" -> "${route}"`);
-      router.push(route as any);
-      return true;
+      return route;
     }
   }
 
-  // 2. Fallback to reference_type (+ reference_id)
   if (data.reference_type) {
     const route = mapReferenceToRoute(data.reference_type, data.reference_id);
     if (route) {
       console.log(`[NotificationNavigation] Navigating via reference_type "${data.reference_type}" -> "${route}"`);
-      router.push(route as any);
-      return true;
+      return route;
     }
   }
 
-  // 3. Fallback to screen property (if present)
   if (data.screen) {
     const route = sanitizeActionUrl(data.screen) || (data.screen.startsWith('/') ? data.screen : `/${data.screen}`);
     console.log(`[NotificationNavigation] Navigating via screen property "${data.screen}" -> "${route}"`);
-    router.push(route as any);
-    return true;
+    return route;
   }
 
-  // 4. Default fallback: Notifications list screen
   console.log('[NotificationNavigation] No specific route target found, navigating to /notifications');
-  router.push('/notifications' as any);
-  return true;
+  return '/notifications';
 }
+
+export const notificationIntent = {
+  set(route: string | null) {
+    pendingNotificationRoute = route;
+  },
+  peek() {
+    return pendingNotificationRoute;
+  },
+  consume() {
+    const route = pendingNotificationRoute;
+    pendingNotificationRoute = null;
+    return route;
+  },
+};

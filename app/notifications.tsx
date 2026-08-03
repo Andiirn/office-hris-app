@@ -130,7 +130,7 @@ export default function NotificationsScreen() {
         <View className="flex-row items-start justify-between gap-3">
           <View className="flex-row items-start gap-3 flex-1">
             <Pressable
-              onPress={() => router.back()}
+              onPress={() => goBackOrTabs(router)}
               className="w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm active:opacity-60 mt-0.5"
               accessibilityRole="button"
               accessibilityLabel="Kembali"

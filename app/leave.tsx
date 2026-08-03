@@ -32,6 +32,7 @@ import { employeeService } from '../src/services/employee.service';
 import { leaveService } from '../src/services/leave.service';
 import { useAuthStore } from '../src/stores/auth.store';
 import { CreateLeaveRequest } from '../src/types/leave';
+import { goBackOrTabs } from '../src/utils/navigation';
 
 function formatTime(timeStr?: string | null) {
   if (!timeStr) return '--:--';
@@ -601,7 +602,7 @@ export default function LeaveScreen() {
 
       <View className="flex-row items-center px-5 pt-2 pb-5 z-10">
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrTabs(router)}
           className="w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm active:opacity-60"
           accessibilityRole="button"
           accessibilityLabel="Kembali"

@@ -1,12 +1,29 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { Redirect, router, Tabs } from 'expo-router';
-import React from 'react';
+import { Redirect, router, Tabs, useRootNavigationState } from 'expo-router';
+import React, { useEffect } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { notificationIntent } from '../../src/utils/notification-router';
 import { Tokens } from '../../src/core/theme/tokens';
 import { useAuthStore } from '../../src/stores/auth.store';
 
 export default function TabLayout() {
   const { isLoggedIn, isInitialized } = useAuthStore();
+  const rootNavigationState = useRootNavigationState();
+  const navigationReady = !!rootNavigationState?.key;
+
+  useEffect(() => {
+    if (!navigationReady || !isLoggedIn) {
+      return;
+    }
+
+    const pendingRoute = notificationIntent.peek();
+    if (!pendingRoute) {
+      return;
+    }
+
+    notificationIntent.consume();
+    router.push(pendingRoute as any);
+  }, [navigationReady, isLoggedIn]);
 
   console.log('[TabLayout] Render:', { isLoggedIn, isInitialized });
 

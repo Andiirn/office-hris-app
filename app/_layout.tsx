@@ -9,16 +9,18 @@ import {
   useFonts
 } from '@expo-google-fonts/manrope';
 import { focusManager, QueryClientProvider } from '@tanstack/react-query';
-import { ErrorBoundaryProps, Stack, useRouter, useSegments } from 'expo-router';
+import { ErrorBoundaryProps, Stack, useRootNavigationState, useRouter, useSegments } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { AppState, AppStateStatus, Platform, Pressable, Text, View } from 'react-native';
 import { queryClient } from '../src/core/api/query-client';
 import { sessionManager } from '../src/core/auth/session-manager';
 import { qk } from '../src/core/query/query-keys';
+import { notificationIntent, resolveNotificationRoute } from '../src/utils/notification-router';
 import { notificationService } from '../src/services/notification.service';
 import { useAuthStore } from '../src/stores/auth.store';
-import { handleNotificationNavigation } from '../src/utils/notification-router';
+// import { BootDebugOverlay } from '../src/components/debug/BootDebugOverlay';
 import './../src/core/theme/global.css';
 
 SplashScreen.preventAutoHideAsync();
@@ -49,12 +51,18 @@ function onAppStateChange(status: AppStateStatus) {
 function RootLayoutNav() {
   const { isInitialized, isLoggedIn, hasSeenOnboarding, checkOnboarding, bootstrapError, setBootstrapError } = useAuthStore();
   const segments = useSegments();
+  const rootNavigationState = useRootNavigationState();
   const router = useRouter();
+  const handledNotificationIdRef = useRef<string | null>(null);
+  const pendingNotificationResponseRef = useRef<Notifications.NotificationResponse | null>(null);
+  const pendingNotificationRouteRef = useRef<string | null>(null);
+  const [debugOverlayVisible, setDebugOverlayVisible] = React.useState(true);
+  const navigationReady = !!rootNavigationState?.key;
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', onAppStateChange);
     return () => subscription.remove();
-  }, []);
+  }, [checkOnboarding]);
 
   const [loaded, error] = useFonts({
     Manrope_800ExtraBold,
@@ -66,7 +74,7 @@ function RootLayoutNav() {
   useEffect(() => {
     sessionManager.initialize();
     checkOnboarding();
-  }, []);
+  }, [checkOnboarding]);
 
   const handleRetryBootstrap = React.useCallback(() => {
     setBootstrapError(null);
@@ -75,6 +83,15 @@ function RootLayoutNav() {
   }, [setBootstrapError, checkOnboarding]);
 
   useEffect(() => {
+    if (!navigationReady) {
+      return;
+    }
+
+    const pendingRoute = pendingNotificationRouteRef.current ?? notificationIntent.peek();
+    if (pendingRoute) {
+      return;
+    }
+
     if (isInitialized && hasSeenOnboarding !== null) {
       if (hasSeenOnboarding === false) {
         if (segments[0] !== 'onboarding') {
@@ -92,12 +109,26 @@ function RootLayoutNav() {
         }
       }
     }
-  }, [isInitialized, isLoggedIn, hasSeenOnboarding, segments]);
+  }, [isInitialized, isLoggedIn, hasSeenOnboarding, segments, router, navigationReady]);
 
   useEffect(() => {
     if (isLoggedIn) {
       let cleanup: (() => void) | undefined;
       let cancelled = false;
+
+      const handleNotificationResponse = (response: Notifications.NotificationResponse) => {
+        const notificationId = response.notification.request.identifier;
+        if (handledNotificationIdRef.current === notificationId) {
+          return;
+        }
+        handledNotificationIdRef.current = notificationId;
+
+        const route = resolveNotificationRoute(response.notification.request.content.data);
+        if (route) {
+          pendingNotificationRouteRef.current = route;
+          notificationIntent.set(route);
+        }
+      };
 
       (async () => {
         let NotificationManager;
@@ -120,6 +151,11 @@ function RootLayoutNav() {
           }
         });
 
+        const lastResponse = await Notifications.getLastNotificationResponseAsync();
+        if (lastResponse) {
+          pendingNotificationResponseRef.current = lastResponse;
+        }
+
         // Set up foreground & background/click listeners
         cleanup = NotificationManager.setupNotificationListeners(
           () => {
@@ -127,16 +163,13 @@ function RootLayoutNav() {
             queryClient.invalidateQueries({ queryKey: qk.notificationsRoot() });
             queryClient.invalidateQueries({ queryKey: qk.homeApprovalsRoot() });
           },
-          (response) => {
-            // Route user based on FCM payload (action_url, reference_type, screen)
-            const data = response.notification.request.content.data;
-            try {
-              handleNotificationNavigation(data, router);
-            } catch (err) {
-              console.warn('[RootLayout] Notification navigation error:', err);
-            }
-          }
+          handleNotificationResponse
         );
+
+        if (pendingNotificationResponseRef.current) {
+          handleNotificationResponse(pendingNotificationResponseRef.current);
+          pendingNotificationResponseRef.current = null;
+        }
       })();
 
       return () => {
@@ -144,13 +177,28 @@ function RootLayoutNav() {
         cleanup?.();
       };
     }
-  }, [isLoggedIn]);
+  }, [isLoggedIn, router]);
 
   useEffect(() => {
     if ((loaded || error) && isInitialized && hasSeenOnboarding !== null) {
       SplashScreen.hideAsync().catch(() => { });
     }
   }, [loaded, error, isInitialized, hasSeenOnboarding]);
+
+  useEffect(() => {
+    if (!navigationReady || !isInitialized || !isLoggedIn) {
+      return;
+    }
+
+    const pendingRoute = pendingNotificationRouteRef.current ?? notificationIntent.peek();
+    if (!pendingRoute) {
+      return;
+    }
+
+    pendingNotificationRouteRef.current = null;
+    notificationIntent.consume();
+    router.push(pendingRoute as any);
+  }, [navigationReady, isInitialized, isLoggedIn, router]);
 
   if ((!loaded && !error) || !isInitialized || hasSeenOnboarding === null) {
     return null;
@@ -171,22 +219,38 @@ function RootLayoutNav() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-      <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
-      <Stack.Screen name="(auth)/reset-password" options={{ headerShown: false }} />
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="approvals" options={{ headerShown: false }} />
-      <Stack.Screen name="leave" options={{ headerShown: false }} />
-      <Stack.Screen name="overtime" options={{ headerShown: false }} />
-      <Stack.Screen name="payroll" options={{ headerShown: false }} />
-      <Stack.Screen name="resign" options={{ headerShown: false }} />
-      <Stack.Screen name="attendance-scan" options={{ headerShown: false }} />
-      <Stack.Screen name="visit" options={{ headerShown: false }} />
-      <Stack.Screen name="correction" options={{ headerShown: false }} />
-      <Stack.Screen name="activity" options={{ headerShown: false }} />
-    </Stack>
+    <View style={{ flex: 1 }}>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)/reset-password" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="approvals" options={{ headerShown: false }} />
+        <Stack.Screen name="leave" options={{ headerShown: false }} />
+        <Stack.Screen name="overtime" options={{ headerShown: false }} />
+        <Stack.Screen name="payroll" options={{ headerShown: false }} />
+        <Stack.Screen name="resign" options={{ headerShown: false }} />
+        <Stack.Screen name="attendance-scan" options={{ headerShown: false }} />
+        <Stack.Screen name="visit" options={{ headerShown: false }} />
+        <Stack.Screen name="correction" options={{ headerShown: false }} />
+        <Stack.Screen name="activity" options={{ headerShown: false }} />
+      </Stack>
+      {/* <BootDebugOverlay
+        visible={debugOverlayVisible}
+        onToggle={() => setDebugOverlayVisible((current) => !current)}
+        rows={[
+          { label: 'init', value: String(isInitialized) },
+          { label: 'login', value: String(isLoggedIn) },
+          { label: 'onboard', value: String(hasSeenOnboarding) },
+          { label: 'nav', value: String(navigationReady) },
+          { label: 'seg', value: segments.join('/') || '-' },
+          { label: 'intent', value: notificationIntent.peek() ?? '-' },
+          { label: 'pending', value: String(!!pendingNotificationResponseRef.current) },
+          { label: 'target', value: pendingNotificationRouteRef.current ?? '-' },
+        ]}
+      /> */}
+    </View>
   );
 }
 

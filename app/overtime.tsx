@@ -28,6 +28,7 @@ import { overtimeService } from '../src/services/overtime.service';
 import { useAuthStore } from '../src/stores/auth.store';
 import { AttendanceItem } from '../src/types/attendance';
 import { AddOvertimeSegmentRequest, CreateOvertimeRequest, OvertimeSegment, OvertimeType, UpdateOvertimeSegmentRequest } from '../src/types/overtime';
+import { goBackOrTabs } from '../src/utils/navigation';
 
 type OvertimeMode = 'attendance' | 'pre_submit';
 
@@ -157,6 +158,14 @@ export default function OvertimeScreen() {
     enabled: !!user?.id,
     staleTime: 1000 * 60 * 5,
   });
+
+  const sortedHistory = useMemo(() => {
+    return [...history].sort((a, b) => {
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : (a.overtime_date ? new Date(a.overtime_date).getTime() : 0);
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : (b.overtime_date ? new Date(b.overtime_date).getTime() : 0);
+      return timeB - timeA;
+    });
+  }, [history]);
 
   const { data: selectedRecordDetail, isLoading: isLoadingDetail, isError: isDetailError, refetch: refetchDetail } = useQuery({
     queryKey: ['overtime-record-detail', selectedRecordId],
@@ -558,7 +567,7 @@ export default function OvertimeScreen() {
       <View className="flex-row justify-between items-center px-5 pt-2 pb-5 z-10">
         <View className="flex-row items-center gap-3 flex-1">
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => goBackOrTabs(router)}
             className="w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm active:opacity-60"
             accessibilityRole="button"
             accessibilityLabel="Kembali"
@@ -632,13 +641,13 @@ export default function OvertimeScreen() {
         <View className="flex-row justify-between items-center mb-4">
           <Text className="font-manrope-bold text-lg text-primary">Riwayat Lembur</Text>
           <View className="bg-primary/10 px-3 py-1 rounded-full">
-            <Text className="font-inter-bold text-[10px] text-primary">{history.length} Tercatat</Text>
+            <Text className="font-inter-bold text-[10px] text-primary">{sortedHistory.length} Tercatat</Text>
           </View>
         </View>
 
         {isLoadingHistory ? (
           <Text className="font-inter text-sm text-text-muted mt-4">Memuat riwayat...</Text>
-        ) : history.length === 0 ? (
+        ) : sortedHistory.length === 0 ? (
           <MotiView from={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ type: 'timing', duration: 400 }}>
             <GlassCard style={{ alignItems: 'center', padding: 24, paddingVertical: 48, marginTop: 16 }}>
               <MotiView
@@ -655,7 +664,7 @@ export default function OvertimeScreen() {
             </GlassCard>
           </MotiView>
         ) : (
-          history.map((item) => {
+          sortedHistory.map((item) => {
             const status = getOvertimeStatus(item);
             return (
               <Pressable key={item.id} onPress={() => openDetail(item.id)} className="mb-3">

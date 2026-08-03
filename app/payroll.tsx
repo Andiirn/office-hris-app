@@ -12,6 +12,7 @@ import { Tokens } from '../src/core/theme/tokens';
 import { authService } from '../src/services/auth.service';
 import { payrollService } from '../src/services/payroll.service';
 import { useAuthStore } from '../src/stores/auth.store';
+import { goBackOrTabs } from '../src/utils/navigation';
 
 export default function PayrollScreen() {
   const { user } = useAuthStore();
@@ -159,7 +160,7 @@ export default function PayrollScreen() {
       <View className="flex-row justify-between items-center px-5 pt-2 pb-5 z-10">
         <View className="flex-row items-center gap-3 flex-1">
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => goBackOrTabs(router)}
             className="w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm active:opacity-60"
             accessibilityRole="button"
             accessibilityLabel="Kembali"

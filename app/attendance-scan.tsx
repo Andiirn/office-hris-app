@@ -18,6 +18,7 @@ import { parseAttendanceQrPayload } from '../src/features/attendance/qr';
 import { getAttendanceScanDecision } from '../src/features/attendance/scan-state';
 import { attendanceService, createSelfiePhotoCode } from '../src/services/attendance.service';
 import { useAuthStore } from '../src/stores/auth.store';
+import { goBackOrTabs } from '../src/utils/navigation';
 
 type LocationStatus = 'loading' | 'granted' | 'denied';
 type CameraStatus = 'loading' | 'granted' | 'denied';
@@ -726,7 +727,7 @@ export default function AttendanceScanScreen() {
 
       <View className="flex-row items-center px-5 py-4 z-10 justify-between">
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrTabs(router)}
           className="w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm active:opacity-60"
         >
           <MaterialIcons name="arrow-back" size={24} color={Tokens.colors.primary} />
