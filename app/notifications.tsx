@@ -1,6 +1,6 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { InfiniteData, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import React from 'react';
 import { FlatList, Modal, Pressable, RefreshControl, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,12 +8,12 @@ import { GlassCard } from '../src/components/ui/GlassCard';
 import { SkeletonCard } from '../src/components/ui/Skeleton';
 import { qk } from '../src/core/query/query-keys';
 import { Tokens } from '../src/core/theme/tokens';
-import { notificationService } from '../src/services/notification.service';
-import { useAuthStore } from '../src/stores/auth.store';
 import {
   markAllNotificationsAsReadInPages,
   markNotificationAsReadInPages,
 } from '../src/features/notifications/notification-cache';
+import { notificationService } from '../src/services/notification.service';
+import { useAuthStore } from '../src/stores/auth.store';
 
 import type { NotificationItem } from '../src/types/notification';
 
@@ -129,14 +129,6 @@ export default function NotificationsScreen() {
       <View className="px-5 pt-2 pb-4">
         <View className="flex-row items-start justify-between gap-3">
           <View className="flex-row items-start gap-3 flex-1">
-            <Pressable
-              onPress={() => goBackOrTabs(router)}
-              className="w-10 h-10 rounded-full bg-white/80 border border-white/90 items-center justify-center shadow-sm active:opacity-60 mt-0.5"
-              accessibilityRole="button"
-              accessibilityLabel="Kembali"
-            >
-              <MaterialIcons name="arrow-back" size={22} color={Tokens.colors.primary} />
-            </Pressable>
             <View className="flex-1">
               <Text className="font-manrope-extrabold text-3xl text-primary">Notifikasi</Text>
               <Text className="font-inter-medium text-sm text-text-muted mt-0.5">Pemberitahuan terbaru di satu tempat</Text>
