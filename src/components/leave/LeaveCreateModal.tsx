@@ -114,8 +114,8 @@ export function LeaveCreateModal({
   );
   const isDocumentRequired = selectedLeaveType?.requires_document ?? false;
   const isDocumentOptional = selectedLeaveType?.optional_document ?? false;
-  const shouldShowDocument = isDocumentRequired;
-  const isStrictlyRequired = isDocumentRequired && !isDocumentOptional;
+  const shouldShowDocument = Boolean(isDocumentRequired || isDocumentOptional);
+  const isStrictlyRequired = Boolean(isDocumentRequired && !isDocumentOptional);
   const effectiveLimit = selectedLeaveType?.max_days_per_year ?? leaveLimit ?? null;
   const remainingDaysLabel = leaveBalance?.remaining_days ?? effectiveLimit;
 

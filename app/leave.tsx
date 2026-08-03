@@ -411,8 +411,8 @@ export default function LeaveScreen() {
       return;
     }
 
-    const isDocRequired = selectedLeaveType?.requires_document ?? false;
-    if (isDocRequired && !documentFile) {
+    const isDocStrictlyRequired = Boolean(selectedLeaveType?.requires_document && !selectedLeaveType?.optional_document);
+    if (isDocStrictlyRequired && !documentFile) {
       Alert.alert('Gagal', `Pengajuan ${selectedLeaveType?.name || 'izin'} ini mewajibkan Anda melampirkan dokumen pendukung.`);
       return;
     }
