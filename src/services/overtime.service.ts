@@ -42,9 +42,11 @@ export const overtimeService = {
   },
 
   async createRecord(payload: CreateOvertimeRequest): Promise<OvertimeRecord> {
+    const reasonValue = payload.reason ?? payload.notes ?? undefined;
     const response = await api.post('/overtime/records', stripNullishFields({
       ...payload,
-      notes: payload.notes ?? payload.reason ?? undefined,
+      reason: reasonValue,
+      notes: reasonValue,
     }));
     return unwrapData<OvertimeRecord>(response.data);
   },
@@ -65,9 +67,11 @@ export const overtimeService = {
   },
 
   async updateRecord(recordId: string, payload: UpdateOvertimeRequest): Promise<OvertimeRecord> {
+    const reasonValue = payload.reason ?? payload.notes ?? undefined;
     const response = await api.put(`/overtime/records/${recordId}`, stripNullishFields({
       ...payload,
-      notes: payload.notes ?? payload.reason ?? undefined,
+      reason: reasonValue,
+      notes: reasonValue,
     }));
     return unwrapData<OvertimeRecord>(response.data);
   },

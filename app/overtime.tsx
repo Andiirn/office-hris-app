@@ -371,7 +371,7 @@ export default function OvertimeScreen() {
       start_time: toTimeInputValue(selectedRecordDetail.start_time),
       end_time: toTimeInputValue(selectedRecordDetail.end_time),
       overtime_type: (selectedRecordDetail.overtime_type as OvertimeType) || 'REGULAR',
-      reason: selectedRecordDetail.reason || '',
+      reason: selectedRecordDetail.reason || selectedRecordDetail.notes || '',
     });
     setDraftSegments(
       (selectedRecordDetail.segments ?? [])
@@ -701,10 +701,10 @@ export default function OvertimeScreen() {
                     </View>
                   </View>
 
-                  {item.reason && (
+                  {(item.reason || item.notes) && (
                     <View className="bg-black/5 px-3 py-2 rounded-lg mt-2">
                       <Text className="font-inter text-xs text-text-muted italic" numberOfLines={2}>
-                        &quot;{item.reason}&quot;
+                        &quot;{item.reason || item.notes}&quot;
                       </Text>
                     </View>
                   )}
@@ -871,7 +871,7 @@ export default function OvertimeScreen() {
                 <GlassCard style={{ padding: 14, marginBottom: 14 }}>
                   <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Alasan</Text>
                   <Text className="font-inter text-sm text-on-surface mt-2 leading-6">
-                    {selectedRecordDetail.reason || '-'}
+                    {selectedRecordDetail.reason || selectedRecordDetail.notes || '-'}
                   </Text>
                 </GlassCard>
 
