@@ -267,13 +267,9 @@ export function OvertimeCreateModal({
                       : 'Isi jam mulai dan selesai untuk sesi lembur tambahan.'}
                   </Text>
                   <View className="mb-3 px-4 py-3 rounded-xl bg-[#f8f8f8]">
-<<<<<<< HEAD
-                    <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Tanggal Segment</Text>
-=======
                     <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">
                       Tanggal Segment
                     </Text>
->>>>>>> fe33839 (Feat/overtime-segments-date)
                     <TextInput
                       value={segmentForm.segment_date}
                       onChangeText={(text) => setSegmentForm((prev) => ({ ...prev, segment_date: text }))}
@@ -281,10 +277,6 @@ export function OvertimeCreateModal({
                       className="font-inter-bold text-sm text-on-surface mt-1 p-0"
                     />
                   </View>
-<<<<<<< HEAD
-=======
-
->>>>>>> fe33839 (Feat/overtime-segments-date)
                   <View className="flex-row gap-3">
                     <View className="flex-1 px-4 py-3 rounded-xl bg-[#f8f8f8]">
                       <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Mulai</Text>
