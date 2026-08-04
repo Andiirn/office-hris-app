@@ -42,6 +42,12 @@ function formatLocalDate(value: Date) {
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
 }
 
+function addDays(value: string, days: number) {
+  const date = new Date(`${value}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  return formatLocalDate(date);
+}
+
 function normalizeTimeInput(value: string) {
   const digits = value.replace(/[^0-9]/g, '').slice(0, 4);
   if (digits.length <= 2) return digits;
@@ -399,7 +405,11 @@ export default function OvertimeScreen() {
     const start = selectedRecordDetail?.end_time || selectedRecordDetail?.start_time || form.end_time || form.start_time;
     const time = toTimeInputValue(start);
     setSegmentForm({
+<<<<<<< HEAD
       segment_date: selectedRecordDetail?.overtime_date || selectedRecordDetail?.attendance_date || form.overtime_date || new Date().toISOString().slice(0, 10),
+=======
+      segment_date: selectedRecordDetail?.attendance_date || selectedRecordDetail?.overtime_date || form.overtime_date || new Date().toISOString().slice(0, 10),
+>>>>>>> fe33839 (Feat/overtime-segments-date)
       start_time: time,
       end_time: time,
     });
@@ -417,11 +427,20 @@ export default function OvertimeScreen() {
       || selectedRecordDetail?.attendance_date
       || form.overtime_date
       || new Date().toISOString().slice(0, 10);
+<<<<<<< HEAD
     const segmentDate = segmentForm.segment_date || baseDate;
     const payload = {
       segment_date: segmentDate,
       start_time: toLocalDateTimeString(baseDate, startTime),
       end_time: toLocalDateTimeString(baseDate, endTime),
+=======
+    const segmentDate = segmentForm.segment_date || selectedRecordDetail?.attendance_date || selectedRecordDetail?.overtime_date || form.overtime_date || baseDate;
+    const endDate = endTime < startTime ? addDays(segmentDate, 1) : segmentDate;
+    const payload = {
+      segment_date: segmentDate,
+      start_time: toLocalDateTimeString(segmentDate, startTime),
+      end_time: toLocalDateTimeString(endDate, endTime),
+>>>>>>> fe33839 (Feat/overtime-segments-date)
     };
 
     if (!selectedRecordDetail) {
@@ -763,12 +782,21 @@ export default function OvertimeScreen() {
         segments={draftSegments}
         onAddSegment={openSegmentComposer}
         onOpenSegmentEditor={(segment) => {
+<<<<<<< HEAD
           setEditingSegmentId(segment.id);
           setSegmentForm({
             segment_date: segment.segment_date || selectedRecordDetail?.overtime_date || selectedRecordDetail?.attendance_date || form.overtime_date,
             start_time: toTimeInputValue(segment.start_time),
             end_time: toTimeInputValue(segment.end_time),
           });
+=======
+        setEditingSegmentId(segment.id);
+        setSegmentForm({
+          segment_date: segment.segment_date || selectedRecordDetail?.attendance_date || selectedRecordDetail?.overtime_date || form.overtime_date || new Date().toISOString().slice(0, 10),
+          start_time: toTimeInputValue(segment.start_time),
+          end_time: toTimeInputValue(segment.end_time),
+        });
+>>>>>>> fe33839 (Feat/overtime-segments-date)
           setSegmentModalVisible(true);
         }}
         onSubmitSegment={submitSegment}
