@@ -47595,6 +47595,11 @@
       },
       "OvertimeAddSegmentRequest": {
         "properties": {
+          "segment_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Segment Date"
+          },
           "start_time": {
             "type": "string",
             "format": "date-time",
@@ -47608,6 +47613,7 @@
         },
         "type": "object",
         "required": [
+          "segment_date",
           "start_time",
           "end_time"
         ],
@@ -47997,6 +48003,11 @@
       },
       "OvertimeSegmentInput": {
         "properties": {
+          "segment_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Segment Date"
+          },
           "start_time": {
             "type": "string",
             "format": "date-time",
@@ -48010,6 +48021,7 @@
         },
         "type": "object",
         "required": [
+          "segment_date",
           "start_time",
           "end_time"
         ],
@@ -48353,6 +48365,11 @@
       },
       "OvertimeUpdateSegmentRequest": {
         "properties": {
+          "segment_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Segment Date"
+          },
           "start_time": {
             "anyOf": [
               {
@@ -48379,6 +48396,9 @@
           }
         },
         "type": "object",
+        "required": [
+          "segment_date"
+        ],
         "title": "OvertimeUpdateSegmentRequest"
       },
       "PaginatedData_ActiveQRSessionResponse_": {

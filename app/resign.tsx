@@ -14,6 +14,7 @@ import { Tokens } from '../src/core/theme/tokens';
 import { resignService } from '../src/services/resign.service';
 import { useAuthStore } from '../src/stores/auth.store';
 import { CreateResignRequest } from '../src/types/resign';
+import { goBackOrTabs } from '../src/utils/navigation';
 
 LocaleConfig.locales.id = {
   monthNames: ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'],

@@ -19,6 +19,13 @@ describe('overtimeService', () => {
       end_time: '2026-06-05T06:00:00.000Z',
       overtime_type: 'REGULAR' as const,
       reason: 'Need to finish monthly report',
+      segments: [
+        {
+          segment_date: '2026-06-05',
+          start_time: '2026-06-05T04:00:00.000Z',
+          end_time: '2026-06-05T06:00:00.000Z',
+        },
+      ],
     };
 
     (api.post as jest.Mock).mockResolvedValue({
@@ -39,6 +46,13 @@ describe('overtimeService', () => {
       overtime_type: 'REGULAR',
       notes: 'Need to finish monthly report',
       reason: 'Need to finish monthly report',
+      segments: [
+        {
+          segment_date: '2026-06-05',
+          start_time: '2026-06-05T04:00:00.000Z',
+          end_time: '2026-06-05T06:00:00.000Z',
+        },
+      ],
     });
     expect(result).toMatchObject({ id: 'overtime-1', ...payload });
   });
@@ -51,6 +65,13 @@ describe('overtimeService', () => {
       end_time: '2026-06-05T06:00:00.000Z',
       overtime_type: 'REGULAR' as const,
       reason: 'Need to finish monthly report',
+      segments: [
+        {
+          segment_date: '2026-06-05',
+          start_time: '2026-06-05T04:00:00.000Z',
+          end_time: '2026-06-05T06:00:00.000Z',
+        },
+      ],
     };
 
     (api.post as jest.Mock).mockResolvedValue({
@@ -149,11 +170,13 @@ describe('overtimeService', () => {
     });
 
     await overtimeService.addSegment('overtime-1', {
+      segment_date: '2026-06-05',
       start_time: '2026-06-05T08:00:00.000Z',
       end_time: '2026-06-05T10:00:00.000Z',
     });
 
     expect(api.post).toHaveBeenCalledWith('/overtime/records/overtime-1/segments', {
+      segment_date: '2026-06-05',
       start_time: '2026-06-05T08:00:00.000Z',
       end_time: '2026-06-05T10:00:00.000Z',
     });
@@ -169,11 +192,13 @@ describe('overtimeService', () => {
     });
 
     await overtimeService.editSegment('overtime-1', 'segment-1', {
+      segment_date: '2026-06-05',
       start_time: '2026-06-05T09:00:00.000Z',
       end_time: '2026-06-05T11:00:00.000Z',
     });
 
     expect(api.put).toHaveBeenCalledWith('/overtime/records/overtime-1/segments/segment-1', {
+      segment_date: '2026-06-05',
       start_time: '2026-06-05T09:00:00.000Z',
       end_time: '2026-06-05T11:00:00.000Z',
     });

@@ -53,8 +53,8 @@ type Props = {
   onDeleteSegment: (segmentId: string) => void;
   segmentModalVisible: boolean;
   setSegmentModalVisible: (value: boolean) => void;
-  segmentForm: { start_time: string; end_time: string };
-  setSegmentForm: React.Dispatch<React.SetStateAction<{ start_time: string; end_time: string }>>;
+  segmentForm: { segment_date: string; start_time: string; end_time: string };
+  setSegmentForm: React.Dispatch<React.SetStateAction<{ segment_date: string; start_time: string; end_time: string }>>;
   editingSegmentId: string | null;
   segmentLoading: boolean;
 };
@@ -266,6 +266,15 @@ export function OvertimeCreateModal({
                       ? 'Ubah jam mulai dan selesai untuk sesi lembur tambahan.'
                       : 'Isi jam mulai dan selesai untuk sesi lembur tambahan.'}
                   </Text>
+                  <View className="mb-3 px-4 py-3 rounded-xl bg-[#f8f8f8]">
+                    <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Tanggal Segment</Text>
+                    <TextInput
+                      value={segmentForm.segment_date}
+                      onChangeText={(text) => setSegmentForm((prev) => ({ ...prev, segment_date: text }))}
+                      placeholder="2026-08-04"
+                      className="font-inter-bold text-sm text-on-surface mt-1 p-0"
+                    />
+                  </View>
                   <View className="flex-row gap-3">
                     <View className="flex-1 px-4 py-3 rounded-xl bg-[#f8f8f8]">
                       <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Mulai</Text>
