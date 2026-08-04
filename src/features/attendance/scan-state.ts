@@ -35,3 +35,8 @@ export const getAttendanceScanDecision = (records: AttendanceRecordLike[]): Atte
 
   return { action: 'checkin' };
 };
+
+export const getAttendanceScanDecisionFromOpenRecord = (record: AttendanceRecordLike | null | undefined): AttendanceScanDecision =>
+  record && hasCheckin(record) && !hasCheckout(record)
+    ? { action: 'checkout' }
+    : { action: 'checkin' };

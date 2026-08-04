@@ -44,33 +44,11 @@ const extractArray = <T>(raw: any): T[] => {
   return [];
 };
 
-const getAttendanceSortTime = (item: AttendanceItem) =>
-  toLocalDateTimeMillis(item.checkin_at || item.checkout_at || item.attendance_date || item.date || (item as any).created_at);
-
-const pickTodayAttendanceRecord = (items: AttendanceItem[]) => {
-  return [...items].sort((a, b) => getAttendanceSortTime(b) - getAttendanceSortTime(a))[0];
-};
-
 const normalizeVisitPhotoUrl = (value?: string | null) => {
   if (!value) return null;
   if (/^https?:\/\//i.test(value)) return value;
   const baseUrl = process.env.EXPO_PUBLIC_API_URL || 'https://hris.javasuperfood.com';
   return `${baseUrl}${value.startsWith('/') ? '' : '/'}${value}`;
-};
-
-const JAKARTA_TIME_ZONE = 'Asia/Jakarta';
-
-const getJakartaDateString = (date = new Date()) => {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: JAKARTA_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
-  const year = parts.find((part) => part.type === 'year')?.value ?? '';
-  const month = parts.find((part) => part.type === 'month')?.value ?? '';
-  const day = parts.find((part) => part.type === 'day')?.value ?? '';
-  return `${year}-${month}-${day}`;
 };
 
 export const createSelfiePhotoCode = () => {
@@ -151,36 +129,14 @@ export const attendanceService = {
     });
     return unwrapData<AttendanceActionResponse>(response.data);
   },
-  async getTodayRecord(employeeId?: string) {
-    const todayString = getJakartaDateString();
-    const response = await api.get('/attendance/', {
-      params: {
-        employee_id: employeeId,
-        date_from: todayString,
-        date_to: todayString,
-        limit: 1000,
-        page: 1,
-      },
-    });
-    const data = unwrapData<AttendanceItem[]>(response.data);
-    if (!Array.isArray(data) || data.length === 0) return undefined;
-    const sorted = [...data].sort((a, b) => getAttendanceSortTime(b) - getAttendanceSortTime(a));
-    return pickTodayAttendanceRecord(sorted);
+  async getTodayRecord(_employeeId?: string) {
+    const response = await api.get('/attendance/open-checkin');
+    const data = unwrapData<AttendanceItem | null>(response.data);
+    return data ?? undefined;
   },
-  async getTodayRecords(employeeId?: string): Promise<AttendanceItem[]> {
-    const todayString = getJakartaDateString();
-    const response = await api.get('/attendance/', {
-      params: {
-        employee_id: employeeId,
-        date_from: todayString,
-        date_to: todayString,
-        limit: 100,
-        page: 1,
-      },
-    });
-    const data = unwrapData<AttendanceItem[]>(response.data);
-    if (!Array.isArray(data) || data.length === 0) return [];
-    return [...data].sort((a, b) => getAttendanceSortTime(b) - getAttendanceSortTime(a));
+  async getTodayRecords(_employeeId?: string): Promise<AttendanceItem[]> {
+    const record = await attendanceService.getTodayRecord();
+    return record ? [record] : [];
   },
   async getAttendanceHistory(query?: AttendanceListQuery): Promise<AttendanceItem[]> {
     try {

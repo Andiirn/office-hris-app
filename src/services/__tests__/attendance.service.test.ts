@@ -173,14 +173,11 @@ describe('attendanceService', () => {
   });
 
   describe('getTodayRecord', () => {
-    it('should return the newest record for today', async () => {
+    it('should fetch the open check-in record', async () => {
       (api.get as jest.Mock).mockReset();
       (api.get as jest.Mock).mockResolvedValue({
         data: {
-          data: [
-            { id: '1', checkin_at: '2026-07-02T02:00:00Z', checkout_at: '2026-07-02T10:00:00Z' },
-            { id: '2', checkin_at: '2026-07-02T05:00:00Z', checkout_at: null },
-          ],
+          data: { id: '2', checkin_at: '2026-07-02T05:00:00Z', checkout_at: null },
         },
       });
 
@@ -188,42 +185,36 @@ describe('attendanceService', () => {
 
       expect(result?.id).toBe('2');
       expect((api.get as jest.Mock).mock.calls.at(-1)).toEqual([
-        '/attendance/',
-        expect.objectContaining({ params: expect.objectContaining({ limit: 1000, page: 1 }) }),
+        '/attendance/open-checkin',
+        undefined,
       ]);
     });
 
-    it('should fall back to the newest record when no open record exists', async () => {
+    it('should return undefined when there is no open record', async () => {
       (api.get as jest.Mock).mockReset();
       (api.get as jest.Mock).mockResolvedValue({
         data: {
-          data: [
-            { id: '1', checkin_at: '2026-07-02T02:00:00Z', checkout_at: '2026-07-02T10:00:00Z' },
-            { id: '2', checkin_at: '2026-07-02T05:00:00Z', checkout_at: '2026-07-02T11:00:00Z' },
-          ],
+          data: null,
         },
       });
 
       const result = await attendanceService.getTodayRecord();
 
-      expect(result?.id).toBe('2');
+      expect(result).toBeUndefined();
     });
   });
 
   describe('getTodayRecords', () => {
-    it('should return all today records sorted newest first', async () => {
+    it('should return the open record as a single-item array', async () => {
       (api.get as jest.Mock).mockResolvedValue({
         data: {
-          data: [
-            { id: '1', checkin_at: '2026-07-02T02:00:00Z', created_at: '2026-07-02T02:00:00Z' },
-            { id: '2', checkin_at: '2026-07-02T05:00:00Z', created_at: '2026-07-02T05:00:00Z' },
-          ],
+          data: { id: '1', checkin_at: '2026-07-02T02:00:00Z', checkout_at: null },
         },
       });
 
       const result = await attendanceService.getTodayRecords();
 
-      expect(result.map((item) => item.id)).toEqual(['2', '1']);
+      expect(result.map((item) => item.id)).toEqual(['1']);
     });
   });
 

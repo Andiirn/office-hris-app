@@ -13831,7 +13831,8 @@
         "tags": [
           "Attendance"
         ],
-        "summary": "Checkout",
+        "summary": "Record employee checkout",
+        "description": "Record employee checkout time with validation.\n\n**Cross-Day Checkout Handling:**\nIf employee checks out after midnight (00:00-04:00 next day), system caps `checkout_at` to 23:59 of checkin date.\nReal checkout time is stored in `actual_checkout_at` for HR review and OvertimeRecord submission.\n`crosses_day_boundary` flag indicates multi-day work; check Attendance → OvertimeRecord flow for full calculation.\n\n**Overtime Estimation (IMPORTANT):**\n`overtime_*` fields in response are CAPPED-TIME estimates only (based on checkout_at if cross-day).\nEmployee must submit OvertimeRecord with actual checkout time (actual_checkout_at) to claim full pay.\n\n**Example:**\n- Employee checks in Fri 09:00, checks out Sat 02:00\n  - checkout_at = Fri 23:59 (response shows this)\n  - actual_checkout_at = Sat 02:00 (real time)\n  - overtime_minutes = ~419 (Fri 17:00-23:59, estimate only)\n  - crosses_day_boundary = true\n- HR submits OvertimeRecord start=Fri 17:00, end=Sat 02:00\n  - System auto-splits into segments (Fri 17:00-23:59 + Sat 00:00-02:00)\n  - Payroll calculates based on segment multipliers",
         "operationId": "checkout_api_v1_attendance_checkout_post",
         "parameters": [
           {
@@ -13963,6 +13964,142 @@
                     "LOCATION_SPOOFING",
                     "MOCK_GPS"
                   ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/attendance/open-checkin": {
+      "get": {
+        "tags": [
+          "Attendance"
+        ],
+        "summary": "Get open attendance record for current user",
+        "description": "Get current open (unchecked-out) attendance record for authenticated user.\n\n**Smart Cross-Day Detection:**\n- Returns today's open record (normal flow, 04:00+)\n- Returns yesterday's open record if 00:00-04:00 (cross-day window)\n\nThis allows employees to checkout past midnight without false \"already checked in\" error.\n\n**Use Cases:**\n1. Frontend calls this to determine Checkin vs Checkout button\n2. If record exists → show Checkout button (use record.attendance_date)\n3. If no record → show Checkin button\n\n**Returns:**\n- 200 OK: `{ \"success\": true, \"data\": { attendance record } }` if open record exists\n- 200 OK: `{ \"success\": true, \"data\": null }` if no open record\n\n**Example (cross-day):**\n- Employee checked in Friday 09:00\n- Saturday 02:00 AM: GET /attendance/open-checkin\n- Response: Friday attendance record (to allow checkout)",
+        "operationId": "get_open_checkin_handler_api_v1_attendance_open_checkin_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse_Union_AttendanceResponse__NoneType__"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Bad request — business rule violation",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Resource not found",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Conflict — resource already exists",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Validation error",
+                  "errors": [
+                    {
+                      "field": "nik",
+                      "message": "Field required",
+                      "type": "missing"
+                    }
+                  ]
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Not authenticated — missing or invalid token",
+                  "errors": []
+                },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": false,
+                  "message": "Access denied — insufficient permissions",
+                  "errors": []
                 },
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
@@ -14568,7 +14705,8 @@
         "tags": [
           "Attendance"
         ],
-        "summary": "List Attendances",
+        "summary": "List employee attendance records",
+        "description": "List attendance records with support for cross-day scenarios.\n\n**Cross-Day Records:**\n- Records with `crosses_day_boundary=true` indicate employee worked past midnight\n- `checkout_at` will be capped to 23:59 of checkin date (estimation)\n- `actual_checkout_at` contains real checkout time for HR review\n- Overtime calculation for cross-day work requires OvertimeRecord submission\n\n**Filtering:**\n- Filter by date_from/date_to based on attendance_date\n- Status can be: HADIR, IZIN_JAM, IZIN_HARI, SAKIT, TIDAK_MASUK, CUTI, etc.\n- Employee-role users can only view their own records",
         "operationId": "list_attendances_api_v1_attendance__get",
         "parameters": [
           {
@@ -14843,7 +14981,8 @@
         "tags": [
           "Attendance"
         ],
-        "summary": "Get Employee Attendance Period",
+        "summary": "Get employee attendance for period (month/year)",
+        "description": "Retrieve all attendance records for employee in specified month/year.\n\n**Cross-Day Handling:**\n- Records with `crosses_day_boundary=true` in period indicate multi-day work\n- `checkout_at`: Capped time (23:59) for UI display\n- `actual_checkout_at`: Real checkout time for HR review\n- Overtime estimated; full calculation requires OvertimeRecord submission\n\n**Default Behavior:**\n- If month/year not provided: returns current month\n- All times localized to employee's branch timezone",
         "operationId": "get_employee_attendance_period_api_v1_attendance_employee__employee_id__period_get",
         "parameters": [
           {
@@ -17701,7 +17840,8 @@
         "tags": [
           "Attendance"
         ],
-        "summary": "Get Attendance",
+        "summary": "Get single attendance record",
+        "description": "Retrieve attendance detail including cross-day checkout information.\n\n**Cross-Day Checkout:**\n- If `crosses_day_boundary=true`: Employee worked past midnight\n- `checkout_at`: Capped to 23:59 of checkin date (estimation only)\n- `actual_checkout_at`: Real checkout time (for HR review and OvertimeRecord submission)\n- `overtime_*` fields: Estimation based on capped checkout_at only\n\n**For Overtime Submission:**\nUse `actual_checkout_at` when submitting OvertimeRecord via `/overtime` endpoint.\nSystem will auto-split calculation into segments (pre-midnight + post-midnight).\n\n**Employee Access:**\n- EMPLOYEE role: Can only view own attendance\n- HR_ADMIN+: Can view any employee's records",
         "operationId": "get_attendance_api_v1_attendance__attendance_id__get",
         "parameters": [
           {
@@ -19911,6 +20051,40 @@
                 }
               ],
               "title": "Year"
+            }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
             }
           },
           {
@@ -22225,6 +22399,40 @@
                 }
               ],
               "title": "Year"
+            }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
             }
           },
           {
@@ -40125,7 +40333,21 @@
                 "type": "null"
               }
             ],
-            "title": "Checkout At"
+            "title": "Checkout At",
+            "description": "Estimated checkout time (capped to 23:59:59 if crosses midnight)"
+          },
+          "actual_checkout_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Checkout At",
+            "description": "Real checkout time for HR review and overtime submission"
           },
           "checkin_lat": {
             "anyOf": [
@@ -40227,15 +40449,18 @@
           },
           "overtime_minutes": {
             "type": "integer",
-            "title": "Overtime Minutes"
+            "title": "Overtime Minutes",
+            "description": "Estimated overtime minutes (based on capped checkout_at)"
           },
           "overtime_hours": {
             "type": "number",
-            "title": "Overtime Hours"
+            "title": "Overtime Hours",
+            "description": "Estimated overtime hours (based on capped checkout_at)"
           },
           "overtime_amount": {
             "type": "number",
-            "title": "Overtime Amount"
+            "title": "Overtime Amount",
+            "description": "Estimated overtime pay (based on capped checkout_at; estimation only)"
           },
           "is_holiday_attendance": {
             "type": "boolean",
@@ -40248,6 +40473,12 @@
           "is_day_off_attendance": {
             "type": "boolean",
             "title": "Is Day Off Attendance",
+            "default": false
+          },
+          "crosses_day_boundary": {
+            "type": "boolean",
+            "title": "Crosses Day Boundary",
+            "description": "True if employee worked past midnight into next day",
             "default": false
           },
           "validation_score": {
@@ -40533,6 +40764,11 @@
           "sakit": {
             "type": "integer",
             "title": "Sakit"
+          },
+          "skd": {
+            "type": "integer",
+            "title": "Skd",
+            "default": 0
           }
         },
         "type": "object",
@@ -40710,7 +40946,21 @@
                 "type": "null"
               }
             ],
-            "title": "Checkout At"
+            "title": "Checkout At",
+            "description": "Estimated checkout time (capped to 23:59:59 if crosses midnight)"
+          },
+          "actual_checkout_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Checkout At",
+            "description": "Real checkout time for HR review and overtime submission"
           },
           "checkin_lat": {
             "anyOf": [
@@ -40805,15 +41055,18 @@
           },
           "overtime_minutes": {
             "type": "integer",
-            "title": "Overtime Minutes"
+            "title": "Overtime Minutes",
+            "description": "Estimated overtime minutes (based on capped checkout_at)"
           },
           "overtime_hours": {
             "type": "number",
-            "title": "Overtime Hours"
+            "title": "Overtime Hours",
+            "description": "Estimated overtime hours (based on capped checkout_at)"
           },
           "overtime_amount": {
             "type": "number",
-            "title": "Overtime Amount"
+            "title": "Overtime Amount",
+            "description": "Estimated overtime pay (based on capped checkout_at; estimation only)"
           },
           "is_holiday_attendance": {
             "type": "boolean",
@@ -40826,6 +41079,12 @@
           "is_day_off_attendance": {
             "type": "boolean",
             "title": "Is Day Off Attendance",
+            "default": false
+          },
+          "crosses_day_boundary": {
+            "type": "boolean",
+            "title": "Crosses Day Boundary",
+            "description": "True if employee worked past midnight into next day",
             "default": false
           },
           "validation_score": {
@@ -41060,7 +41319,8 @@
           "validation_decision",
           "is_corrected"
         ],
-        "title": "AttendanceResponse"
+        "title": "AttendanceResponse",
+        "description": "Attendance record with cross-day support.\n\n**Important Cross-Day Handling:**\nWhen employee checks out after midnight (00:00-04:00 next day):\n- `checkout_at`: Capped to 23:59:59 of checkin_date (used for estimation only)\n- `actual_checkout_at`: Real checkout time (used for HR review and overtime submission)\n- `crosses_day_boundary`: True (indicates multi-day work)\n\n**Overtime Estimation:**\n- `overtime_*` fields (overtime_minutes, overtime_hours, overtime_amount) reflect\n  CAPPED time only and are estimation-only\n- For actual payment submission, use `actual_checkout_at` and submit OvertimeRecord\n- HR must review real checkout time before payroll processing\n\n**Frontend/Mobile Guidance:**\n- Display `checkout_at` for UI (estimated end time)\n- Store `actual_checkout_at` for backend submission\n- Show warning if `crosses_day_boundary` is True (multi-day work)"
       },
       "AttendanceSettingsResponse": {
         "properties": {
@@ -46844,6 +47104,11 @@
             "title": "Requires Document",
             "default": false
           },
+          "optional_document": {
+            "type": "boolean",
+            "title": "Optional Document",
+            "default": false
+          },
           "is_paid": {
             "type": "boolean",
             "title": "Is Paid",
@@ -46935,6 +47200,10 @@
             "type": "boolean",
             "title": "Requires Document"
           },
+          "optional_document": {
+            "type": "boolean",
+            "title": "Optional Document"
+          },
           "is_paid": {
             "type": "boolean",
             "title": "Is Paid"
@@ -46962,6 +47231,7 @@
           "code",
           "category",
           "requires_document",
+          "optional_document",
           "is_paid",
           "is_active"
         ],
@@ -47004,6 +47274,17 @@
               }
             ],
             "title": "Requires Document"
+          },
+          "optional_document": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Optional Document"
           },
           "is_paid": {
             "anyOf": [
@@ -47741,6 +48022,11 @@
             "format": "uuid",
             "title": "Id"
           },
+          "segment_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Segment Date"
+          },
           "start_time": {
             "type": "string",
             "format": "date-time",
@@ -47759,6 +48045,14 @@
             "type": "number",
             "title": "Overtime Hours"
           },
+          "multiplier": {
+            "type": "number",
+            "title": "Multiplier"
+          },
+          "overtime_amount": {
+            "type": "number",
+            "title": "Overtime Amount"
+          },
           "sort_order": {
             "type": "integer",
             "title": "Sort Order"
@@ -47767,10 +48061,13 @@
         "type": "object",
         "required": [
           "id",
+          "segment_date",
           "start_time",
           "end_time",
           "overtime_minutes",
           "overtime_hours",
+          "multiplier",
+          "overtime_amount",
           "sort_order"
         ],
         "title": "OvertimeSegmentResponse"
@@ -47981,6 +48278,54 @@
       },
       "OvertimeUpdateRequest": {
         "properties": {
+          "attendance_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attendance Id"
+          },
+          "overtime_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overtime Date"
+          },
+          "start_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Time"
+          },
+          "end_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Time"
+          },
           "overtime_type": {
             "anyOf": [
               {
@@ -50921,6 +51266,14 @@
             "type": "number",
             "title": "New Salary"
           },
+          "old_allowance": {
+            "type": "number",
+            "title": "Old Allowance"
+          },
+          "new_allowance": {
+            "type": "number",
+            "title": "New Allowance"
+          },
           "effective_date": {
             "type": "string",
             "format": "date",
@@ -50936,12 +51289,34 @@
               }
             ],
             "title": "Reason"
+          },
+          "income_summary_old": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IncomeSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "income_summary_new": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IncomeSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
         "required": [
           "old_salary",
           "new_salary",
+          "old_allowance",
+          "new_allowance",
           "effective_date"
         ],
         "title": "SalaryHistoryResponse"
@@ -53600,6 +53975,32 @@
         "type": "object",
         "title": "SuccessResponse[TokenResponse]"
       },
+      "SuccessResponse_Union_AttendanceResponse__NoneType__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": "Success"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AttendanceResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "SuccessResponse[Union[AttendanceResponse, NoneType]]"
+      },
       "SuccessResponse_VisitResponse_": {
         "properties": {
           "success": {
@@ -55889,7 +56290,7 @@
     },
     {
       "name": "Attendance",
-      "description": "QR check-in/out, attendance correction, history"
+      "description": "QR check-in/out, attendance correction, history. Supports cross-day checkout (past midnight) with actual_checkout_at field for HR review."
     },
     {
       "name": "Leave",

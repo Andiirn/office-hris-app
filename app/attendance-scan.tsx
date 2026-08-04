@@ -15,7 +15,7 @@ import { getStableDeviceFingerprint } from '../src/core/auth/device-fingerprint'
 import { qk } from '../src/core/query/query-keys';
 import { Tokens } from '../src/core/theme/tokens';
 import { parseAttendanceQrPayload } from '../src/features/attendance/qr';
-import { getAttendanceScanDecision } from '../src/features/attendance/scan-state';
+import { getAttendanceScanDecisionFromOpenRecord } from '../src/features/attendance/scan-state';
 import { attendanceService, createSelfiePhotoCode } from '../src/services/attendance.service';
 import { useAuthStore } from '../src/stores/auth.store';
 import { goBackOrTabs } from '../src/utils/navigation';
@@ -31,22 +31,6 @@ type ScanFailure = {
   mode: ScanMode;
   actionLabel: string;
   actionHint?: string;
-};
-
-type AttendanceRecordLike = {
-  id?: string;
-  attendance_date?: string;
-  date?: string;
-  checkin_at?: string | null;
-  checkin_time?: string | null;
-  checkout_at?: string | null;
-  checkout_time?: string | null;
-  attendance_status?: string;
-  status?: string;
-  attendance_method?: string;
-  branch_name?: string | null;
-  branch?: { name?: string | null } | null;
-  created_at?: string | null;
 };
 
 const SELFIE_INFO_SEEN_KEY = 'attendance_scan_selfie_info_seen';
@@ -157,10 +141,7 @@ const toSelfieUpload = (photo: CameraCapturedPicture, photoCode: string) => ({
   type: photo.format === 'png' ? 'image/png' : 'image/jpeg',
 });
 
-const pickOpenAttendanceRecord = (records: AttendanceRecordLike[]) =>
-  records.find((record) => !!record.checkin_at && !record.checkout_at) ?? null;
-
-const getAttendanceIsLate = (record: AttendanceRecordLike | null | undefined) =>
+const getAttendanceIsLate = (record: { attendance_status?: string | null; status?: string | null } | null | undefined) =>
   String(record?.attendance_status || record?.status || '').toUpperCase() === 'LATE';
 
 const formatSuccessTime = (date = new Date()) =>
@@ -364,7 +345,6 @@ export default function AttendanceScanScreen() {
   const [coords, setCoords] = useState<{ lat: number; long: number } | null>(null);
   const [address, setAddress] = useState<string | null>(null);
   const [isMocked, setIsMocked] = useState(false);
-  const [todayRecords, setTodayRecords] = useState<AttendanceRecordLike[]>([]);
   const [isSelfieMode, setIsSelfieMode] = useState(false);
   const [scanFailure, setScanFailure] = useState<ScanFailure | null>(null);
   const { width, height } = useWindowDimensions();
@@ -385,14 +365,8 @@ export default function AttendanceScanScreen() {
         throw new Error('Kamera selfie belum siap');
       }
 
-      const latestRecords = await attendanceService.getTodayRecords(user?.id);
-      setTodayRecords(latestRecords);
-
-      const decision = getAttendanceScanDecision(latestRecords);
-      if (decision.action === 'blocked') {
-        setErrorMessage(decision.message);
-        return;
-      }
+      const latestRecord = await attendanceService.getTodayRecord();
+      const isCheckout = getAttendanceScanDecisionFromOpenRecord(latestRecord).action === 'checkout';
 
       const photoCode = createSelfiePhotoCode();
       const selfiePhoto = await camera.takePictureAsync({ quality: 0.85, skipProcessing: false });
@@ -413,7 +387,7 @@ export default function AttendanceScanScreen() {
       };
       const upload = toSelfieUpload(selfiePhoto, photoCode);
 
-      if (decision.action === 'checkin') {
+      if (!isCheckout) {
         const result = await attendanceService.checkinSelfie(selfiePayload, upload);
         setCheckinMessage(result?.message ?? 'Check-in selfie berhasil');
         setSuccessTime(formatSuccessTime());
@@ -423,9 +397,8 @@ export default function AttendanceScanScreen() {
         setSuccessTime(formatSuccessTime());
       }
 
-      const latest = await attendanceService.getTodayRecords(user?.id);
-      setTodayRecords(latest);
-      setSuccessIsLate(getAttendanceIsLate(latest.find((record) => record.checkin_at || record.checkout_at)));
+      const latest = await attendanceService.getTodayRecord();
+      setSuccessIsLate(getAttendanceIsLate(latest));
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryRoot() }),
         queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryFullRoot() }),
@@ -537,11 +510,9 @@ export default function AttendanceScanScreen() {
   useEffect(() => {
     const loadTodayRecord = async () => {
       try {
-        const records = await attendanceService.getTodayRecords(user?.id);
-        setTodayRecords(records);
+        await attendanceService.getTodayRecord();
       } catch (err) {
         console.error(err);
-        setTodayRecords([]);
       }
     };
     loadTodayRecord();
@@ -566,16 +537,10 @@ export default function AttendanceScanScreen() {
     try {
       const { qrToken } = parseAttendanceQrPayload(rawQrData);
       const branchId = qrToken.split(':')[0];
-      const latestRecords = await attendanceService.getTodayRecords(user?.id);
-      setTodayRecords(latestRecords);
-      const decision = getAttendanceScanDecision(latestRecords);
+      const latestRecord = await attendanceService.getTodayRecord();
+      const isCheckout = getAttendanceScanDecisionFromOpenRecord(latestRecord).action === 'checkout';
 
-      if (decision.action === 'blocked') {
-        setErrorMessage(decision.message);
-        return;
-      }
-
-      if (decision.action === 'checkout') {
+      if (isCheckout) {
         const result = await attendanceService.checkout({
           qr_token: qrToken,
           gps_lat: coords.lat,
@@ -607,9 +572,8 @@ export default function AttendanceScanScreen() {
         setCheckinMessage(result.message ?? 'Check-in berhasil');
         setSuccessTime(formatSuccessTime());
       }
-      const latest = await attendanceService.getTodayRecords(user?.id);
-      setTodayRecords(latest);
-      setSuccessIsLate(getAttendanceIsLate(latest.find((record) => record.checkin_at || record.checkout_at)));
+      const latest = await attendanceService.getTodayRecord();
+      setSuccessIsLate(getAttendanceIsLate(latest));
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryRoot() }),
         queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryFullRoot() }),
@@ -684,14 +648,6 @@ export default function AttendanceScanScreen() {
   const failureReasons = scanFailure?.reasons ?? [];
   const failureActionLabel = getFailureActionLabel(scanFailure);
   const failureActionHint = scanFailure?.actionHint;
-  const openTodayRecord = pickOpenAttendanceRecord(todayRecords);
-  const completedTodayRecords = todayRecords.filter((record) => !!record.checkin_at && !!record.checkout_at);
-  const recordState = openTodayRecord
-    ? 'open'
-    : completedTodayRecords.length > 0
-      ? 'completed'
-      : 'none';
-
   if (hasSuccessState) {
     return (
       <SafeAreaView className="flex-1 bg-background">
