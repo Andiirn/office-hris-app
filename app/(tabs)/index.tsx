@@ -368,6 +368,7 @@ export default function HomeScreen() {
       const attendanceDate = item.attendance_date || item.date || '-';
       const checkinTime = item.checkin_at || item.checkin_time;
       const checkoutTime = item.checkout_at || item.checkout_time;
+      const actualCheckoutTime = item.actual_checkout_at;
       const badgeProps = getAttendanceBadgeProps(item.attendance_status || item.status);
       const status = badgeProps.label;
       if (item.is_corrected) return;
@@ -397,7 +398,12 @@ export default function HomeScreen() {
           type: 'attendance.checkout',
           title: 'Anda check-out',
           summary: `${attendanceDate} · ${formatTime(checkoutTime)}`,
-          details: [`Tanggal: ${attendanceDate}`, `Jam pulang: ${formatTime(checkoutTime)}`, `Status: ${status}`],
+          details: [
+            `Tanggal: ${attendanceDate}`,
+            `Jam pulang: ${formatTime(checkoutTime)}`,
+            ...(actualCheckoutTime ? [`Actual check-out: ${formatTime(actualCheckoutTime)}`] : []),
+            `Status: ${status}`,
+          ],
           timestamp: checkoutTime,
           sortTime: toSortTime(checkoutTime),
           sortRank: 2,

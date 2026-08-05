@@ -1,6 +1,7 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import React from 'react';
+import React, { useState } from 'react';
 import { Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Calendar } from 'react-native-calendars';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../ui/Button';
@@ -25,6 +26,8 @@ type Props = {
   getCheckOut: (item: any) => any;
   getAttendanceRecordId: (item: any) => string;
   handlePickAttendance: (att: AttendanceItem) => void;
+  checkoutDate: string;
+  setCheckoutDate: React.Dispatch<React.SetStateAction<string>>;
   checkinExists: boolean;
   setCheckinExists: React.Dispatch<React.SetStateAction<boolean>>;
   checkoutExists: boolean;
@@ -58,6 +61,8 @@ export function CorrectionCreateModal({
   getCheckOut,
   getAttendanceRecordId,
   handlePickAttendance,
+  checkoutDate,
+  setCheckoutDate,
   checkinExists,
   setCheckinExists,
   checkoutExists,
@@ -77,6 +82,8 @@ export function CorrectionCreateModal({
 }: Props) {
   const insets = useSafeAreaInsets();
   const headerTopPadding = Math.max(insets.top, 12);
+
+  const [activeCalendar, setActiveCalendar] = useState<'checkout' | null>(null);
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -188,11 +195,17 @@ export function CorrectionCreateModal({
                 ) : null}
               </GlassCard>
 
-              <View className="flex-row gap-3 mb-4">
-                <View className="flex-1 bg-white border border-black/5 rounded-2xl p-3 shadow-sm">
-                  <View className="flex-row justify-between items-center mb-2">
-                    <Text className="font-inter-bold text-[10px] text-text-muted uppercase">Check In</Text>
-                    <Pressable onPress={() => setCheckinExists(!checkinExists)}>
+              {/* Input Segment Check-in & Check-out */}
+              <View className="gap-3 mb-4">
+                {/* Segment Check In */}
+                <View className="bg-white border border-black/5 rounded-2xl p-3.5 shadow-sm">
+                  <View className="flex-row justify-between items-center mb-3">
+                    <View className="flex-row items-center gap-1.5">
+                      <MaterialIcons name="login" size={16} color={Tokens.colors.primary} />
+                      <Text className="font-inter-bold text-xs text-primary uppercase">Koreksi Check In</Text>
+                    </View>
+                    <Pressable onPress={() => setCheckinExists(!checkinExists)} className="flex-row items-center gap-1">
+                      <Text className="font-inter-medium text-[11px] text-text-muted">Aktif</Text>
                       <MaterialIcons
                         name={checkinExists ? 'check-box' : 'check-box-outline-blank'}
                         size={18}
@@ -200,44 +213,70 @@ export function CorrectionCreateModal({
                       />
                     </Pressable>
                   </View>
-                  <View
-                    className={`bg-primary/5 rounded-2xl border border-primary/10 px-2 py-4 items-center justify-center ${!checkinExists && 'opacity-40'}`}
-                  >
-                    {selectedAttendance && checkinExists ? (
-                      <View className="flex-row items-center justify-center w-full">
-                        <TextInput
-                          value={correctedCheckinHour}
-                          onChangeText={(t) => setCorrectedCheckinHour(t.replace(/[^0-9]/g, '').slice(0, 2))}
-                          keyboardType="number-pad"
-                          maxLength={2}
-                          selectTextOnFocus
-                          className="flex-1 font-manrope-extrabold text-[32px] leading-[36px] text-primary tracking-tight p-0 text-right"
-                        />
-                        <Text className="font-manrope-extrabold text-[28px] leading-[36px] text-primary tracking-tight p-0 mx-1">:</Text>
-                        <TextInput
-                          value={correctedCheckinMin}
-                          onChangeText={(t) => setCorrectedCheckinMin(t.replace(/[^0-9]/g, '').slice(0, 2))}
-                          keyboardType="number-pad"
-                          maxLength={2}
-                          selectTextOnFocus
-                          className="flex-1 font-manrope-extrabold text-[32px] leading-[36px] text-primary tracking-tight p-0 text-left"
-                        />
+
+                  {checkinExists ? (
+                    <View className="gap-3">
+                      {/* Tanggal Check In (Fixed to attendance date) */}
+                      <View>
+                        <Text className="font-inter-medium text-[11px] text-text-muted mb-1">Tanggal Check In</Text>
+                        <View className="flex-row items-center justify-between px-3.5 py-2.5 rounded-xl bg-black/5 border border-black/5">
+                          <View className="flex-row items-center gap-2">
+                            <MaterialIcons name="calendar-today" size={14} color={Tokens.colors.textMuted} />
+                            <Text className="font-inter-bold text-xs text-on-surface">
+                              {selectedAttendance ? getAttendanceDate(selectedAttendance) : 'Tanggal Kehadiran'}
+                            </Text>
+                          </View>
+                        </View>
                       </View>
-                    ) : (
-                      <Text className="font-manrope-extrabold text-[28px] leading-[36px] text-text-muted tracking-tight text-center w-full">
-                        --:--
-                      </Text>
-                    )}
-                  </View>
-                  <Text className="font-inter text-[10px] text-text-muted mt-2 text-center">
-                    Tap angka untuk ubah
-                  </Text>
+
+                      {/* Jam Check In */}
+                      <View>
+                        <Text className="font-inter-medium text-[11px] text-text-muted mb-1">Jam Check In (HH:MM)</Text>
+                        <View className="bg-primary/5 rounded-xl border border-primary/10 px-3 py-2 items-center justify-center">
+                          {selectedAttendance ? (
+                            <View className="flex-row items-center justify-center w-full">
+                              <TextInput
+                                value={correctedCheckinHour}
+                                onChangeText={(t) => setCorrectedCheckinHour(t.replace(/[^0-9]/g, '').slice(0, 2))}
+                                keyboardType="number-pad"
+                                maxLength={2}
+                                selectTextOnFocus
+                                className="flex-1 font-manrope-extrabold text-2xl text-primary tracking-tight p-0 text-right"
+                              />
+                              <Text className="font-manrope-extrabold text-xl text-primary tracking-tight p-0 mx-1">:</Text>
+                              <TextInput
+                                value={correctedCheckinMin}
+                                onChangeText={(t) => setCorrectedCheckinMin(t.replace(/[^0-9]/g, '').slice(0, 2))}
+                                keyboardType="number-pad"
+                                maxLength={2}
+                                selectTextOnFocus
+                                className="flex-1 font-manrope-extrabold text-2xl text-primary tracking-tight p-0 text-left"
+                              />
+                            </View>
+                          ) : (
+                            <Text className="font-manrope-extrabold text-xl text-text-muted tracking-tight text-center w-full">
+                              --:--
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                    </View>
+                  ) : (
+                    <Text className="font-inter text-xs text-text-muted italic text-center py-2">
+                      Tidak ada koreksi untuk Check In
+                    </Text>
+                  )}
                 </View>
 
-                <View className="flex-1 bg-white border border-black/5 rounded-2xl p-3 shadow-sm">
-                  <View className="flex-row justify-between items-center mb-2">
-                    <Text className="font-inter-bold text-[10px] text-text-muted uppercase">Check Out</Text>
-                    <Pressable onPress={() => setCheckoutExists(!checkoutExists)}>
+                {/* Segment Check Out */}
+                <View className="bg-white border border-black/5 rounded-2xl p-3.5 shadow-sm">
+                  <View className="flex-row justify-between items-center mb-3">
+                    <View className="flex-row items-center gap-1.5">
+                      <MaterialIcons name="logout" size={16} color={Tokens.colors.primary} />
+                      <Text className="font-inter-bold text-xs text-primary uppercase">Koreksi Check Out</Text>
+                    </View>
+                    <Pressable onPress={() => setCheckoutExists(!checkoutExists)} className="flex-row items-center gap-1">
+                      <Text className="font-inter-medium text-[11px] text-text-muted">Aktif</Text>
                       <MaterialIcons
                         name={checkoutExists ? 'check-box' : 'check-box-outline-blank'}
                         size={18}
@@ -245,38 +284,81 @@ export function CorrectionCreateModal({
                       />
                     </Pressable>
                   </View>
-                  <View
-                    className={`bg-primary/5 rounded-2xl border border-primary/10 px-2 py-4 items-center justify-center ${!checkoutExists && 'opacity-40'}`}
-                  >
-                    {selectedAttendance && checkoutExists ? (
-                      <View className="flex-row items-center justify-center w-full">
-                        <TextInput
-                          value={correctedCheckoutHour}
-                          onChangeText={(t) => setCorrectedCheckoutHour(t.replace(/[^0-9]/g, '').slice(0, 2))}
-                          keyboardType="number-pad"
-                          maxLength={2}
-                          selectTextOnFocus
-                          className="flex-1 font-manrope-extrabold text-[32px] leading-[36px] text-primary tracking-tight p-0 text-right"
-                        />
-                        <Text className="font-manrope-extrabold text-[28px] leading-[36px] text-primary tracking-tight p-0 mx-1">:</Text>
-                        <TextInput
-                          value={correctedCheckoutMin}
-                          onChangeText={(t) => setCorrectedCheckoutMin(t.replace(/[^0-9]/g, '').slice(0, 2))}
-                          keyboardType="number-pad"
-                          maxLength={2}
-                          selectTextOnFocus
-                          className="flex-1 font-manrope-extrabold text-[32px] leading-[36px] text-primary tracking-tight p-0 text-left"
-                        />
+
+                  {checkoutExists ? (
+                    <View className="gap-3">
+                      {/* Tanggal Check Out */}
+                      <View>
+                        <Text className="font-inter-medium text-[11px] text-text-muted mb-1">Tanggal Check Out</Text>
+                        <Pressable
+                          onPress={() => setActiveCalendar(activeCalendar === 'checkout' ? null : 'checkout')}
+                          className="flex-row items-center justify-between px-3.5 py-2.5 rounded-xl bg-primary/5 border border-primary/10"
+                        >
+                          <View className="flex-row items-center gap-2">
+                            <MaterialIcons name="calendar-today" size={14} color={Tokens.colors.primary} />
+                            <Text className="font-inter-bold text-xs text-primary">{checkoutDate || 'Pilih Tanggal'}</Text>
+                          </View>
+                          <MaterialIcons name={activeCalendar === 'checkout' ? 'keyboard-arrow-up' : 'keyboard-arrow-down'} size={18} color={Tokens.colors.primary} />
+                        </Pressable>
+
+                        {activeCalendar === 'checkout' ? (
+                          <View className="mt-2 rounded-2xl border border-black/5 overflow-hidden bg-white">
+                            <Calendar
+                              current={checkoutDate || undefined}
+                              onDayPress={(day) => {
+                                setCheckoutDate(day.dateString);
+                                setActiveCalendar(null);
+                              }}
+                              markedDates={{
+                                [checkoutDate]: { selected: true, selectedColor: Tokens.colors.primary },
+                              }}
+                              theme={{
+                                todayTextColor: Tokens.colors.primary,
+                                selectedDayBackgroundColor: Tokens.colors.primary,
+                                arrowColor: Tokens.colors.primary,
+                              }}
+                            />
+                          </View>
+                        ) : null}
                       </View>
-                    ) : (
-                      <Text className="font-manrope-extrabold text-[28px] leading-[36px] text-text-muted tracking-tight text-center w-full">
-                        --:--
-                      </Text>
-                    )}
-                  </View>
-                  <Text className="font-inter text-[10px] text-text-muted mt-2 text-center">
-                    Tap angka untuk ubah
-                  </Text>
+
+                      {/* Jam Check Out */}
+                      <View>
+                        <Text className="font-inter-medium text-[11px] text-text-muted mb-1">Jam Check Out (HH:MM)</Text>
+                        <View className="bg-primary/5 rounded-xl border border-primary/10 px-3 py-2 items-center justify-center">
+                          {selectedAttendance ? (
+                            <View className="flex-row items-center justify-center w-full">
+                              <TextInput
+                                value={correctedCheckoutHour}
+                                onChangeText={(t) => setCorrectedCheckoutHour(t.replace(/[^0-9]/g, '').slice(0, 2))}
+                                keyboardType="number-pad"
+                                maxLength={2}
+                                selectTextOnFocus
+                                className="flex-1 font-manrope-extrabold text-2xl text-primary tracking-tight p-0 text-right"
+                              />
+                              <Text className="font-manrope-extrabold text-xl text-primary tracking-tight p-0 mx-1">:</Text>
+                              <TextInput
+                                value={correctedCheckoutMin}
+                                onChangeText={(t) => setCorrectedCheckoutMin(t.replace(/[^0-9]/g, '').slice(0, 2))}
+                                keyboardType="number-pad"
+                                maxLength={2}
+                                selectTextOnFocus
+                                className="flex-1 font-manrope-extrabold text-2xl text-primary tracking-tight p-0 text-left"
+                              />
+                            </View>
+                          ) : (
+                            <Text className="font-manrope-extrabold text-xl text-text-muted tracking-tight text-center w-full">
+                              --:--
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                    </View>
+                  ) : (
+                    <Text className="font-inter text-xs text-text-muted italic text-center py-2">
+                      Tidak ada koreksi untuk Check Out
+                    </Text>
+                  )}
                 </View>
               </View>
 

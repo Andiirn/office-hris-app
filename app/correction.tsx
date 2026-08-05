@@ -74,10 +74,21 @@ function clampTimePart(value: string, max: number, fallback: string) {
   return String(Math.min(Math.max(parsed, 0), max)).padStart(2, '0');
 }
 
+function getTimezoneOffsetString() {
+  const date = new Date();
+  const offsetMinutes = -date.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? '+' : '-';
+  const absMinutes = Math.abs(offsetMinutes);
+  const hours = String(Math.floor(absMinutes / 60)).padStart(2, '0');
+  const mins = String(absMinutes % 60).padStart(2, '0');
+  return `${sign}${hours}:${mins}`;
+}
+
 function toDateTimeString(dateStr: string, hour: string, minute: string) {
   if (!dateStr) return '';
   const cleanDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
-  return `${cleanDate}T${clampTimePart(hour, 23, '00')}:${clampTimePart(minute, 59, '00')}:00`;
+  const isoLocal = `${cleanDate}T${clampTimePart(hour, 23, '00')}:${clampTimePart(minute, 59, '00')}:00`;
+  return `${isoLocal}${getTimezoneOffsetString()}`;
 }
 
 export default function CorrectionScreen() {
@@ -96,7 +107,8 @@ export default function CorrectionScreen() {
   const [checkinExists, setCheckinExists] = useState(true);
   const [checkoutExists, setCheckoutExists] = useState(true);
 
-  // Time picker fields
+  // Date & Time picker fields
+  const [checkoutDate, setCheckoutDate] = useState('');
   const [correctedCheckinHour, setCorrectedCheckinHour] = useState('08');
   const [correctedCheckinMin, setCorrectedCheckinMin] = useState('00');
   const [correctedCheckoutHour, setCorrectedCheckoutHour] = useState('17');
@@ -165,6 +177,7 @@ export default function CorrectionScreen() {
     setReason('');
     setCheckinExists(true);
     setCheckoutExists(true);
+    setCheckoutDate('');
     setCorrectedCheckinHour('08');
     setCorrectedCheckinMin('00');
     setCorrectedCheckoutHour('17');
@@ -175,6 +188,8 @@ export default function CorrectionScreen() {
 
   const handlePickAttendance = (att: AttendanceItem) => {
     setSelectedAttendance(att);
+    const dateStr = getAttendanceDate(att);
+    setCheckoutDate(dateStr);
 
     const checkin = getCheckIn(att);
     if (checkin) {
@@ -191,6 +206,9 @@ export default function CorrectionScreen() {
 
     const checkout = getCheckOut(att);
     if (checkout) {
+      if (typeof checkout === 'string' && checkout.includes('T')) {
+        setCheckoutDate(checkout.split('T')[0]);
+      }
       const timeStr = formatTime(checkout);
       const [h, m] = timeStr.split(':');
       setCorrectedCheckoutHour(h);
@@ -217,12 +235,12 @@ export default function CorrectionScreen() {
       return;
     }
 
-    const dateStr = getAttendanceDate(selectedAttendance);
+    const defaultDate = getAttendanceDate(selectedAttendance);
     const corrected_checkin = checkinExists
-      ? toDateTimeString(dateStr, correctedCheckinHour, correctedCheckinMin)
+      ? toDateTimeString(defaultDate, correctedCheckinHour, correctedCheckinMin)
       : null;
     const corrected_checkout = checkoutExists
-      ? toDateTimeString(dateStr, correctedCheckoutHour, correctedCheckoutMin)
+      ? toDateTimeString(checkoutDate || defaultDate, correctedCheckoutHour, correctedCheckoutMin)
       : null;
 
     createMutation.mutate({
@@ -437,6 +455,8 @@ export default function CorrectionScreen() {
         getCheckOut={getCheckOut}
         getAttendanceRecordId={getAttendanceRecordId}
         handlePickAttendance={handlePickAttendance}
+        checkoutDate={checkoutDate}
+        setCheckoutDate={setCheckoutDate}
         checkinExists={checkinExists}
         setCheckinExists={setCheckinExists}
         checkoutExists={checkoutExists}

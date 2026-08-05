@@ -70,6 +70,7 @@ export interface AttendanceItem {
   attendance_date?: string;
   checkin_at?: string | null;
   checkout_at?: string | null;
+  actual_checkout_at?: string | null;
   attendance_status?: string;
   is_corrected?: boolean;
   attendance_method?: string;
