@@ -8,6 +8,7 @@ import { SkeletonCard } from '../../src/components/ui/Skeleton';
 import { StatusBadge } from '../../src/components/ui/StatusBadge';
 import { qk } from '../../src/core/query/query-keys';
 import { Tokens } from '../../src/core/theme/tokens';
+import { formatIndonesianDateTime, formatIndonesianTime } from '../../src/utils/datetime';
 import { getAttendanceBadgeProps } from '../../src/utils/status';
 import { attendanceService } from '../../src/services/attendance.service';
 import { useAuthStore } from '../../src/stores/auth.store';
@@ -17,12 +18,12 @@ const MONTH_NAMES = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
 ];
 
-const formatDateLabel = (date: Date) => {
-  const day = date.getDate();
-  const month = MONTH_NAMES[date.getMonth()];
-  const year = date.getFullYear();
-  return `${day} ${month} ${year}`;
-};
+  const formatDateLabel = (date: Date) => {
+    const day = date.getDate();
+    const month = MONTH_NAMES[date.getMonth()];
+    const year = date.getFullYear();
+    return `${day} ${month} ${year}`;
+  };
 
 function getPeriodDates(offset = 0) {
   const today = new Date();
@@ -123,12 +124,6 @@ export default function AttendanceHistoryScreen() {
     return time;
   };
 
-  const formatTime = (time?: string | null) => {
-    if (!time) return '--:--';
-    const timeOnly = time.includes(' ') ? time.split(' ')[1] : (time.includes('T') ? time.split('T')[1] : time);
-    return timeOnly.substring(0, 5);
-  };
-
   const getAttendanceDate = (item: any) => item.attendance_date || item.date || '-';
   const getCheckinTime = (item: any) => item.checkin_at || item.checkin_time;
   const getCheckoutTime = (item: any) => item.checkout_at || item.checkout_time;
@@ -221,12 +216,12 @@ export default function AttendanceHistoryScreen() {
                     <View className="flex-row justify-between">
                       <View className="items-center flex-1">
                         <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-1">Check In</Text>
-                        <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(getCheckinTime(item))}</Text>
+                        <Text className="font-manrope-extrabold text-lg text-primary">{formatIndonesianTime(getCheckinTime(item))}</Text>
                       </View>
                       <View className="w-[1px] bg-black/10 mx-2" />
                       <View className="items-center flex-1">
                         <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-1">Check Out</Text>
-                        <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(getCheckoutTime(item))}</Text>
+                        <Text className="font-manrope-extrabold text-lg text-primary">{formatIndonesianTime(getCheckoutTime(item))}</Text>
                       </View>
                     </View>
                     {getActualCheckoutTime(item) ? (

@@ -1,12 +1,12 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useQuery } from '@tanstack/react-query';
-import React from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { MotiView } from 'moti';
-import { Tokens } from '../src/core/theme/tokens';
+import React from 'react';
+import { Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { qk } from '../src/core/query/query-keys';
+import { Tokens } from '../src/core/theme/tokens';
 import { buildApprovalActivityItems } from '../src/features/activity/approval-activity';
 import { approvalService } from '../src/services/approval.service';
 import { attendanceService } from '../src/services/attendance.service';
@@ -14,8 +14,9 @@ import { leaveService } from '../src/services/leave.service';
 import { overtimeService } from '../src/services/overtime.service';
 import { resignService } from '../src/services/resign.service';
 import { useAuthStore } from '../src/stores/auth.store';
-import { getAttendanceBadgeProps } from '../src/utils/status';
+import { formatIndonesianDate, formatIndonesianDateTime, formatIndonesianTime } from '../src/utils/datetime';
 import { goBackOrTabs } from '../src/utils/navigation';
+import { getAttendanceBadgeProps } from '../src/utils/status';
 
 type FeedType =
   | 'attendance.checkin'
@@ -193,6 +194,7 @@ export default function ActivityScreen() {
       const attendanceDate = item.attendance_date || item.date || '-';
       const checkinTime = item.checkin_at || item.checkin_time;
       const checkoutTime = item.checkout_at || item.checkout_time;
+      const actualCheckoutTime = item.actual_checkout_at;
       const badgeProps = getAttendanceBadgeProps(item.attendance_status || item.status);
       const status = badgeProps.label;
       if (item.is_corrected) return;
@@ -202,12 +204,8 @@ export default function ActivityScreen() {
           id: `${item.id}-checkin`,
           type: 'attendance.checkin',
           title: 'Anda check-in',
-          summary: `${attendanceDate} · ${formatTime(checkinTime)}`,
-          details: [
-            `Tanggal: ${attendanceDate}`,
-            `Jam masuk: ${formatTime(checkinTime)}`,
-            `Keterangan: ${status}`,
-          ],
+          summary: `${formatIndonesianDate(attendanceDate)} · ${formatIndonesianTime(checkinTime)}`,
+          details: [`Tanggal: ${formatIndonesianDate(attendanceDate)}`, `Jam masuk: ${formatIndonesianTime(checkinTime)}`, `Keterangan: ${status}`],
           timestamp: checkinTime,
           sortTime: toSortTime(checkinTime),
           icon: 'login',
@@ -222,10 +220,11 @@ export default function ActivityScreen() {
           id: `${item.id}-checkout`,
           type: 'attendance.checkout',
           title: 'Anda check-out',
-          summary: `${attendanceDate} · ${formatTime(checkoutTime)}`,
+          summary: `${formatIndonesianDate(attendanceDate)} · ${formatIndonesianTime(checkoutTime)}`,
           details: [
-            `Tanggal: ${attendanceDate}`,
-            `Jam pulang: ${formatTime(checkoutTime)}`,
+            `Tanggal: ${formatIndonesianDate(attendanceDate)}`,
+            `Jam pulang: ${formatIndonesianTime(checkoutTime)}`,
+            ...(actualCheckoutTime ? [`Waktu checkout sistem: ${formatIndonesianDateTime(actualCheckoutTime)}`] : []),
             `Keterangan: ${status}`,
           ],
           timestamp: checkoutTime,
@@ -249,11 +248,11 @@ export default function ActivityScreen() {
             item.status === 'REJECTED' ? `Pengajuan ${leaveTypeLabel} Anda ditolak` :
               item.status === 'CANCELLED' ? `Pengajuan ${leaveTypeLabel} Anda dibatalkan` :
                 `Pengajuan ${leaveTypeLabel} Anda menunggu persetujuan`,
-        summary: `${formatDateOnly(item.start_date)}${item.end_date ? ` - ${formatDateOnly(item.end_date)}` : ''} · ${leaveTypeLabel} · ${item.status || 'PENDING'}`,
+        summary: `${formatIndonesianDate(item.start_date)}${item.end_date ? ` - ${formatIndonesianDate(item.end_date)}` : ''} · ${leaveTypeLabel} · ${item.status || 'PENDING'}`,
         details: [
           `Pengaju: Anda`,
           `Jenis: ${leaveTypeLabel}`,
-          `Tanggal: ${formatDateOnly(item.start_date)}${item.end_date ? ` - ${formatDateOnly(item.end_date)}` : ''}`,
+          `Tanggal: ${formatIndonesianDate(item.start_date)}${item.end_date ? ` - ${formatIndonesianDate(item.end_date)}` : ''}`,
           `Status: ${item.status || 'PENDING'}`,
           ...(isHourlyLeave ? [`Jam: ${item.start_time?.slice(0, 5) || '--:--'} - ${item.end_time?.slice(0, 5) || '--:--'}`] : []),
           `Alasan: ${item.reason || '-'}`,

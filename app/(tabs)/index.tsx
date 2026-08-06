@@ -9,6 +9,7 @@ import { qk } from '../../src/core/query/query-keys';
 import { Tokens } from '../../src/core/theme/tokens';
 import { buildApprovalActivityItems } from '../../src/features/activity/approval-activity';
 import { isApprovalPendingForUser } from '../../src/features/approvals/status';
+import { isTodayAttendanceRecord } from '../../src/features/attendance/scan-state';
 import { buildHomeMenuItems } from '../../src/features/home/home-menu';
 import { filterVisitsByDescendants, findDescendantIds } from '../../src/features/visit/hierarchy';
 import { approvalService } from '../../src/services/approval.service';
@@ -18,6 +19,7 @@ import { leaveService } from '../../src/services/leave.service';
 import { overtimeService } from '../../src/services/overtime.service';
 import { resignService } from '../../src/services/resign.service';
 import { useAuthStore } from '../../src/stores/auth.store';
+import { formatIndonesianDate, formatIndonesianDateTime, formatIndonesianTime } from '../../src/utils/datetime';
 import { getAttendanceBadgeProps } from '../../src/utils/status';
 
 type FeedType =
@@ -110,6 +112,20 @@ export default function HomeScreen() {
     return `${year}-${month}-${day}`;
   }, []);
 
+  const parseAttendanceTimestamp = React.useCallback((value?: string | null, fallbackDate?: string | null) => {
+    if (!value) return 0;
+
+    const parsed = Date.parse(value);
+    if (Number.isFinite(parsed)) return parsed;
+
+    if (!fallbackDate) return 0;
+
+    const normalized = value.includes(' ') ? value.split(' ')[0] : value;
+    const combined = `${fallbackDate}T${normalized}`;
+    const combinedParsed = Date.parse(combined);
+    return Number.isFinite(combinedParsed) ? combinedParsed : 0;
+  }, []);
+
   const dateRange = React.useMemo(() => {
     const dateTo = new Date();
     const dateFrom = new Date();
@@ -118,6 +134,13 @@ export default function HomeScreen() {
       dateFrom: formatLocalDate(dateFrom),
       dateTo: formatLocalDate(dateTo),
     };
+  }, [formatLocalDate]);
+
+  const today = React.useMemo(() => formatLocalDate(new Date()), [formatLocalDate]);
+  const yesterday = React.useMemo(() => {
+    const date = new Date();
+    date.setDate(date.getDate() - 1);
+    return formatLocalDate(date);
   }, [formatLocalDate]);
 
   const { data: attendanceFeed = [], isLoading: isLoadingAttendanceFeed, refetch: refetchAttendanceFeed, isFetching: isFetchingAttendanceFeed } = useQuery({
@@ -133,6 +156,45 @@ export default function HomeScreen() {
       });
     },
     enabled: !!user?.id,
+  });
+
+  const { data: openAttendanceRecord = null, refetch: refetchOpenAttendanceRecord } = useQuery({
+    queryKey: ['attendance-open-checkin', user?.id],
+    queryFn: () => attendanceService.getTodayRecord(),
+    enabled: !!user?.id,
+    staleTime: 30 * 1000,
+  });
+
+  const { data: todayAttendanceRecords = [], refetch: refetchTodayAttendanceRecords } = useQuery({
+    queryKey: qk.attendanceHistory(user?.id, today, today),
+    queryFn: () => {
+      if (!user?.id) return [];
+      return attendanceService.getAttendanceHistory({
+        employee_id: user.id,
+        date_from: today,
+        date_to: today,
+        limit: 20,
+        page: 1,
+      });
+    },
+    enabled: !!user?.id,
+    staleTime: 30 * 1000,
+  });
+
+  const { data: yesterdayAttendanceRecords = [], refetch: refetchYesterdayAttendanceRecords } = useQuery({
+    queryKey: qk.attendanceHistory(user?.id, yesterday, yesterday),
+    queryFn: () => {
+      if (!user?.id) return [];
+      return attendanceService.getAttendanceHistory({
+        employee_id: user.id,
+        date_from: yesterday,
+        date_to: yesterday,
+        limit: 20,
+        page: 1,
+      });
+    },
+    enabled: !!user?.id,
+    staleTime: 30 * 1000,
   });
 
   const { data: leaveRequests = [], isLoading: isLoadingLeaveFeed, refetch: refetchLeaveFeed, isFetching: isFetchingLeaveFeed } = useQuery({
@@ -153,25 +215,27 @@ export default function HomeScreen() {
     enabled: !!user?.id,
   });
 
-  const todayString = formatLocalDate(new Date());
-  const latestAttendance = React.useMemo(() => {
-    return attendanceFeed.find((item: any) => (item.attendance_date || item.date) === todayString) || null;
-  }, [attendanceFeed, todayString]);
+  const latestAttendance = openAttendanceRecord ?? todayAttendanceRecords.find((record) => isTodayAttendanceRecord(record, today)) ?? null;
   const latestAttendanceDate = latestAttendance?.attendance_date || latestAttendance?.date;
   const hasCheckIn = !!(latestAttendance?.checkin_time || latestAttendance?.checkin_at);
   const hasCheckOut = !!(latestAttendance?.checkout_time || latestAttendance?.checkout_at);
-  const isTodayAttendance = !!latestAttendance;
-  const isClockedIn = hasCheckIn && !hasCheckOut && isTodayAttendance;
-  const isClockedOut = hasCheckOut && isTodayAttendance;
+  const hasCompletedTodayRecord = todayAttendanceRecords.some((record) => isTodayAttendanceRecord(record, today) && !!(record.checkin_at || record.checkin_time) && !!(record.checkout_at || record.checkout_time));
+  const activeTodayRecord = openAttendanceRecord
+    ?? todayAttendanceRecords.find((record) => isTodayAttendanceRecord(record, today) && !!(record.checkin_at || record.checkin_time) && !(record.checkout_at || record.checkout_time))
+    ?? null;
+  const isClockedIn = !!activeTodayRecord && !hasCompletedTodayRecord;
+  const isAttendanceCompleted = hasCompletedTodayRecord;
+  const hasAttendanceRecord = !!latestAttendance || todayAttendanceRecords.length > 0;
+  const isClockedOut = isAttendanceCompleted;
   const attendanceChipText = isClockedIn
     ? 'Masuk. Selamat bekerja.'
-    : isClockedOut
-      ? 'Keluar. Selamat istirahat.'
+    : isAttendanceCompleted
+      ? 'Presensi hari ini sudah selesai.'
       : 'Belum absen hari ini.';
   const attendanceChipTextClass = isClockedIn
     ? 'text-primary'
-    : isClockedOut
-      ? 'text-primary'
+    : isAttendanceCompleted
+      ? 'text-white'
       : 'text-error';
 
   const [workingDuration, setWorkingDuration] = React.useState({ hours: 0, minutes: 0 });
@@ -189,19 +253,18 @@ export default function HomeScreen() {
       setWorkingDuration({ hours: 0, minutes: 0 });
       return;
     }
-    if (isTodayAttendance && latestAttendance) {
+    if (latestAttendance) {
       const calculateDiff = () => {
         const startStr = latestAttendance.checkin_at || latestAttendance.checkin_time;
         if (!startStr) return;
-        const startFull = startStr.includes('T') || startStr.includes(' ') ? startStr : `${todayString}T${startStr}`;
-        const startTime = new Date(startFull).getTime();
+        const baseDate = latestAttendanceDate || formatLocalDate(new Date());
+        const startTime = parseAttendanceTimestamp(startStr, baseDate);
 
         let endTime = new Date().getTime();
         if (isClockedOut) {
-          const endStr = latestAttendance.checkout_at || latestAttendance.checkout_time;
+          const endStr = latestAttendance.actual_checkout_at || latestAttendance.checkout_at || latestAttendance.checkout_time;
           if (endStr) {
-            const endFull = endStr.includes('T') || endStr.includes(' ') ? endStr : `${todayString}T${endStr}`;
-            endTime = new Date(endFull).getTime();
+            endTime = parseAttendanceTimestamp(endStr, baseDate);
           }
         }
 
@@ -217,7 +280,7 @@ export default function HomeScreen() {
         return () => clearInterval(interval);
       }
     }
-  }, [formatLocalDate, isClockedIn, isClockedOut, isTodayAttendance, latestAttendance, todayString]);
+  }, [formatLocalDate, isClockedIn, isClockedOut, latestAttendance, latestAttendanceDate, parseAttendanceTimestamp]);
 
   const { data: resignRequests = [], isLoading: isLoadingResignFeed, refetch: refetchResignFeed, isFetching: isFetchingResignFeed } = useQuery({
     queryKey: ['resign-history', user?.id, 'home'],
@@ -333,6 +396,9 @@ export default function HomeScreen() {
     setIsManualRefreshing(true);
     await Promise.all([
       refetchAttendanceFeed(),
+      refetchOpenAttendanceRecord(),
+      refetchTodayAttendanceRecords(),
+      refetchYesterdayAttendanceRecords(),
       refetchLeaveFeed(),
       refetchOvertimeFeed(),
       refetchResignFeed(),
@@ -342,10 +408,13 @@ export default function HomeScreen() {
       refetchPendingTeamVisits(),
     ]);
     setIsManualRefreshing(false);
-  }, [refetchAttendanceFeed, refetchLeaveFeed, refetchOvertimeFeed, refetchResignFeed, refetchApprovalFeed, refetchCorrectionFeed, refetchPendingApprovals, refetchPendingTeamVisits]);
+  }, [refetchAttendanceFeed, refetchOpenAttendanceRecord, refetchTodayAttendanceRecords, refetchYesterdayAttendanceRecords, refetchLeaveFeed, refetchOvertimeFeed, refetchResignFeed, refetchApprovalFeed, refetchCorrectionFeed, refetchPendingApprovals, refetchPendingTeamVisits]);
 
   const onRefresh = React.useCallback(() => {
     refetchAttendanceFeed();
+    refetchOpenAttendanceRecord();
+    refetchTodayAttendanceRecords();
+    refetchYesterdayAttendanceRecords();
     refetchLeaveFeed();
     refetchOvertimeFeed();
     refetchResignFeed();
@@ -353,7 +422,7 @@ export default function HomeScreen() {
     refetchCorrectionFeed();
     refetchPendingApprovals();
     refetchPendingTeamVisits();
-  }, [refetchAttendanceFeed, refetchLeaveFeed, refetchOvertimeFeed, refetchResignFeed, refetchApprovalFeed, refetchCorrectionFeed, refetchPendingApprovals, refetchPendingTeamVisits]);
+  }, [refetchAttendanceFeed, refetchOpenAttendanceRecord, refetchTodayAttendanceRecords, refetchYesterdayAttendanceRecords, refetchLeaveFeed, refetchOvertimeFeed, refetchResignFeed, refetchApprovalFeed, refetchCorrectionFeed, refetchPendingApprovals, refetchPendingTeamVisits]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -378,8 +447,8 @@ export default function HomeScreen() {
           id: `${item.id}-checkin`,
           type: 'attendance.checkin',
           title: 'Anda check-in',
-          summary: `${attendanceDate} · ${formatTime(checkinTime)}`,
-          details: [`Tanggal: ${attendanceDate}`, `Jam masuk: ${formatTime(checkinTime)}`, `Status: ${status}`],
+          summary: `${formatIndonesianDate(attendanceDate)} · ${formatIndonesianTime(checkinTime)}`,
+          details: [`Tanggal: ${formatIndonesianDate(attendanceDate)}`, `Jam masuk: ${formatIndonesianTime(checkinTime)}`, `Status: ${status}`],
           timestamp: checkinTime,
           sortTime: toSortTime(checkinTime),
           sortRank: 1,
@@ -397,11 +466,11 @@ export default function HomeScreen() {
           id: `${item.id}-checkout`,
           type: 'attendance.checkout',
           title: 'Anda check-out',
-          summary: `${attendanceDate} · ${formatTime(checkoutTime)}`,
+          summary: `${formatIndonesianDate(attendanceDate)} · ${formatIndonesianTime(checkoutTime)}`,
           details: [
-            `Tanggal: ${attendanceDate}`,
-            `Jam pulang: ${formatTime(checkoutTime)}`,
-            ...(actualCheckoutTime ? [`Actual check-out: ${formatTime(actualCheckoutTime)}`] : []),
+            `Tanggal: ${formatIndonesianDate(attendanceDate)}`,
+            `Jam pulang: ${formatIndonesianTime(checkoutTime)}`,
+            ...(actualCheckoutTime ? [`Waktu checkout sistem: ${formatIndonesianDateTime(actualCheckoutTime)}`] : []),
             `Status: ${status}`,
           ],
           timestamp: checkoutTime,
@@ -671,13 +740,13 @@ export default function HomeScreen() {
               {/* The Text */}
               <View className="flex-1">
                 <Text className="font-inter-bold text-[11px] text-yellow-400 mb-1">
-                  {isClockedOut ? 'Check-out berhasil!' : isClockedIn ? 'Check-in berhasil!' : 'Anda belum melakukan absensi!'}
+                  {isClockedIn ? 'Check-in berhasil!' : isAttendanceCompleted ? 'Presensi hari ini selesai.' : 'Belum ada catatan absen hari ini.'}
                 </Text>
                 <Text className="font-inter-medium text-[10px] text-white/80 leading-4">
-                  {isClockedOut
-                    ? 'Kerja hari ini telah selesai! Terima kasih! Selamat beristirahat!'
-                    : isClockedIn
-                      ? 'Kerja hari ini telah dimulai! Please, Do your best!'
+                  {isClockedIn
+                    ? 'Kerja hari ini telah dimulai! Please, Do your best!'
+                    : isAttendanceCompleted
+                      ? 'Kamu sudah check-in dan check-out hari ini. Sampai jumpa besok.'
                       : 'Belum ada catatan absen hari ini. Ayo, jangan lupa check-in ya!'}
                 </Text>
               </View>
@@ -694,10 +763,10 @@ export default function HomeScreen() {
               />
 
               {/* The Fill */}
-              {(isClockedIn || isClockedOut) && (
+              {hasAttendanceRecord && (
                 <MotiView
                   className="absolute left-0 top-0 bottom-0 rounded-full"
-                  style={{ backgroundColor: isClockedOut ? '#81c784' : '#ffffff' }}
+                  style={{ backgroundColor: '#ffffff' }}
                   from={{ width: '0%' }}
                   animate={{ width: `${journeyProgress}%` }}
                   transition={{ type: 'spring', damping: 20, stiffness: 90 }}
@@ -705,7 +774,7 @@ export default function HomeScreen() {
               )}
 
               {/* Shimmer for active state */}
-              {isClockedIn && !isClockedOut && (
+              {isClockedIn && (
                 <MotiView
                   className="absolute left-0 top-0 bottom-0 rounded-full bg-white"
                   from={{ width: '0%', opacity: 0.5 }}
@@ -715,7 +784,7 @@ export default function HomeScreen() {
               )}
 
               {/* Sparkles for completed state */}
-              {isClockedOut && (
+              {isClockedIn && (
                 <MotiView
                   className="absolute -top-1.5"
                   style={{ left: '95%' }}

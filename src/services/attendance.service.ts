@@ -129,10 +129,10 @@ export const attendanceService = {
     });
     return unwrapData<AttendanceActionResponse>(response.data);
   },
-  async getTodayRecord(_employeeId?: string) {
+  async getTodayRecord(_employeeId?: string): Promise<AttendanceItem | null> {
     const response = await api.get('/attendance/open-checkin');
     const data = unwrapData<AttendanceItem | null>(response.data);
-    return data ?? undefined;
+    return data ?? null;
   },
   async getTodayRecords(_employeeId?: string): Promise<AttendanceItem[]> {
     const record = await attendanceService.getTodayRecord();

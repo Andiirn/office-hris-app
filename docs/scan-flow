@@ -1,0 +1,207 @@
+# Panduan Alur Scan QR & Logika Status Absensi Frontend
+
+Dokumen ini berisi spesifikasi logika, *state machine*, dan panduan alur implementasi untuk modul **Scan QR / Presensi** pada Frontend (Mobile React Native / Web App).
+
+---
+
+## 1. Status Utama Absensi Hari Ini (*Attendance State Machine*)
+
+Frontend memiliki 3 status utama yang menentukan tampilan UI dan perilaku tombol scan:
+
+```mermaid
+stateDiagram-v2
+    [*] --> NOT_CHECKED_IN : App Loaded / Refreshed
+    
+    NOT_CHECKED_IN --> CLOCKED_IN : Hit POST /attendance/checkin (Sukses)
+    CLOCKED_IN --> COMPLETED : Hit POST /attendance/checkout (Sukses)
+    
+    COMPLETED --> [*] : Presensi Hari Ini Selesai
+```
+
+### Penjelasan 3 State:
+
+| Attendance State | Definisi Kondisi | Tampilan Tombol | Perilaku Saat Tombol Scan Ditekan |
+| :--- | :--- | :--- | :--- |
+| **`NOT_CHECKED_IN`** | Belum ada record check-in untuk tanggal hari ini (`openCheckin == null` && `todayRecord == null`). | **"Check-In Absensi"** (Warna Hijau/Biru) | Buka Kamera Scanner QR dengan Mode `CHECK_IN`. |
+| **`CLOCKED_IN`** | User sudah check-in dan belum check-out (`openCheckin != null` && `checkout_at == null`). | **"Check-Out Absensi"** (Warna Kuning/Oranye) | Buka Kamera Scanner QR dengan Mode `CHECK_OUT`. |
+| **`COMPLETED`** | User sudah check-in DAN sudah check-out hari ini (`checkin_at != null` && `checkout_at != null`). | **"Presensi Hari Ini Selesai"** (Disabled / Abot/Abu-abu) | **Tolak Scan!** Tampilkan Alert: *"Anda telah menyelesaikan presensi hari ini."* |
+
+---
+
+## 2. Logika Fetching & Penentuan State (`useAttendanceStatus`)
+
+Frontend melakukan *fetch* data saat halaman dibuka (`useFocusEffect` / `useEffect`). Karena endpoint `open-checkin` khusus mencari record yang menggantung (`checkout_at == null`), maka kombinasikan dengan endpoint history untuk mendeteksi status `COMPLETED`.
+
+```mermaid
+flowchart TD
+    A[Mulai Fetch Data Absensi] --> B[GET /attendance/open-checkin]
+    B --> C{openCheckin != null?}
+    
+    C -- Ya --> D[Set State: CLOCKED_IN]
+    D --> E[Simpan data openCheckin ke State]
+    
+    C -- Tidak --> F[GET /attendance?date_from=TODAY&date_to=TODAY]
+    F --> G{Ada record hari ini dengan checkout_at != null?}
+    
+    G -- Ya --> H[Set State: COMPLETED]
+    H --> I[Simpan data completedRecord ke State]
+    
+    G -- Tidak --> J[Set State: NOT_CHECKED_IN]
+```
+
+---
+
+## 3. Penanganan Kasus Cross-Day Shift Malam (00:00 - 04:00)
+
+Sistem backend memiliki window *cross-day* otomatis antara pukul **00:00 hingga 04:00 pagi**:
+
+1. **Jika User Shift Malam (Misal masuk Jumat 22:00, Checkout Sabtu 02:00):**
+   * Saat Sabtu jam 02:00 pagi dipanggil `GET /attendance/open-checkin`, backend akan mengembalikan record tanggal **Jumat**.
+   * Frontend mendeteksi `openCheckin != null` $\rightarrow$ State menjadi **`CLOCKED_IN`**.
+   * UI menampilkan info banner: *"Melanjutkan Shift Malam (Jumat)"* & tombol **Check-Out**.
+
+2. **Jika Sudah Lewat Jam 04:00 Pagi (Misal Sabtu 04:05):**
+   * Backend `open-checkin` akan mengembalikan `null`.
+   * State Sabtu otomatis berganti menjadi **`NOT_CHECKED_IN`** (siap untuk absensi hari Sabtu).
+   * Record Jumat yang lupa di-checkout tetap tersimpan dan diselesaikan melalui fitur *Attendance Correction*.
+
+---
+
+## 4. Contoh Referensi Kode TypeScript Hook (`useAttendanceStatus.ts`)
+
+```typescript
+import { useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { attendanceService } from '../services/attendance.service';
+import { AttendanceItem } from '../types/attendance';
+
+export type AttendanceState = 'LOADING' | 'NOT_CHECKED_IN' | 'CLOCKED_IN' | 'COMPLETED';
+
+export function useAttendanceStatus() {
+  const [state, setState] = useState<AttendanceState>('LOADING');
+  const [activeRecord, setActiveRecord] = useState<AttendanceItem | null>(null);
+  const [completedRecord, setCompletedRecord] = useState<AttendanceItem | null>(null);
+
+  const fetchStatus = useCallback(async () => {
+    setState('LOADING');
+    try {
+      // 1. Cek apakah ada Open Check-In (Checkin terisi, Checkout null)
+      const openRecord = await attendanceService.getTodayRecord();
+      
+      if (openRecord && openRecord.checkin_at && !openRecord.checkout_at) {
+        setActiveRecord(openRecord);
+        setCompletedRecord(null);
+        setState('CLOCKED_IN');
+        return;
+      }
+
+      // 2. Jika open-checkin NULL, cek riwayat absensi hari ini (Apakah sudah checkout?)
+      const todayStr = new Date().toISOString().split('T')[0];
+      const todayHistory = await attendanceService.getAttendanceHistory({
+        date_from: todayStr,
+        date_to: todayStr,
+        limit: 1,
+      });
+
+      const todayRecord = todayHistory[0];
+      if (todayRecord && todayRecord.checkin_at && todayRecord.checkout_at) {
+        setActiveRecord(null);
+        setCompletedRecord(todayRecord);
+        setState('COMPLETED');
+        return;
+      }
+
+      // 3. Belum absen sama sekali hari ini
+      setActiveRecord(null);
+      setCompletedRecord(null);
+      setState('NOT_CHECKED_IN');
+    } catch (error) {
+      console.error('Failed to fetch attendance status:', error);
+      setState('NOT_CHECKED_IN');
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchStatus();
+    }, [fetchStatus])
+  );
+
+  return { state, activeRecord, completedRecord, refetchStatus: fetchStatus };
+}
+```
+
+---
+
+## 5. Implementasi Guard Logika Scanner di UI (`ScannerButton.tsx`)
+
+```typescript
+import React from 'react';
+import { Alert, TouchableOpacity, Text, View } from 'react-native';
+import { useAttendanceStatus } from '../hooks/useAttendanceStatus';
+
+export function ScanAttendanceWidget({ onOpenScanner }: { onOpenScanner: (mode: 'CHECK_IN' | 'CHECK_OUT') => void }) {
+  const { state, activeRecord, completedRecord, state: loadingState } = useAttendanceStatus();
+
+  const handlePressScan = () => {
+    if (state === 'COMPLETED') {
+      Alert.alert(
+        'Presensi Hari Ini Selesai',
+        '⚠️ Anda sudah melakukan Check-In dan Check-Out untuk hari ini. Terima kasih!',
+        [{ text: 'Mengerti', style: 'default' }]
+      );
+      return;
+    }
+
+    if (state === 'CLOCKED_IN') {
+      // Buka Scanner untuk Check-Out
+      onOpenScanner('CHECK_OUT');
+    } else {
+      // Buka Scanner untuk Check-In
+      onOpenScanner('CHECK_IN');
+    }
+  };
+
+  if (loadingState === 'LOADING') {
+    return <Text>Memuat status absensi...</Text>;
+  }
+
+  return (
+    <View className="p-4 border rounded-xl bg-card">
+      {/* Informative Status Text */}
+      <Text className="font-bold text-lg mb-2">
+        {state === 'CLOCKED_IN' && '🟢 Sedang Bekerja (Sudah Check-In)'}
+        {state === 'COMPLETED' && '🎉 Presensi Hari Ini Selesai'}
+        {state === 'NOT_CHECKED_IN' && '⚪ Belum Absen Hari Ini'}
+      </Text>
+
+      {/* Main Scan Button */}
+      <TouchableOpacity
+        onPress={handlePressScan}
+        disabled={state === 'COMPLETED'}
+        className={`py-3 px-6 rounded-lg items-center ${
+          state === 'COMPLETED'
+            ? 'bg-gray-400'
+            : state === 'CLOCKED_IN'
+            ? 'bg-amber-500'
+            : 'bg-emerald-600'
+        }`}
+      >
+        <Text className="text-white font-bold">
+          {state === 'COMPLETED' && 'Presensi Selesai'}
+          {state === 'CLOCKED_IN' && 'Scan QR untuk Check-Out'}
+          {state === 'NOT_CHECKED_IN' && 'Scan QR untuk Check-In'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+```
+
+---
+
+## 6. Ringkasan Safeguard Poin-Poin Kunci
+
+1. **Guard Sebelum Scan**: Jika `state === 'COMPLETED'`, tahan user di frontend dan berikan Alert/Pop-up tanpa membuka kamera scanner.
+2. **Refresh State Pasca Action**: Setiap kali `POST /checkin` atau `POST /checkout` berhasil, panggil `refetchStatus()` untuk memperbarui UI seketika.
+3. **Double Defense**: Backend juga akan menolak jika request checkout/checkin ilegal terkirim, namun Guard Frontend ini memastikan pengalaman pengguna (*User Experience*) tetap intuitif dan bebas kebingungan.

@@ -190,7 +190,7 @@ describe('attendanceService', () => {
       ]);
     });
 
-    it('should return undefined when there is no open record', async () => {
+    it('should return null when there is no open record', async () => {
       (api.get as jest.Mock).mockReset();
       (api.get as jest.Mock).mockResolvedValue({
         data: {
@@ -200,7 +200,7 @@ describe('attendanceService', () => {
 
       const result = await attendanceService.getTodayRecord();
 
-      expect(result).toBeUndefined();
+      expect(result).toBeNull();
     });
   });
 

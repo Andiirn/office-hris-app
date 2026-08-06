@@ -15,7 +15,7 @@ import { getStableDeviceFingerprint } from '../src/core/auth/device-fingerprint'
 import { qk } from '../src/core/query/query-keys';
 import { Tokens } from '../src/core/theme/tokens';
 import { parseAttendanceQrPayload } from '../src/features/attendance/qr';
-import { getAttendanceScanDecisionFromOpenRecord } from '../src/features/attendance/scan-state';
+import { getAttendanceScanDecisionForToday } from '../src/features/attendance/scan-state';
 import { attendanceService, createSelfiePhotoCode } from '../src/services/attendance.service';
 import { useAuthStore } from '../src/stores/auth.store';
 import { goBackOrTabs } from '../src/utils/navigation';
@@ -31,6 +31,7 @@ type ScanFailure = {
   mode: ScanMode;
   actionLabel: string;
   actionHint?: string;
+  tone?: 'success' | 'guidance' | 'security';
 };
 
 const SELFIE_INFO_SEEN_KEY = 'attendance_scan_selfie_info_seen';
@@ -41,11 +42,13 @@ const FRAUD_REASON_LABELS: Record<string, string> = {
   OUTSIDE_RADIUS: 'Lokasi berada di luar radius cabang',
   EMULATOR_DETECTED: 'Perangkat terdeteksi sebagai emulator atau lingkungan virtual',
   MOCK_LOCATION: 'Lokasi palsu / mock location terdeteksi',
-  QR_REPLAY: 'QR sudah pernah dipakai, tunggu QR di tablet berubah.',
-  QR_EXPIRED: 'QR sudah kedaluwarsa, tunggu QR di tablet berubah.',
+  QR_REPLAY: 'QR sudah pernah dipakai. Tekan refresh QR di tablet lalu scan ulang.',
+  QR_EXPIRED: 'QR sudah kedaluwarsa. Tekan refresh QR di tablet lalu scan ulang.',
 };
 
 const LOCATION_FLAGS = new Set(['OUTSIDE_RADIUS', 'HIGH_PRECISION_GPS', 'MOCK_LOCATION']);
+const GUIDANCE_FLAGS = new Set(['QR_REPLAY', 'QR_EXPIRED']);
+const SECURITY_FLAGS = new Set(['TAMPERED_TOKEN', 'EMULATOR_DETECTED', 'MOCK_LOCATION']);
 
 const normalizeErrorItems = (value: unknown) => {
   if (!Array.isArray(value)) return [];
@@ -71,6 +74,13 @@ const isLocationRelatedFailure = (failure: ScanFailure | null) =>
 
 const getFailureActionLabel = (failure: ScanFailure | null) =>
   isLocationRelatedFailure(failure) ? 'Dapatkan Lokasi Tinggi' : 'Coba Lagi';
+
+const getFailureTone = (flags: string[], rawMessage: string): NonNullable<ScanFailure['tone']> => {
+  if (flags.some((flag) => SECURITY_FLAGS.has(flag))) return 'security';
+  if (flags.some((flag) => GUIDANCE_FLAGS.has(flag))) return 'guidance';
+  if (/sudah lengkap|Anda baru saja check-in|silakan tunggu/i.test(rawMessage)) return 'guidance';
+  return 'security';
+};
 
 const formatScanFailure = (error: any, mode: ScanMode): ScanFailure => {
   const response = error?.response?.data ?? {};
@@ -114,24 +124,30 @@ const formatScanFailure = (error: any, mode: ScanMode): ScanFailure => {
     ? flags.map((flag) => FRAUD_REASON_LABELS[flag] ?? flag)
     : [rawMessage];
   const isLocationIssue = flags.some(isLocationRelatedFlag);
+  const tone = getFailureTone(flags, rawMessage);
 
   return {
     title: isLocationIssue
       ? 'Lokasi belum valid'
-      : mode === 'selfie'
-        ? 'Selfie ditolak sistem anti-fraud'
-        : 'QR ditolak sistem anti-fraud',
+      : tone === 'guidance'
+        ? 'Perlu tindakan'
+        : mode === 'selfie'
+          ? 'Selfie ditolak sistem anti-fraud'
+          : 'QR ditolak sistem anti-fraud',
     message: isLocationIssue
       ? 'Lokasi yang terdeteksi belum memenuhi syarat absensi. Coba ambil lokasi yang lebih akurat.'
-      : mode === 'selfie'
-        ? 'Foto berhasil terkirim, tetapi server menolak absensi karena alasan berikut:'
-        : 'QR berhasil dipindai, tetapi server menolak absensi karena alasan berikut:',
+      : tone === 'guidance'
+        ? 'Ikuti instruksi di bawah agar absensi bisa diproses dengan benar.'
+        : mode === 'selfie'
+          ? 'Foto berhasil terkirim, tetapi server menolak absensi karena alasan berikut:'
+          : 'QR berhasil dipindai, tetapi server menolak absensi karena alasan berikut:',
     reasons: formattedReasons,
     mode,
-    actionLabel: isLocationIssue ? 'Ambil Lokasi Lebih Akurat' : 'Coba Lagi',
+    actionLabel: isLocationIssue ? 'Ambil Lokasi Lebih Akurat' : tone === 'guidance' ? 'Ikuti Instruksi' : 'Coba Lagi',
     actionHint: isLocationIssue
       ? 'Gunakan tombol ini untuk memaksa ambil ulang lokasi dengan presisi lebih tinggi.'
       : undefined,
+    tone,
   };
 };
 
@@ -152,6 +168,19 @@ const formatSuccessTime = (date = new Date()) =>
       : Intl.DateTimeFormat().resolvedOptions().timeZone === 'Asia/Jayapura'
         ? 'WIT'
         : Intl.DateTimeFormat().resolvedOptions().timeZone}`;
+
+const getLocalDateString = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const getYesterdayDateString = (date = new Date()) => {
+  const prev = new Date(date);
+  prev.setDate(prev.getDate() - 1);
+  return getLocalDateString(prev);
+};
 
 
 function SuccessResultScreen({
@@ -254,6 +283,7 @@ function FailureResultScreen({
   reasons,
   actionLabel,
   actionHint,
+  tone = 'security',
   onRetry,
 }: {
   title: string;
@@ -261,12 +291,53 @@ function FailureResultScreen({
   reasons: string[];
   actionLabel: string;
   actionHint?: string;
+  tone?: 'success' | 'guidance' | 'security';
   onRetry: () => void;
 }) {
+  const theme =
+    tone === 'guidance'
+      ? {
+        accent: Tokens.colors.primary,
+        accentSoft: 'bg-primary/10',
+        accentSoft2: 'bg-primary/5',
+        ring: 'border-primary/20',
+        icon: 'info',
+        iconBg: 'bg-primary/10',
+        reasonBorder: 'border-primary/15',
+        reasonBg: 'bg-white/85',
+        titleClass: 'text-primary',
+        actionClass: 'bg-primary',
+      }
+      : tone === 'success'
+        ? {
+          accent: '#1f6b42',
+          accentSoft: 'bg-emerald-500/10',
+          accentSoft2: 'bg-emerald-500/5',
+          ring: 'border-emerald-500/20',
+          icon: 'check-circle',
+          iconBg: 'bg-emerald-500/10',
+          reasonBorder: 'border-emerald-200',
+          reasonBg: 'bg-emerald-50/70',
+          titleClass: 'text-emerald-700',
+          actionClass: 'bg-emerald-600',
+        }
+        : {
+          accent: Tokens.colors.error,
+          accentSoft: 'bg-error/10',
+          accentSoft2: 'bg-primary/10',
+          ring: 'border-error/20',
+          icon: 'error',
+          iconBg: 'bg-error/10',
+          reasonBorder: 'border-red-100',
+          reasonBg: 'bg-white/80',
+          titleClass: 'text-error',
+          actionClass: 'bg-primary',
+        };
+
   return (
     <View className="flex-1 bg-background px-5">
-      <View className="absolute top-20 -right-16 w-72 h-72 rounded-full bg-error/10" />
-      <View className="absolute bottom-12 -left-20 w-80 h-80 rounded-full bg-primary/10" />
+      <View className={`absolute top-20 -right-16 w-72 h-72 rounded-full ${theme.accentSoft}`} />
+      <View className={`absolute bottom-12 -left-20 w-80 h-80 rounded-full ${theme.accentSoft2}`} />
 
       <View className="flex-1 items-center justify-center">
         <MotiView
@@ -279,12 +350,12 @@ function FailureResultScreen({
             from={{ scale: 0.95 }}
             animate={{ scale: 1.05 }}
             transition={{ loop: true, repeatReverse: true, type: 'timing', duration: 900 }}
-            className="w-24 h-24 rounded-full bg-error/10 items-center justify-center mb-6"
+            className={`w-24 h-24 rounded-full ${theme.iconBg} items-center justify-center mb-6`}
           >
-            <MaterialIcons name="error" size={56} color={Tokens.colors.error} />
+            <MaterialIcons name={theme.icon as any} size={56} color={theme.accent} />
           </MotiView>
 
-          <Text className="font-manrope-extrabold text-3xl text-error text-center">
+          <Text className={`font-manrope-extrabold text-3xl text-center ${theme.titleClass}`}>
             {title}
           </Text>
           <Text className="font-inter text-base text-on-surface-variant text-center mt-3 leading-6 px-4">
@@ -299,8 +370,8 @@ function FailureResultScreen({
           {!!reasons.length && (
             <View className="w-full mt-6 gap-3">
               {reasons.map((reason) => (
-                <View key={reason} className="w-full rounded-2xl bg-white/80 px-4 py-3 border border-red-100">
-                  <Text className="font-inter-semibold text-sm text-error text-center">
+                <View key={reason} className={`w-full rounded-2xl px-4 py-3 border ${theme.reasonBg} ${theme.reasonBorder}`}>
+                  <Text className="font-inter-semibold text-sm text-center" style={{ color: theme.accent }}>
                     {reason}
                   </Text>
                 </View>
@@ -317,7 +388,7 @@ function FailureResultScreen({
             <Button
               title={actionLabel}
               onPress={onRetry}
-              className="w-full h-14 rounded-2xl bg-primary"
+              className={`w-full h-14 rounded-2xl ${theme.actionClass}`}
               textStyle={{ color: '#ffffff', fontSize: 16 }}
             />
           </MotiView>
@@ -365,8 +436,39 @@ export default function AttendanceScanScreen() {
         throw new Error('Kamera selfie belum siap');
       }
 
-      const latestRecord = await attendanceService.getTodayRecord();
-      const isCheckout = getAttendanceScanDecisionFromOpenRecord(latestRecord).action === 'checkout';
+      const today = getLocalDateString();
+      const yesterday = getYesterdayDateString();
+      const [openRecord, todayRecords] = await Promise.all([
+        attendanceService.getTodayRecord(),
+        attendanceService.getAttendanceHistory({
+          employee_id: user?.id,
+          date_from: today,
+          date_to: today,
+          limit: 20,
+          page: 1,
+        }),
+      ]);
+      const yesterdayRecords = await attendanceService.getAttendanceHistory({
+        employee_id: user?.id,
+        date_from: yesterday,
+        date_to: yesterday,
+        limit: 20,
+        page: 1,
+      });
+      const decision = getAttendanceScanDecisionForToday(openRecord, todayRecords, today, new Date(), yesterdayRecords);
+
+      if (decision.action === 'blocked') {
+        const isCooldown = /baru saja check-in/i.test(decision.message);
+        setScanFailure({
+          title: isCooldown ? 'Tunggu Sebentar' : 'Presensi Hari Ini Selesai',
+          message: decision.message,
+          reasons: [],
+          mode: scanMode,
+          actionLabel: isCooldown ? 'Tunggu Sebentar' : 'Mengerti',
+          tone: isCooldown ? 'guidance' : 'success',
+        });
+        return;
+      }
 
       const photoCode = createSelfiePhotoCode();
       const selfiePhoto = await camera.takePictureAsync({ quality: 0.85, skipProcessing: false });
@@ -387,7 +489,7 @@ export default function AttendanceScanScreen() {
       };
       const upload = toSelfieUpload(selfiePhoto, photoCode);
 
-      if (!isCheckout) {
+      if (decision.action !== 'checkout') {
         const result = await attendanceService.checkinSelfie(selfiePayload, upload);
         setCheckinMessage(result?.message ?? 'Check-in selfie berhasil');
         setSuccessTime(formatSuccessTime());
@@ -399,7 +501,9 @@ export default function AttendanceScanScreen() {
 
       const latest = await attendanceService.getTodayRecord();
       setSuccessIsLate(getAttendanceIsLate(latest));
+      queryClient.setQueryData(['attendance-open-checkin', user?.id], latest ?? null);
       await Promise.all([
+        queryClient.refetchQueries({ queryKey: ['attendance-open-checkin', user?.id], exact: true }),
         queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryRoot() }),
         queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryFullRoot() }),
         queryClient.invalidateQueries({ queryKey: qk.homeApprovals(user?.id) }),
@@ -537,10 +641,41 @@ export default function AttendanceScanScreen() {
     try {
       const { qrToken } = parseAttendanceQrPayload(rawQrData);
       const branchId = qrToken.split(':')[0];
-      const latestRecord = await attendanceService.getTodayRecord();
-      const isCheckout = getAttendanceScanDecisionFromOpenRecord(latestRecord).action === 'checkout';
+      const today = getLocalDateString();
+      const yesterday = getYesterdayDateString();
+      const [openRecord, todayRecords] = await Promise.all([
+        attendanceService.getTodayRecord(),
+        attendanceService.getAttendanceHistory({
+          employee_id: user?.id,
+          date_from: today,
+          date_to: today,
+          limit: 20,
+          page: 1,
+        }),
+      ]);
+      const yesterdayRecords = await attendanceService.getAttendanceHistory({
+        employee_id: user?.id,
+        date_from: yesterday,
+        date_to: yesterday,
+        limit: 20,
+        page: 1,
+      });
+      const decision = getAttendanceScanDecisionForToday(openRecord, todayRecords, today, new Date(), yesterdayRecords);
 
-      if (isCheckout) {
+      if (decision.action === 'blocked') {
+        const isCooldown = /baru saja check-in/i.test(decision.message);
+        setScanFailure({
+          title: isCooldown ? 'Tunggu Sebentar' : 'Presensi Hari Ini Selesai',
+          message: decision.message,
+          reasons: [],
+          mode: scanMode,
+          actionLabel: isCooldown ? 'Tunggu Sebentar' : 'Mengerti',
+          tone: isCooldown ? 'guidance' : 'success',
+        });
+        return;
+      }
+
+      if (decision.action === 'checkout') {
         const result = await attendanceService.checkout({
           qr_token: qrToken,
           gps_lat: coords.lat,
@@ -574,7 +709,9 @@ export default function AttendanceScanScreen() {
       }
       const latest = await attendanceService.getTodayRecord();
       setSuccessIsLate(getAttendanceIsLate(latest));
+      queryClient.setQueryData(['attendance-open-checkin', user?.id], latest ?? null);
       await Promise.all([
+        queryClient.refetchQueries({ queryKey: ['attendance-open-checkin', user?.id], exact: true }),
         queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryRoot() }),
         queryClient.invalidateQueries({ queryKey: qk.attendanceHistoryFullRoot() }),
         queryClient.invalidateQueries({ queryKey: qk.homeApprovals(user?.id) }),
@@ -670,6 +807,7 @@ export default function AttendanceScanScreen() {
           reasons={failureReasons}
           actionLabel={failureActionLabel}
           actionHint={failureActionHint}
+          tone={scanFailure?.tone}
           onRetry={handleRetryScanner}
         />
       </SafeAreaView>
