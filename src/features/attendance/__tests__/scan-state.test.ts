@@ -1,4 +1,4 @@
-import { getAttendanceScanDecision } from '../scan-state';
+import { getAttendanceScanDecision, getAttendanceScanDecisionFromOpenRecord } from '../scan-state';
 
 describe('getAttendanceScanDecision', () => {
   it('returns checkout when there is an open record', () => {
@@ -24,5 +24,16 @@ describe('getAttendanceScanDecision', () => {
 
   it('returns checkin when there is no attendance yet', () => {
     expect(getAttendanceScanDecision([])).toEqual({ action: 'checkin' });
+  });
+
+  it('returns checkout directly from an open record', () => {
+    expect(getAttendanceScanDecisionFromOpenRecord({
+      checkin_at: '2026-07-15T01:00:00Z',
+      checkout_at: null,
+    })).toEqual({ action: 'checkout' });
+  });
+
+  it('returns checkin directly when the open record is missing', () => {
+    expect(getAttendanceScanDecisionFromOpenRecord(null)).toEqual({ action: 'checkin' });
   });
 });

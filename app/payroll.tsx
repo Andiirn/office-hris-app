@@ -362,9 +362,9 @@ export default function PayrollScreen() {
                     <View key={`allowance-${idx}`} className="flex-row justify-between items-center pl-3 border-l-2 border-emerald-500/40 py-1">
                       <View>
                         <Text className="font-inter text-sm text-emerald-800">{c.name}</Text>
-                        {c.keterangan ? (
+                        {/* {c.keterangan ? (
                           <Text className="font-inter text-[10px] text-[#454652] italic">{c.keterangan}</Text>
-                        ) : null}
+                        ) : null} */}
                       </View>
                       <Text className="font-inter-semibold text-sm text-emerald-700">+{formatCurrency(c.amount)}</Text>
                     </View>
@@ -403,7 +403,7 @@ export default function PayrollScreen() {
                     <Text className="font-inter-semibold text-sm text-error">-{formatCurrency(lateDeductionVal)}</Text>
                   </View>
                   <View className="flex-row justify-between items-center pb-2.5 border-b border-black/5">
-                    <Text className="font-inter text-sm text-[#454652]">Potongan Izin / Cuti</Text>
+                    <Text className="font-inter text-sm text-[#454652]">Potongan Izin</Text>
                     <Text className="font-inter-semibold text-sm text-error">-{formatCurrency(leaveDeductionVal)}</Text>
                   </View>
                   {absentDeduction > 0 && (
@@ -448,14 +448,14 @@ export default function PayrollScreen() {
               </View>
             </View>
 
-            <Pressable
+            {/* <Pressable
               onPress={handleDownload}
               className="mt-2 h-14 rounded-2xl shadow-xl shadow-black/10 flex-row items-center justify-center"
               style={{ backgroundColor: Tokens.colors.primaryContainer }}
             >
               <MaterialIcons name="picture-as-pdf" size={20} color="#fff" style={{ marginRight: 8 }} />
               <Text className="font-inter-bold text-white text-base">Download Slip Gaji (PDF)</Text>
-            </Pressable>
+            </Pressable> */}
 
             <View className="items-center py-4">
               <Text className="font-inter text-[10px] text-[#454652] italic text-center">

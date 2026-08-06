@@ -53,8 +53,8 @@ type Props = {
   onDeleteSegment: (segmentId: string) => void;
   segmentModalVisible: boolean;
   setSegmentModalVisible: (value: boolean) => void;
-  segmentForm: { start_time: string; end_time: string };
-  setSegmentForm: React.Dispatch<React.SetStateAction<{ start_time: string; end_time: string }>>;
+  segmentForm: { segment_date: string; start_time: string; end_time: string };
+  setSegmentForm: React.Dispatch<React.SetStateAction<{ segment_date: string; start_time: string; end_time: string }>>;
   editingSegmentId: string | null;
   segmentLoading: boolean;
 };
@@ -266,6 +266,17 @@ export function OvertimeCreateModal({
                       ? 'Ubah jam mulai dan selesai untuk sesi lembur tambahan.'
                       : 'Isi jam mulai dan selesai untuk sesi lembur tambahan.'}
                   </Text>
+                  <View className="mb-3 px-4 py-3 rounded-xl bg-[#f8f8f8]">
+                    <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">
+                      Tanggal Segment
+                    </Text>
+                    <TextInput
+                      value={segmentForm.segment_date}
+                      onChangeText={(text) => setSegmentForm((prev) => ({ ...prev, segment_date: text }))}
+                      placeholder="2026-08-04"
+                      className="font-inter-bold text-sm text-on-surface mt-1 p-0"
+                    />
+                  </View>
                   <View className="flex-row gap-3">
                     <View className="flex-1 px-4 py-3 rounded-xl bg-[#f8f8f8]">
                       <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Mulai</Text>
@@ -291,19 +302,29 @@ export function OvertimeCreateModal({
                       />
                     </View>
                   </View>
+                  <Text className="font-inter text-[11px] text-text-muted mt-2 leading-4">
+                    Gunakan format 24 jam. Jika jam selesai lebih kecil dari jam mulai, sistem otomatis menganggapnya masuk ke hari berikutnya.
+                  </Text>
                   <View className="flex-row gap-3 mt-4">
-                    <Button
-                      title="Batal"
+                    <Pressable
                       onPress={() => setSegmentModalVisible(false)}
-                      className="flex-1 h-12 rounded-2xl bg-black/5"
-                    />
-                    <Button
-                      title="Simpan"
+                      className="flex-1 h-10 rounded-xl bg-black/5 items-center justify-center"
+                      accessibilityRole="button"
+                    >
+                      <Text className="font-inter-bold text-[13px] text-primary">Batal</Text>
+                    </Pressable>
+                    <Pressable
                       onPress={onSubmitSegment}
-                      loading={segmentLoading}
                       disabled={segmentLoading}
-                      className="flex-1 size-full rounded-2xl bg-primary"
-                    />
+                      className={`flex-1 h-10 rounded-xl bg-primary items-center justify-center ${segmentLoading ? 'opacity-60' : ''}`}
+                      accessibilityRole="button"
+                    >
+                      {segmentLoading ? (
+                        <Text className="font-inter-bold text-[13px] text-white">Menyimpan...</Text>
+                      ) : (
+                        <Text className="font-inter-bold text-[13px] text-white">Simpan</Text>
+                      )}
+                    </Pressable>
                   </View>
                 </View>
               ) : null}
@@ -319,22 +340,22 @@ export function OvertimeCreateModal({
                           {segment.overtime_hours ? `${segment.overtime_hours} jam` : `${segment.overtime_minutes} menit`}
                         </Text>
                       </View>
-                      <View className="flex-row items-center gap-2 ml-2">
+                      <View className="flex-row items-center gap-1.5 ml-2">
                         <Pressable
                           onPress={() => onOpenSegmentEditor(segment)}
-                          className="w-8 h-8 rounded-full bg-black/5 items-center justify-center ml-2"
+                          className="w-7 h-7 rounded-full bg-black/5 items-center justify-center ml-1"
                           accessibilityRole="button"
                           accessibilityLabel="Edit segment"
                         >
-                          <MaterialIcons name="edit" size={16} color={Tokens.colors.primary} />
+                          <MaterialIcons name="edit" size={14} color={Tokens.colors.primary} />
                         </Pressable>
                         <Pressable
                           onPress={() => onDeleteSegment(segment.id)}
-                          className="w-8 h-8 rounded-full bg-black/5 items-center justify-center"
+                          className="w-7 h-7 rounded-full bg-black/5 items-center justify-center"
                           accessibilityRole="button"
                           accessibilityLabel="Hapus segment"
                         >
-                          <MaterialIcons name="close" size={16} color={Tokens.colors.error} />
+                          <MaterialIcons name="close" size={14} color={Tokens.colors.error} />
                         </Pressable>
                       </View>
                     </View>

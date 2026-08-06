@@ -26,6 +26,7 @@ export interface OvertimeRecord {
 
 export interface OvertimeSegment {
   id: string;
+  segment_date?: string;
   start_time: string;
   end_time: string;
   overtime_minutes: number;
@@ -62,13 +63,16 @@ export interface UpdateOvertimeRequest {
 }
 
 export interface OvertimeSegmentInput {
+  segment_date: string;
   start_time: string;
   end_time: string;
 }
 
-export interface AddOvertimeSegmentRequest extends OvertimeSegmentInput {}
+export type AddOvertimeSegmentRequest = OvertimeSegmentInput;
 
-export interface UpdateOvertimeSegmentRequest extends Partial<OvertimeSegmentInput> {}
+export interface UpdateOvertimeSegmentRequest extends Partial<Omit<OvertimeSegmentInput, 'segment_date'>> {
+  segment_date: string;
+}
 
 export interface OvertimeHistoryQuery {
   employee_id?: string;

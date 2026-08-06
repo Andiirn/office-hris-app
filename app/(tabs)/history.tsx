@@ -100,6 +100,29 @@ export default function AttendanceHistoryScreen() {
     }
   };
 
+  const formatDateTime = (time?: string | null) => {
+    if (!time) return '--:--';
+    const parsed = new Date(time);
+    if (!Number.isNaN(parsed.getTime())) {
+      const formattedDate = parsed.toLocaleDateString('id-ID', {
+        day: '2-digit',
+        month: 'short',
+      });
+      const formattedTime = parsed.toLocaleTimeString('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      });
+      return `${formattedDate}, ${formattedTime}`;
+    }
+    if (time.includes('T')) {
+      const [d, t] = time.split('T');
+      return `${d} ${t.slice(0, 5)}`;
+    }
+    return time;
+  };
+
   const formatTime = (time?: string | null) => {
     if (!time) return '--:--';
     const timeOnly = time.includes(' ') ? time.split(' ')[1] : (time.includes('T') ? time.split('T')[1] : time);
@@ -109,6 +132,7 @@ export default function AttendanceHistoryScreen() {
   const getAttendanceDate = (item: any) => item.attendance_date || item.date || '-';
   const getCheckinTime = (item: any) => item.checkin_at || item.checkin_time;
   const getCheckoutTime = (item: any) => item.checkout_at || item.checkout_time;
+  const getActualCheckoutTime = (item: any) => item.actual_checkout_at;
   const getBranchName = (item: any) => item.branch_name || item.branch?.name || item.branch?.code || '';
 
   return (
@@ -193,16 +217,24 @@ export default function AttendanceHistoryScreen() {
                 </View>
 
                 {(getCheckinTime(item) || getCheckoutTime(item) || ['PRESENT', 'LATE', 'EARLY_CHECKOUT'].includes(String(item.attendance_status || item.status || 'PRESENT').toUpperCase())) && (
-                  <View className="flex-row justify-between bg-black/5 p-3 rounded-xl mt-1">
-                    <View className="items-center flex-1">
-                      <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-1">Check In</Text>
-                      <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(getCheckinTime(item))}</Text>
+                  <View className="bg-black/5 p-3 rounded-xl mt-1 gap-3">
+                    <View className="flex-row justify-between">
+                      <View className="items-center flex-1">
+                        <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-1">Check In</Text>
+                        <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(getCheckinTime(item))}</Text>
+                      </View>
+                      <View className="w-[1px] bg-black/10 mx-2" />
+                      <View className="items-center flex-1">
+                        <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-1">Check Out</Text>
+                        <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(getCheckoutTime(item))}</Text>
+                      </View>
                     </View>
-                    <View className="w-[1px] bg-black/10 mx-2" />
-                    <View className="items-center flex-1">
-                      <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-1">Check Out</Text>
-                      <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(getCheckoutTime(item))}</Text>
-                    </View>
+                    {getActualCheckoutTime(item) ? (
+                      <View className="items-center pt-2 border-t border-black/5">
+                        <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-1">Actual Check Out</Text>
+                        <Text className="font-manrope-extrabold text-base text-primary">{formatDateTime(getActualCheckoutTime(item))}</Text>
+                      </View>
+                    ) : null}
                   </View>
                 )}
 

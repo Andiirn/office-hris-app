@@ -30,6 +30,29 @@ function formatTime(time?: string | null) {
   return time.slice(0, 5);
 }
 
+function formatDateTime(time?: string | null) {
+  if (!time) return '--:--';
+  const parsed = new Date(time);
+  if (!Number.isNaN(parsed.getTime())) {
+    const formattedDate = parsed.toLocaleDateString('id-ID', {
+      day: '2-digit',
+      month: 'short',
+    });
+    const formattedTime = parsed.toLocaleTimeString('en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    });
+    return `${formattedDate}, ${formattedTime}`;
+  }
+  if (time.includes('T')) {
+    const [d, t] = time.split('T');
+    return `${d} ${t.slice(0, 5)}`;
+  }
+  return time;
+}
+
 function getAttendanceDate(item: any) {
   return item.attendance_date || item.date || '-';
 }
@@ -40,6 +63,10 @@ function getCheckIn(item: any) {
 
 function getCheckOut(item: any) {
   return item.checkout_at || item.checkout_time;
+}
+
+function getActualCheckOut(item: any) {
+  return item.actual_checkout_at;
 }
 
 export default function AttendanceScreen() {
@@ -229,16 +256,24 @@ export default function AttendanceScreen() {
                 </View>
 
                 {(getCheckIn(item) || getCheckOut(item) || ['PRESENT', 'LATE', 'EARLY_CHECKOUT'].includes(String(item.attendance_status || item.status || 'PRESENT').toUpperCase())) && (
-                  <View className="flex-row justify-between bg-black/5 p-3 rounded-xl mt-1">
-                    <View className="items-center flex-1">
-                      <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-1">Check In</Text>
-                      <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(getCheckIn(item))}</Text>
+                  <View className="bg-black/5 p-3 rounded-xl mt-1 gap-3">
+                    <View className="flex-row justify-between">
+                      <View className="items-center flex-1">
+                        <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-1">Check In</Text>
+                        <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(getCheckIn(item))}</Text>
+                      </View>
+                      <View className="w-[1px] bg-black/10 mx-2" />
+                      <View className="items-center flex-1">
+                        <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-1">Check Out</Text>
+                        <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(getCheckOut(item))}</Text>
+                      </View>
                     </View>
-                    <View className="w-[1px] bg-black/10 mx-2" />
-                    <View className="items-center flex-1">
-                      <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-1">Check Out</Text>
-                      <Text className="font-manrope-extrabold text-lg text-primary">{formatTime(getCheckOut(item))}</Text>
-                    </View>
+                    {getActualCheckOut(item) ? (
+                      <View className="items-center pt-2 border-t border-black/5">
+                        <Text className="font-inter-semibold text-[10px] text-text-muted uppercase mb-1">Actual Check Out</Text>
+                        <Text className="font-manrope-extrabold text-base text-primary">{formatDateTime(getActualCheckOut(item))}</Text>
+                      </View>
+                    ) : null}
                   </View>
                 )}
               </GlassCard>
