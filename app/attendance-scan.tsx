@@ -1,13 +1,12 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CameraView, useCameraPermissions, type CameraCapturedPicture } from 'expo-camera';
 import * as Device from 'expo-device';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { MotiView } from 'moti';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../src/components/ui/Button';
 import { Skeleton, SkeletonCard } from '../src/components/ui/Skeleton';
@@ -17,6 +16,9 @@ import { Tokens } from '../src/core/theme/tokens';
 import { parseAttendanceQrPayload } from '../src/features/attendance/qr';
 import { getAttendanceScanDecisionForToday } from '../src/features/attendance/scan-state';
 import { attendanceService, createSelfiePhotoCode } from '../src/services/attendance.service';
+import { authService } from '../src/services/auth.service';
+import { EmpAssignmentService, EmpStoreAssignment, EmpStoreShift } from '../src/services/emp-assignment.service';
+import { ProfileData } from '../src/types/profile';
 import { useAuthStore } from '../src/stores/auth.store';
 import { goBackOrTabs } from '../src/utils/navigation';
 
@@ -34,8 +36,6 @@ type ScanFailure = {
   tone?: 'success' | 'guidance' | 'security';
 };
 
-const SELFIE_INFO_SEEN_KEY = 'attendance_scan_selfie_info_seen';
-
 const FRAUD_REASON_LABELS: Record<string, string> = {
   TAMPERED_TOKEN: 'Token selfie tidak valid atau berubah',
   HIGH_PRECISION_GPS: 'Presisi GPS belum cukup untuk verifikasi',
@@ -49,6 +49,12 @@ const FRAUD_REASON_LABELS: Record<string, string> = {
 const LOCATION_FLAGS = new Set(['OUTSIDE_RADIUS', 'HIGH_PRECISION_GPS', 'MOCK_LOCATION']);
 const GUIDANCE_FLAGS = new Set(['QR_REPLAY', 'QR_EXPIRED']);
 const SECURITY_FLAGS = new Set(['TAMPERED_TOKEN', 'EMULATOR_DETECTED', 'MOCK_LOCATION']);
+
+const DEFAULT_FALLBACK_SHIFTS: EmpStoreShift[] = [
+  { id: 'pagi', name: 'Pagi', code: 'PAGI' },
+  { id: 'siang', name: 'Siang', code: 'SIANG' },
+  { id: 'malam', name: 'Malam', code: 'MALAM' },
+];
 
 const normalizeErrorItems = (value: unknown) => {
   if (!Array.isArray(value)) return [];
@@ -181,6 +187,9 @@ const getYesterdayDateString = (date = new Date()) => {
   prev.setDate(prev.getDate() - 1);
   return getLocalDateString(prev);
 };
+
+const isSelfieCategory = (value?: string | null) =>
+  value !== null && value !== undefined && String(value).trim() !== '';
 
 
 function SuccessResultScreen({
@@ -402,7 +411,6 @@ export default function AttendanceScanScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const cameraRef = useRef<React.ElementRef<typeof CameraView> | null>(null);
-  const mockAlertShownRef = useRef(false);
   const { user } = useAuthStore();
   const [status, setStatus] = useState<LocationStatus>('loading');
   const [cameraStatus, setCameraStatus] = useState<CameraStatus>('loading');
@@ -416,9 +424,30 @@ export default function AttendanceScanScreen() {
   const [coords, setCoords] = useState<{ lat: number; long: number } | null>(null);
   const [address, setAddress] = useState<string | null>(null);
   const [isMocked, setIsMocked] = useState(false);
-  const [isSelfieMode, setIsSelfieMode] = useState(false);
   const [scanFailure, setScanFailure] = useState<ScanFailure | null>(null);
+  const [selfieAssignment, setSelfieAssignment] = useState<EmpStoreAssignment | null>(null);
+  const [selfieAssignmentLoading, setSelfieAssignmentLoading] = useState(false);
+  const [selfieAssignmentError, setSelfieAssignmentError] = useState<string | null>(null);
+  const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null);
+  const [assignmentReloadTick, setAssignmentReloadTick] = useState(0);
   const { width, height } = useWindowDimensions();
+  const { data: fetchedProfile } = useQuery({
+    queryKey: qk.profile(),
+    queryFn: () => authService.getProfile(),
+    staleTime: 1000 * 60 * 5,
+    enabled: !!user?.id,
+  });
+  const cachedProfile = queryClient.getQueryData<ProfileData>(qk.profile());
+  const selfieCategory = fetchedProfile?.employee_category ?? cachedProfile?.employee_category ?? user?.employee_category ?? null;
+  const hasSelfieCategory = isSelfieCategory(selfieCategory);
+  const [scanMode, setScanMode] = useState<ScanMode>(hasSelfieCategory ? 'selfie' : 'qr');
+  const rawSelfieShifts = selfieAssignment?.store?.shifts ?? [];
+  const selfieShifts = rawSelfieShifts.length > 0 ? rawSelfieShifts : DEFAULT_FALLBACK_SHIFTS;
+  const selectedShift = selfieShifts.find((shift) => shift.id === selectedShiftId) ?? selfieShifts[0] ?? null;
+
+  useEffect(() => {
+    setScanMode(hasSelfieCategory ? 'selfie' : 'qr');
+  }, [hasSelfieCategory]);
 
   const submitSelfieAttendance = async () => {
     if (!coords) return;
@@ -486,6 +515,7 @@ export default function AttendanceScanScreen() {
         deviceModel: Device.modelName || Device.deviceName || 'unknown',
         timezoneID: Intl.DateTimeFormat().resolvedOptions().timeZone,
         timestamp: Math.floor(Date.now() / 1000),
+        selected_shift_id: selectedShift?.id || null,
       };
       const upload = toSelfieUpload(selfiePhoto, photoCode);
 
@@ -523,7 +553,6 @@ export default function AttendanceScanScreen() {
     setCoords(null);
     setAddress(null);
     setIsMocked(false);
-    mockAlertShownRef.current = false;
     try {
       const permission = await Location.requestForegroundPermissionsAsync();
       if (permission.status !== 'granted') {
@@ -568,20 +597,6 @@ export default function AttendanceScanScreen() {
       setErrorMessage('Gagal mengakses lokasi. Coba lagi atau buka pengaturan lokasi.');
     }
   }, []);
-
-  // useEffect(() => {
-  //   if (status !== 'granted' || !isMocked || mockAlertShownRef.current) return;
-
-  //   mockAlertShownRef.current = true;
-  //   Alert.alert(
-  //     'Mock location terdeteksi',
-  //     'Matikan fake GPS atau developer mock location terlebih dahulu, lalu coba lagi untuk melanjutkan absensi.',
-  //     [
-  //       { text: 'Coba Lagi', onPress: requestLocationPermission },
-  //       { text: 'OK', style: 'cancel' },
-  //     ]
-  //   );
-  // }, [isMocked, requestLocationPermission, status]);
 
   useEffect(() => {
     requestLocationPermission();
@@ -629,6 +644,42 @@ export default function AttendanceScanScreen() {
     };
     run();
   }, [cameraPermission, requestCameraPermission]);
+
+  useEffect(() => {
+    if (!hasSelfieCategory || !user?.id) {
+      setSelfieAssignment(null);
+      setSelfieAssignmentError(null);
+      setSelfieAssignmentLoading(false);
+      setSelectedShiftId(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadAssignment = async () => {
+      setSelfieAssignmentLoading(true);
+      setSelfieAssignmentError(null);
+
+      try {
+        const assignment = await EmpAssignmentService.getActiveStoreAssignmentByEmployeeId(user.id);
+        if (cancelled) return;
+        setSelfieAssignment(assignment);
+        setSelectedShiftId((current) => current ?? assignment?.store?.shifts?.[0]?.id ?? null);
+      } catch (error: any) {
+        if (cancelled) return;
+        setSelfieAssignment(null);
+        setSelfieAssignmentError(error?.response?.data?.message || error?.message || 'Gagal memuat assignment selfie');
+      } finally {
+        if (!cancelled) setSelfieAssignmentLoading(false);
+      }
+    };
+
+    loadAssignment();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [assignmentReloadTick, hasSelfieCategory, user?.id]);
 
   const submitAttendance = useCallback(async (rawQrData: string) => {
     if (!coords) return;
@@ -740,32 +791,12 @@ export default function AttendanceScanScreen() {
   };
 
   const handleModeChange = (mode: ScanMode) => {
-    setIsSelfieMode(mode === 'selfie');
+    setScanMode(mode);
     setScanned(false);
     setCheckinMessage(null);
     setSuccessTime(null);
     setErrorMessage(null);
     setScanFailure(null);
-
-    if (mode === 'selfie') {
-      AsyncStorage.getItem(SELFIE_INFO_SEEN_KEY)
-        .then((value) => {
-          if (value === 'true') return;
-          Alert.alert(
-            'Info Mode Selfie',
-            'Jika ingin menggunakan mode selfie, pastikan HRD sudah menugaskan Anda untuk menggunakannya terlebih dahulu.',
-            [
-              {
-                text: 'Mengerti',
-                onPress: () => {
-                  AsyncStorage.setItem(SELFIE_INFO_SEEN_KEY, 'true').catch(() => { });
-                },
-              },
-            ]
-          );
-        })
-        .catch(() => { });
-    }
   };
 
   const isScannerVisible =
@@ -827,7 +858,7 @@ export default function AttendanceScanScreen() {
           <MaterialIcons name="arrow-back" size={24} color={Tokens.colors.primary} />
         </Pressable>
         <Text className="font-manrope-extrabold text-xl text-primary flex-1 text-center mr-10">
-          Silahkan Scan QR Code / Wajah Anda
+          {hasSelfieCategory ? 'Absensi Selfie' : 'Silahkan Scan QR Code / Wajah Anda'}
         </Text>
       </View>
 
@@ -876,7 +907,7 @@ export default function AttendanceScanScreen() {
             </View>
             <Text className="font-manrope-bold text-lg text-primary text-center">Izin Kamera Diperlukan</Text>
             <Text className="font-inter text-sm text-on-surface-variant text-center px-2">
-              Harap berikan izin kamera untuk memindai QR code cabang Anda.
+              Harap berikan izin kamera untuk melanjutkan absensi.
             </Text>
             <Button title="Beri Izin Kamera" onPress={requestCameraPermission} className="w-full mt-2" />
           </View>
@@ -884,21 +915,22 @@ export default function AttendanceScanScreen() {
 
         {status === 'granted' && cameraStatus === 'granted' && (
           <View className="items-center w-full gap-5">
-            {!isSelfieMode ? (
+            {!hasSelfieCategory && scanMode === 'qr' && (
               <View className="w-full max-w-[320px] rounded-2xl bg-white/80 px-4 py-3 border border-white/90 shadow-sm">
                 <Text className="font-inter-bold text-[10px] text-primary uppercase tracking-wider">Lokasi Saat Ini</Text>
                 <Text className="font-inter text-xs text-on-surface-variant mt-1 leading-5">
                   {address || 'Mengambil lokasi jalan...'}
                 </Text>
               </View>
-            ) : null}
+            )}
 
             {isScannerVisible && (
               <>
-                {!isSelfieMode ? (
+                {scanMode === 'qr' ? (
                   <View className="w-full max-w-[320px] aspect-square rounded-3xl overflow-hidden border-[4px] border-primary-container/20 shadow-2xl relative">
                     <CameraView
                       style={{ flex: 1 }}
+                      facing="back"
                       barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
                       onBarcodeScanned={scanned ? undefined : ({ data }) => {
                         setScanned(true);
@@ -911,52 +943,107 @@ export default function AttendanceScanScreen() {
                     </View>
                   </View>
                 ) : (
-                  <View className="w-full aspect-[3/4] rounded-3xl overflow-hidden border-[4px] border-primary-container/20 shadow-2xl relative bg-black">
-                    <CameraView
-                      ref={cameraRef}
-                      style={{ flex: 1 }}
-                      facing="front"
-                    />
-                    {submitting && (
-                      <View className="absolute inset-0 items-center justify-center bg-black/45">
-                        <View className="items-center rounded-3xl bg-white/92 px-5 py-4 shadow-lg">
-                          <ActivityIndicator size="large" color={Tokens.colors.primary} />
-                          <Text className="font-inter-bold text-sm text-primary mt-3 text-center">
-                            Mengirim payload selfie
-                          </Text>
+                  <View className="w-full gap-3">
+                    <View className="w-full aspect-[3/4] rounded-3xl overflow-hidden border-[4px] border-primary-container/20 shadow-2xl relative bg-black">
+                      <CameraView
+                        ref={cameraRef}
+                        style={{ flex: 1 }}
+                        facing="front"
+                      />
+                      {submitting && (
+                        <View className="absolute inset-0 items-center justify-center bg-black/45">
+                          <View className="items-center rounded-3xl bg-white/92 px-5 py-4 shadow-lg">
+                            <ActivityIndicator size="large" color={Tokens.colors.primary} />
+                            <Text className="font-inter-bold text-sm text-primary mt-3 text-center">
+                              Mengirim payload selfie
+                            </Text>
+                          </View>
                         </View>
+                      )}
+                      <View className="absolute bottom-4 left-4 right-4 bg-black/60 p-4 rounded-xl border border-white/30">
+                        <Text className="font-inter text-xs text-white/90 leading-relaxed">
+                          {address ? `${address}\n` : ''}Lat: {coords?.lat.toFixed(6)}, Long: {coords?.long.toFixed(6)}
+                        </Text>
                       </View>
-                    )}
-                    <View className="absolute bottom-4 left-4 right-4 bg-black/60 p-4 rounded-xl border border-white/30">
-                      <Text className="font-inter text-xs text-white/90 leading-relaxed">
-                        {address ? `${address}\n` : ''}Lat: {coords?.lat.toFixed(6)}, Long: {coords?.long.toFixed(6)}
-                      </Text>
                     </View>
                   </View>
                 )}
 
                 <Text className="font-inter text-xs text-text-muted italic text-center mt-2 px-6">
-                  {!isSelfieMode
+                  {scanMode === 'qr'
                     ? 'Arahkan kamera ke QR Code tablet untuk Check-in/Out'
                     : 'Posisikan wajah Anda di kamera, lalu tekan tombol foto di bawah.'}
                 </Text>
 
-                <View className="flex-row items-center justify-center mt-2 gap-4 w-full">
-                  <Pressable
-                    onPress={() => handleModeChange('qr')}
-                    className={`flex-1 py-3 rounded-xl border items-center ${!isSelfieMode ? 'bg-primary border-primary' : 'bg-transparent border-primary/20'}`}
-                  >
-                    <Text className={`font-inter-bold text-sm ${!isSelfieMode ? 'text-white' : 'text-primary'}`}>Scan QR</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => handleModeChange('selfie')}
-                    className={`flex-1 py-3 rounded-xl border items-center ${isSelfieMode ? 'bg-primary border-primary' : 'bg-transparent border-primary/20'}`}
-                  >
-                    <Text className={`font-inter-bold text-sm ${isSelfieMode ? 'text-white' : 'text-primary'}`}>Foto Selfie</Text>
-                  </Pressable>
-                </View>
+                {!hasSelfieCategory ? (
+                  <View className="flex-row items-center justify-center mt-2 gap-4 w-full">
+                    <Pressable
+                      onPress={() => handleModeChange('qr')}
+                      className={`flex-1 py-3 rounded-xl border items-center ${scanMode === 'qr' ? 'bg-primary border-primary' : 'bg-transparent border-primary/20'}`}
+                    >
+                      <Text className={`font-inter-bold text-sm ${scanMode === 'qr' ? 'text-white' : 'text-primary'}`}>Scan QR</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => handleModeChange('selfie')}
+                      className={`flex-1 py-3 rounded-xl border items-center ${scanMode === 'selfie' ? 'bg-primary border-primary' : 'bg-transparent border-primary/20'}`}
+                    >
+                      <Text className={`font-inter-bold text-sm ${scanMode === 'selfie' ? 'text-white' : 'text-primary'}`}>Foto Selfie</Text>
+                    </Pressable>
+                  </View>
+                ) : (
+                  <View className="w-full max-w-[320px] rounded-3xl bg-white/90 px-4 py-4 border border-white/90 shadow-sm">
+                    <Text className="font-inter-bold text-[10px] text-primary uppercase tracking-wider">
+                      Shift Tersedia
+                    </Text>
+                    {selfieAssignmentLoading ? (
+                      <View className="mt-3 gap-2">
+                        <Skeleton height={18} width="72%" />
+                        <Skeleton height={14} width="48%" />
+                      </View>
+                    ) : selfieAssignmentError ? (
+                      <View className="mt-3 gap-2">
+                        <Text className="font-inter text-sm text-error">{selfieAssignmentError}</Text>
+                        <Button
+                          title="Coba Lagi"
+                          onPress={() => setAssignmentReloadTick((value) => value + 1)}
+                          className="mt-1"
+                        />
+                      </View>
+                    ) : (
+                      <View className="mt-3 gap-2">
+                        <Text className="font-manrope-bold text-base text-primary">
+                          {selfieAssignment?.store?.name || selfieAssignment?.store?.code || 'Selfie Mode'}
+                        </Text>
+                        <Text className="font-inter text-xs text-on-surface-variant">
+                          {selfieAssignment?.employee?.full_name || user?.full_name || '-'} • {user?.employee_category || '-'}
+                        </Text>
+                        <View className="mt-3">
+                          <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider mb-2">
+                            Pilih Shift
+                          </Text>
+                          <View className="flex-row flex-wrap gap-2">
+                            {selfieShifts.map((shift: EmpStoreShift) => {
+                              const active = shift.id === selectedShift?.id;
+                              return (
+                                <Pressable
+                                  key={shift.id}
+                                  onPress={() => setSelectedShiftId(shift.id)}
+                                  className={`px-3 py-2 rounded-full border ${active ? 'bg-primary border-primary' : 'bg-white border-outline-variant'}`}
+                                >
+                                  <Text className={`font-inter-bold text-xs ${active ? 'text-white' : 'text-primary'}`}>
+                                    {shift.name || shift.code || 'Shift'}
+                                  </Text>
+                                </Pressable>
+                              );
+                            })}
+                          </View>
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                )}
 
-                {isSelfieMode && (
+                {scanMode === 'selfie' && (
                   <Pressable
                     disabled={submitting}
                     onPress={submitSelfieAttendance}

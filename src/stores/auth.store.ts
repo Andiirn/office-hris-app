@@ -8,6 +8,7 @@ export interface User {
   nik: string;
   full_name: string;
   role?: string | null;
+  employee_category?: string | null;
   company_id?: string | null;
   branch_id?: string | null;
   position_name?: string | null;
@@ -55,7 +56,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const value = await AsyncStorage.getItem('has_seen_onboarding');
       set({ hasSeenOnboarding: value === 'true' });
-    } catch (e) {
+    } catch {
       set({ hasSeenOnboarding: false });
     }
   },

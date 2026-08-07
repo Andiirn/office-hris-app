@@ -1,5 +1,5 @@
 import { CancelledError } from '@tanstack/react-query';
-import axios from 'axios';
+import { isAxiosError } from 'axios';
 import { authService } from '../../services/auth.service';
 import { useAuthStore } from '../../stores/auth.store';
 import { setSuppressAuthErrorAlerts } from '../api/client';
@@ -32,6 +32,7 @@ export const sessionManager = {
         nik: profile.nik || '',
         full_name: profile.full_name || '',
         role: profile.role,
+        employee_category: profile.employee_category ?? null,
         company_id: profile.company_id || profile.company?.id || null,
         position_name: profile.position_name,
         department_name: profile.department_name,
@@ -55,7 +56,7 @@ export const sessionManager = {
 
       console.error('[SessionManager] Failed to initialize session:', error);
 
-      if (axios.isAxiosError(error) && error.response?.status === 401) {
+      if (isAxiosError(error) && error.response?.status === 401) {
         await tokenStore.clearTokens();
         useAuthStore.getState().setUser(null);
         useAuthStore.getState().setInitialized(true);
