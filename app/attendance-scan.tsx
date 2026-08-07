@@ -6,7 +6,7 @@ import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { MotiView } from 'moti';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../src/components/ui/Button';
 import { Skeleton, SkeletonCard } from '../src/components/ui/Skeleton';
@@ -862,88 +862,153 @@ export default function AttendanceScanScreen() {
         </Text>
       </View>
 
-      <View className="flex-1 px-5 items-center justify-center gap-4 z-10">
-        {status === 'loading' && (
-          <View className="w-full gap-3 items-center">
-            <ActivityIndicator size="large" color={Tokens.colors.primary} className="mb-4" />
-            <Text className="font-inter-medium text-sm text-text-muted">Mengambil lokasi GPS...</Text>
-            <View className="w-full mt-4">
-              <Skeleton height={20} width="60%" style={{ alignSelf: 'center', marginBottom: 12 }} />
-              <SkeletonCard />
-            </View>
-          </View>
-        )}
-
-        {status === 'denied' && (
-          <View className="items-center gap-4 w-full bg-white rounded-3xl p-6 shadow-sm border border-white/80">
-            <View className="w-16 h-16 rounded-full bg-error/10 items-center justify-center mb-2">
-              <MaterialIcons name="location-off" size={32} color={Tokens.colors.error} />
-            </View>
-            <Text className="font-manrope-bold text-lg text-primary text-center">Akses Lokasi Ditolak</Text>
-            <Text className="font-inter text-sm text-on-surface-variant text-center px-2">
-              {errorMessage || 'Aplikasi memerlukan izin lokasi untuk melakukan absensi.'}
-            </Text>
-            <Button title="Coba Lagi" onPress={() => requestLocationPermission()} className="w-full mt-2" />
-          </View>
-        )}
-
-        {hasMockLocationState && (
-          <View className="items-center gap-4 w-full bg-white rounded-3xl p-6 shadow-sm border border-red-200">
-            <View className="w-16 h-16 rounded-full bg-red-50 items-center justify-center mb-2">
-              <MaterialIcons name="gps-not-fixed" size={32} color={Tokens.colors.error} />
-            </View>
-            <Text className="font-manrope-bold text-lg text-error text-center">Fake GPS Terdeteksi</Text>
-            <Text className="font-inter text-sm text-on-surface-variant text-center px-2">
-              Matikan fake GPS atau lokasi palsu terlebih dahulu, lalu coba lagi.
-            </Text>
-            <Button title="Coba Lagi" onPress={() => requestLocationPermission()} className="w-full mt-2" />
-          </View>
-        )}
-
-        {status === 'granted' && cameraStatus === 'denied' && (
-          <View className="items-center gap-4 w-full bg-white rounded-3xl p-6 shadow-sm border border-white/80">
-            <View className="w-16 h-16 rounded-full bg-error/10 items-center justify-center mb-2">
-              <MaterialIcons name="camera-alt" size={32} color={Tokens.colors.error} />
-            </View>
-            <Text className="font-manrope-bold text-lg text-primary text-center">Izin Kamera Diperlukan</Text>
-            <Text className="font-inter text-sm text-on-surface-variant text-center px-2">
-              Harap berikan izin kamera untuk melanjutkan absensi.
-            </Text>
-            <Button title="Beri Izin Kamera" onPress={requestCameraPermission} className="w-full mt-2" />
-          </View>
-        )}
-
-        {status === 'granted' && cameraStatus === 'granted' && (
-          <View className="items-center w-full gap-5">
-            {!hasSelfieCategory && scanMode === 'qr' && (
-              <View className="w-full max-w-[320px] rounded-2xl bg-white/80 px-4 py-3 border border-white/90 shadow-sm">
-                <Text className="font-inter-bold text-[10px] text-primary uppercase tracking-wider">Lokasi Saat Ini</Text>
-                <Text className="font-inter text-xs text-on-surface-variant mt-1 leading-5">
-                  {address || 'Mengambil lokasi jalan...'}
-                </Text>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 20, paddingBottom: 32, alignItems: 'center', justifyContent: 'center' }}
+      >
+        <View className="flex-1 items-center justify-center gap-4 w-full max-w-[340px] z-10">
+          {status === 'loading' && (
+            <View className="w-full gap-3 items-center">
+              <ActivityIndicator size="large" color={Tokens.colors.primary} className="mb-4" />
+              <Text className="font-inter-medium text-sm text-text-muted">Mengambil lokasi GPS...</Text>
+              <View className="w-full mt-4">
+                <Skeleton height={20} width="60%" style={{ alignSelf: 'center', marginBottom: 12 }} />
+                <SkeletonCard />
               </View>
-            )}
+            </View>
+          )}
 
-            {isScannerVisible && (
-              <>
-                {scanMode === 'qr' ? (
-                  <View className="w-full max-w-[320px] aspect-square rounded-3xl overflow-hidden border-[4px] border-primary-container/20 shadow-2xl relative">
-                    <CameraView
-                      style={{ flex: 1 }}
-                      facing="back"
-                      barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-                      onBarcodeScanned={scanned ? undefined : ({ data }) => {
-                        setScanned(true);
-                        submitAttendance(data);
-                      }}
-                    />
-                    <View className="absolute inset-0 items-center justify-center pointer-events-none">
-                      <View className="w-48 h-48 border-2 border-dashed border-white/80 rounded-2xl" />
-                      <View className="absolute left-1/2 top-12 w-[1px] h-40 bg-red-500 opacity-60" style={{ transform: [{ translateX: -0.5 }] }} />
+          {status === 'denied' && (
+            <View className="items-center gap-4 w-full bg-white rounded-3xl p-6 shadow-sm border border-white/80">
+              <View className="w-16 h-16 rounded-full bg-error/10 items-center justify-center mb-2">
+                <MaterialIcons name="location-off" size={32} color={Tokens.colors.error} />
+              </View>
+              <Text className="font-manrope-bold text-lg text-primary text-center">Akses Lokasi Ditolak</Text>
+              <Text className="font-inter text-sm text-on-surface-variant text-center px-2">
+                {errorMessage || 'Aplikasi memerlukan izin lokasi untuk melakukan absensi.'}
+              </Text>
+              <Button title="Coba Lagi" onPress={() => requestLocationPermission()} className="w-full mt-2" />
+            </View>
+          )}
+
+          {hasMockLocationState && (
+            <View className="items-center gap-4 w-full bg-white rounded-3xl p-6 shadow-sm border border-red-200">
+              <View className="w-16 h-16 rounded-full bg-red-50 items-center justify-center mb-2">
+                <MaterialIcons name="gps-not-fixed" size={32} color={Tokens.colors.error} />
+              </View>
+              <Text className="font-manrope-bold text-lg text-error text-center">Fake GPS Terdeteksi</Text>
+              <Text className="font-inter text-sm text-on-surface-variant text-center px-2">
+                Matikan fake GPS atau lokasi palsu terlebih dahulu, lalu coba lagi.
+              </Text>
+              <Button title="Coba Lagi" onPress={() => requestLocationPermission()} className="w-full mt-2" />
+            </View>
+          )}
+
+          {status === 'granted' && cameraStatus === 'denied' && (
+            <View className="items-center gap-4 w-full bg-white rounded-3xl p-6 shadow-sm border border-white/80">
+              <View className="w-16 h-16 rounded-full bg-error/10 items-center justify-center mb-2">
+                <MaterialIcons name="camera-alt" size={32} color={Tokens.colors.error} />
+              </View>
+              <Text className="font-manrope-bold text-lg text-primary text-center">Izin Kamera Diperlukan</Text>
+              <Text className="font-inter text-sm text-on-surface-variant text-center px-2">
+                Harap berikan izin kamera untuk melanjutkan absensi.
+              </Text>
+              <Button title="Beri Izin Kamera" onPress={requestCameraPermission} className="w-full mt-2" />
+            </View>
+          )}
+
+          {status === 'granted' && cameraStatus === 'granted' && (
+            <View className="items-center w-full gap-4">
+              {!hasSelfieCategory && scanMode === 'qr' && (
+                <View className="w-full rounded-2xl bg-white/80 px-4 py-3 border border-white/90 shadow-sm">
+                  <Text className="font-inter-bold text-[10px] text-primary uppercase tracking-wider">Lokasi Saat Ini</Text>
+                  <Text className="font-inter text-xs text-on-surface-variant mt-1 leading-5">
+                    {address || 'Mengambil lokasi jalan...'}
+                  </Text>
+                </View>
+              )}
+
+              {isScannerVisible && (
+                <>
+                  {hasSelfieCategory && scanMode === 'selfie' && (
+                    <View className="w-full rounded-3xl bg-white/95 px-4 py-4 border border-white/90 shadow-sm mb-1">
+                      <View className="flex-row items-center justify-between">
+                        <Text className="font-inter-bold text-[10px] text-primary uppercase tracking-wider">
+                          Shift Tersedia
+                        </Text>
+                        {selfieAssignment?.store?.code && (
+                          <View className="bg-primary/10 px-2.5 py-0.5 rounded-full">
+                            <Text className="font-inter-bold text-[10px] text-primary">
+                              {selfieAssignment.store.code}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                      {selfieAssignmentLoading ? (
+                        <View className="mt-3 gap-2">
+                          <Skeleton height={18} width="72%" />
+                          <Skeleton height={14} width="48%" />
+                        </View>
+                      ) : selfieAssignmentError ? (
+                        <View className="mt-3 gap-2">
+                          <Text className="font-inter text-sm text-error">{selfieAssignmentError}</Text>
+                          <Button
+                            title="Coba Lagi"
+                            onPress={() => setAssignmentReloadTick((value) => value + 1)}
+                            className="mt-1"
+                          />
+                        </View>
+                      ) : (
+                        <View className="mt-2 gap-1.5">
+                          <Text className="font-manrope-bold text-base text-primary">
+                            {selfieAssignment?.store?.name || selfieAssignment?.store?.code || 'Selfie Mode'}
+                          </Text>
+                          <Text className="font-inter text-xs text-on-surface-variant">
+                            {selfieAssignment?.employee?.full_name || user?.full_name || '-'} • {user?.employee_category || '-'}
+                          </Text>
+                          <View className="mt-2">
+                            <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider mb-2">
+                              Pilih Shift Toko
+                            </Text>
+                            <View className="flex-row flex-wrap gap-2">
+                              {selfieShifts.map((shift: EmpStoreShift) => {
+                                const active = shift.id === selectedShift?.id;
+                                return (
+                                  <Pressable
+                                    key={shift.id}
+                                    onPress={() => setSelectedShiftId(shift.id)}
+                                    className={`px-3.5 py-2 rounded-full border ${active ? 'bg-primary border-primary' : 'bg-white border-outline-variant'}`}
+                                  >
+                                    <Text className={`font-inter-bold text-xs ${active ? 'text-white' : 'text-primary'}`}>
+                                      {shift.name || shift.code || 'Shift'}
+                                    </Text>
+                                  </Pressable>
+                                );
+                              })}
+                            </View>
+                          </View>
+                        </View>
+                      )}
                     </View>
-                  </View>
-                ) : (
-                  <View className="w-full gap-3">
+                  )}
+
+                  {scanMode === 'qr' ? (
+                    <View className="w-full aspect-square rounded-3xl overflow-hidden border-[4px] border-primary-container/20 shadow-2xl relative">
+                      <CameraView
+                        style={{ flex: 1 }}
+                        facing="back"
+                        barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+                        onBarcodeScanned={scanned ? undefined : ({ data }) => {
+                          setScanned(true);
+                          submitAttendance(data);
+                        }}
+                      />
+                      <View className="absolute inset-0 items-center justify-center pointer-events-none">
+                        <View className="w-48 h-48 border-2 border-dashed border-white/80 rounded-2xl" />
+                        <View className="absolute left-1/2 top-12 w-[1px] h-40 bg-red-500 opacity-60" style={{ transform: [{ translateX: -0.5 }] }} />
+                      </View>
+                    </View>
+                  ) : (
                     <View className="w-full aspect-[3/4] rounded-3xl overflow-hidden border-[4px] border-primary-container/20 shadow-2xl relative bg-black">
                       <CameraView
                         ref={cameraRef}
@@ -951,7 +1016,7 @@ export default function AttendanceScanScreen() {
                         facing="front"
                       />
                       {submitting && (
-                        <View className="absolute inset-0 items-center justify-center bg-black/45">
+                        <View className="absolute inset-0 items-center justify-center bg-black/45 z-20">
                           <View className="items-center rounded-3xl bg-white/92 px-5 py-4 shadow-lg">
                             <ActivityIndicator size="large" color={Tokens.colors.primary} />
                             <Text className="font-inter-bold text-sm text-primary mt-3 text-center">
@@ -960,104 +1025,52 @@ export default function AttendanceScanScreen() {
                           </View>
                         </View>
                       )}
-                      <View className="absolute bottom-4 left-4 right-4 bg-black/60 p-4 rounded-xl border border-white/30">
+                      <View className="absolute bottom-4 left-4 right-4 bg-black/60 p-4 rounded-xl border border-white/30 z-10">
                         <Text className="font-inter text-xs text-white/90 leading-relaxed">
                           {address ? `${address}\n` : ''}Lat: {coords?.lat.toFixed(6)}, Long: {coords?.long.toFixed(6)}
                         </Text>
                       </View>
                     </View>
-                  </View>
-                )}
+                  )}
 
-                <Text className="font-inter text-xs text-text-muted italic text-center mt-2 px-6">
-                  {scanMode === 'qr'
-                    ? 'Arahkan kamera ke QR Code tablet untuk Check-in/Out'
-                    : 'Posisikan wajah Anda di kamera, lalu tekan tombol foto di bawah.'}
-                </Text>
+                  <Text className="font-inter text-xs text-text-muted italic text-center mt-1 px-6">
+                    {scanMode === 'qr'
+                      ? 'Arahkan kamera ke QR Code tablet untuk Check-in/Out'
+                      : 'Posisikan wajah Anda di kamera, lalu tekan tombol foto di bawah.'}
+                  </Text>
 
-                {!hasSelfieCategory ? (
-                  <View className="flex-row items-center justify-center mt-2 gap-4 w-full">
+                  {!hasSelfieCategory && (
+                    <View className="flex-row items-center justify-center mt-2 gap-4 w-full">
+                      <Pressable
+                        onPress={() => handleModeChange('qr')}
+                        className={`flex-1 py-3 rounded-xl border items-center ${scanMode === 'qr' ? 'bg-primary border-primary' : 'bg-transparent border-primary/20'}`}
+                      >
+                        <Text className={`font-inter-bold text-sm ${scanMode === 'qr' ? 'text-white' : 'text-primary'}`}>Scan QR</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => handleModeChange('selfie')}
+                        className={`flex-1 py-3 rounded-xl border items-center ${scanMode === 'selfie' ? 'bg-primary border-primary' : 'bg-transparent border-primary/20'}`}
+                      >
+                        <Text className={`font-inter-bold text-sm ${scanMode === 'selfie' ? 'text-white' : 'text-primary'}`}>Foto Selfie</Text>
+                      </Pressable>
+                    </View>
+                  )}
+
+                  {scanMode === 'selfie' && (
                     <Pressable
-                      onPress={() => handleModeChange('qr')}
-                      className={`flex-1 py-3 rounded-xl border items-center ${scanMode === 'qr' ? 'bg-primary border-primary' : 'bg-transparent border-primary/20'}`}
+                      disabled={submitting}
+                      onPress={submitSelfieAttendance}
+                      className={`w-16 h-16 rounded-full items-center justify-center shadow-lg mt-2 ${submitting ? 'bg-primary/50' : 'bg-primary'}`}
                     >
-                      <Text className={`font-inter-bold text-sm ${scanMode === 'qr' ? 'text-white' : 'text-primary'}`}>Scan QR</Text>
+                      <MaterialIcons name="camera-alt" size={28} color="white" />
                     </Pressable>
-                    <Pressable
-                      onPress={() => handleModeChange('selfie')}
-                      className={`flex-1 py-3 rounded-xl border items-center ${scanMode === 'selfie' ? 'bg-primary border-primary' : 'bg-transparent border-primary/20'}`}
-                    >
-                      <Text className={`font-inter-bold text-sm ${scanMode === 'selfie' ? 'text-white' : 'text-primary'}`}>Foto Selfie</Text>
-                    </Pressable>
-                  </View>
-                ) : (
-                  <View className="w-full max-w-[320px] rounded-3xl bg-white/90 px-4 py-4 border border-white/90 shadow-sm">
-                    <Text className="font-inter-bold text-[10px] text-primary uppercase tracking-wider">
-                      Shift Tersedia
-                    </Text>
-                    {selfieAssignmentLoading ? (
-                      <View className="mt-3 gap-2">
-                        <Skeleton height={18} width="72%" />
-                        <Skeleton height={14} width="48%" />
-                      </View>
-                    ) : selfieAssignmentError ? (
-                      <View className="mt-3 gap-2">
-                        <Text className="font-inter text-sm text-error">{selfieAssignmentError}</Text>
-                        <Button
-                          title="Coba Lagi"
-                          onPress={() => setAssignmentReloadTick((value) => value + 1)}
-                          className="mt-1"
-                        />
-                      </View>
-                    ) : (
-                      <View className="mt-3 gap-2">
-                        <Text className="font-manrope-bold text-base text-primary">
-                          {selfieAssignment?.store?.name || selfieAssignment?.store?.code || 'Selfie Mode'}
-                        </Text>
-                        <Text className="font-inter text-xs text-on-surface-variant">
-                          {selfieAssignment?.employee?.full_name || user?.full_name || '-'} • {user?.employee_category || '-'}
-                        </Text>
-                        <View className="mt-3">
-                          <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider mb-2">
-                            Pilih Shift
-                          </Text>
-                          <View className="flex-row flex-wrap gap-2">
-                            {selfieShifts.map((shift: EmpStoreShift) => {
-                              const active = shift.id === selectedShift?.id;
-                              return (
-                                <Pressable
-                                  key={shift.id}
-                                  onPress={() => setSelectedShiftId(shift.id)}
-                                  className={`px-3 py-2 rounded-full border ${active ? 'bg-primary border-primary' : 'bg-white border-outline-variant'}`}
-                                >
-                                  <Text className={`font-inter-bold text-xs ${active ? 'text-white' : 'text-primary'}`}>
-                                    {shift.name || shift.code || 'Shift'}
-                                  </Text>
-                                </Pressable>
-                              );
-                            })}
-                          </View>
-                        </View>
-                      </View>
-                    )}
-                  </View>
-                )}
-
-                {scanMode === 'selfie' && (
-                  <Pressable
-                    disabled={submitting}
-                    onPress={submitSelfieAttendance}
-                    className={`w-16 h-16 rounded-full items-center justify-center shadow-lg mt-2 ${submitting ? 'bg-primary/50' : 'bg-primary'}`}
-                  >
-                    <MaterialIcons name="camera-alt" size={28} color="white" />
-                  </Pressable>
-                )}
-              </>
-            )}
-
-          </View>
-        )}
-      </View>
+                  )}
+                </>
+              )}
+            </View>
+          )}
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
