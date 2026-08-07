@@ -12,7 +12,13 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.hris.employee.app",
       "buildNumber": "1",
+      "entitlements": {
+        "aps-environment": "production"
+      },
       "infoPlist": {
+        "UIBackgroundModes": [
+          "remote-notification"
+        ],
         "NSPhotoLibraryUsageDescription": "Allow $(PRODUCT_NAME) to access your photo library so you can choose and upload your profile picture or submit supporting attachments for leave requests (e.g., uploading a doctor's sick note).",
         "NSPhotoLibraryAddUsageDescription": "Allow $(PRODUCT_NAME) to save photos and generated documents, such as downloaded payslips or attendance receipts, to your photo library.",
         "NSCameraUsageDescription": "Allow $(PRODUCT_NAME) to access your camera to scan office QR codes and take a verification selfie when performing check-in or check-out (e.g. taking a selfie at the start of your shift).",
@@ -91,7 +97,9 @@
             "kotlinVersion": "2.1.20"
           }
         }
-      ]
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging"
     ],
     "experiments": {
       "typedRoutes": true,

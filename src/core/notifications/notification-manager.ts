@@ -2,6 +2,12 @@ import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
+import {
+  getMessaging,
+  getToken,
+  registerDeviceForRemoteMessages,
+  isDeviceRegisteredForRemoteMessages,
+} from '@react-native-firebase/messaging';
 
 // Configure how notifications behave when the app is in the foreground
 Notifications.setNotificationHandler({
@@ -67,10 +73,26 @@ export const NotificationManager = {
       const expoTokenData = await Notifications.getExpoPushTokenAsync({ projectId });
       const expoToken = expoTokenData.data;
 
-      // 5. Retrieve the Native Device Token (FCM Token for Android, APNs for iOS)
-      // This is the token usually required by direct backend integrations
-      const nativeTokenData = await Notifications.getDevicePushTokenAsync();
-      const nativeToken = nativeTokenData.data;
+      // 5. Retrieve the Native Device Token (FCM Token for Android & iOS)
+      // Backend (FCM v1 API) requires a valid FCM Token for both platforms
+      let nativeToken: string | null = null;
+      if (Platform.OS === 'ios') {
+        try {
+          const messagingInstance = getMessaging();
+          if (!isDeviceRegisteredForRemoteMessages(messagingInstance)) {
+            await registerDeviceForRemoteMessages(messagingInstance);
+          }
+          nativeToken = await getToken(messagingInstance);
+          console.log('[NotificationManager] iOS FCM Token obtained successfully:', nativeToken);
+        } catch (fcmErr) {
+          console.warn('[NotificationManager] getToken() failed, falling back to APNs token:', fcmErr);
+          const nativeTokenData = await Notifications.getDevicePushTokenAsync();
+          nativeToken = nativeTokenData.data;
+        }
+      } else {
+        const nativeTokenData = await Notifications.getDevicePushTokenAsync();
+        nativeToken = nativeTokenData.data;
+      }
 
       console.log('======================================================');
       console.log('[NotificationManager] Registration Successful');
@@ -78,7 +100,7 @@ export const NotificationManager = {
       console.log('NATIVE DEVICE TOKEN:', nativeToken);
       console.log('======================================================');
 
-      // Return the native token as it's more standard for direct FCM backends
+      // Return the native token (FCM token) for backend synchronization
       return nativeToken;
     } catch (error) {
       console.error('[NotificationManager] Error during token registration:', error);
