@@ -50,12 +50,6 @@ const LOCATION_FLAGS = new Set(['OUTSIDE_RADIUS', 'HIGH_PRECISION_GPS', 'MOCK_LO
 const GUIDANCE_FLAGS = new Set(['QR_REPLAY', 'QR_EXPIRED']);
 const SECURITY_FLAGS = new Set(['TAMPERED_TOKEN', 'EMULATOR_DETECTED', 'MOCK_LOCATION']);
 
-const DEFAULT_FALLBACK_SHIFTS: EmpStoreShift[] = [
-  { id: 'pagi', name: 'Pagi', code: 'PAGI' },
-  { id: 'siang', name: 'Siang', code: 'SIANG' },
-  { id: 'malam', name: 'Malam', code: 'MALAM' },
-];
-
 const normalizeErrorItems = (value: unknown) => {
   if (!Array.isArray(value)) return [];
   return value
@@ -441,8 +435,7 @@ export default function AttendanceScanScreen() {
   const selfieCategory = fetchedProfile?.employee_category ?? cachedProfile?.employee_category ?? user?.employee_category ?? null;
   const hasSelfieCategory = isSelfieCategory(selfieCategory);
   const [scanMode, setScanMode] = useState<ScanMode>(hasSelfieCategory ? 'selfie' : 'qr');
-  const rawSelfieShifts = selfieAssignment?.store?.shifts ?? [];
-  const selfieShifts = rawSelfieShifts.length > 0 ? rawSelfieShifts : DEFAULT_FALLBACK_SHIFTS;
+  const selfieShifts = selfieAssignment?.store?.shifts ?? [];
   const selectedShift = selfieShifts.find((shift) => shift.id === selectedShiftId) ?? selfieShifts[0] ?? null;
 
   useEffect(() => {
@@ -970,22 +963,30 @@ export default function AttendanceScanScreen() {
                             <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider mb-2">
                               Pilih Shift Toko
                             </Text>
-                            <View className="flex-row flex-wrap gap-2">
-                              {selfieShifts.map((shift: EmpStoreShift) => {
-                                const active = shift.id === selectedShift?.id;
-                                return (
-                                  <Pressable
-                                    key={shift.id}
-                                    onPress={() => setSelectedShiftId(shift.id)}
-                                    className={`px-3.5 py-2 rounded-full border ${active ? 'bg-primary border-primary' : 'bg-white border-outline-variant'}`}
-                                  >
-                                    <Text className={`font-inter-bold text-xs ${active ? 'text-white' : 'text-primary'}`}>
-                                      {shift.name || shift.code || 'Shift'}
-                                    </Text>
-                                  </Pressable>
-                                );
-                              })}
-                            </View>
+                            {selfieShifts.length > 0 ? (
+                              <View className="flex-row flex-wrap gap-2">
+                                {selfieShifts.map((shift: EmpStoreShift) => {
+                                  const active = shift.id === selectedShift?.id;
+                                  return (
+                                    <Pressable
+                                      key={shift.id}
+                                      onPress={() => setSelectedShiftId(shift.id)}
+                                      className={`px-3.5 py-2 rounded-full border ${active ? 'bg-primary border-primary' : 'bg-white border-outline-variant'}`}
+                                    >
+                                      <Text className={`font-inter-bold text-xs ${active ? 'text-white' : 'text-primary'}`}>
+                                        {shift.name || shift.code || 'Shift'}
+                                      </Text>
+                                    </Pressable>
+                                  );
+                                })}
+                              </View>
+                            ) : (
+                              <View className="py-1">
+                                <Text className="font-inter-medium text-xs text-error">
+                                  Shift tidak tersedia untuk toko ini.
+                                </Text>
+                              </View>
+                            )}
                           </View>
                         </View>
                       )}
