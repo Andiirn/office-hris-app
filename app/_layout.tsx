@@ -48,8 +48,32 @@ function onAppStateChange(status: AppStateStatus) {
   }
 }
 
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+function OfflineBanner() {
+  const { isOffline, isLoggedIn } = useAuthStore();
+  const insets = useSafeAreaInsets();
+
+  if (!isOffline || !isLoggedIn) {
+    return null;
+  }
+
+  return (
+    <View
+      style={{ paddingTop: Math.max(insets.top, 8), paddingBottom: 8 }}
+      className="bg-amber-600 px-4 flex-row items-center justify-center gap-2 z-50 shadow-sm"
+    >
+      <MaterialIcons name="wifi-off" size={16} color="#ffffff" />
+      <Text className="font-inter-bold text-xs text-white text-center">
+        Anda sedang dalam mode offline.
+      </Text>
+    </View>
+  );
+}
+
 function RootLayoutNav() {
-  const { isInitialized, isLoggedIn, hasSeenOnboarding, checkOnboarding, bootstrapError, setBootstrapError } = useAuthStore();
+  const { isInitialized, isLoggedIn, hasSeenOnboarding, checkOnboarding, bootstrapError, setBootstrapError, isOffline } = useAuthStore();
   const segments = useSegments();
   const rootNavigationState = useRootNavigationState();
   const router = useRouter();
@@ -220,6 +244,7 @@ function RootLayoutNav() {
 
   return (
     <View style={{ flex: 1 }}>
+      <OfflineBanner />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />

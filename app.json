@@ -2,7 +2,7 @@
   "expo": {
     "name": "HRIS - Mobile",
     "slug": "hris-app",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/new-icon.png",
     "scheme": "hrisapp",
@@ -93,13 +93,17 @@
       [
         "expo-build-properties",
         {
+          "ios": {
+            "useFrameworks": "static"
+          },
           "android": {
             "kotlinVersion": "2.1.20"
           }
         }
       ],
       "@react-native-firebase/app",
-      "@react-native-firebase/messaging"
+      "@react-native-firebase/messaging",
+      "./plugins/withRNFirebaseDisableSPM"
     ],
     "experiments": {
       "typedRoutes": true,
