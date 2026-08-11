@@ -41,6 +41,7 @@ export const authService = {
       return {
         ...rawData,
         role: normalizeRole(rawData.role),
+        employee_category: rawData.employee_category ?? rawData.employee?.employee_category ?? rawData.category ?? null,
         company_id: rawData.company?.id || rawData.company_id || null,
         division_id: rawData.division?.id || rawData.division_id || null,
         position_name: rawData.position?.name || rawData.position_name || null,

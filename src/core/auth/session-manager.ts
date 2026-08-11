@@ -1,5 +1,6 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CancelledError } from '@tanstack/react-query';
-import axios from 'axios';
+import { isAxiosError } from 'axios';
 import { authService } from '../../services/auth.service';
 import { useAuthStore } from '../../stores/auth.store';
 import { setSuppressAuthErrorAlerts } from '../api/client';
@@ -32,6 +33,7 @@ export const sessionManager = {
         nik: profile.nik || '',
         full_name: profile.full_name || '',
         role: profile.role,
+        employee_category: profile.employee_category ?? null,
         company_id: profile.company_id || profile.company?.id || null,
         position_name: profile.position_name,
         department_name: profile.department_name,
@@ -43,8 +45,9 @@ export const sessionManager = {
 
       const refreshToken = await tokenStore.getRefreshToken();
 
-      // Update Auth Store
+      // Update Auth Store (and persist to AsyncStorage)
       await useAuthStore.getState().setAuth(user, accessToken, refreshToken || '');
+      useAuthStore.getState().setOffline(false);
 
       console.log('[SessionManager] Session initialized for:', user.full_name);
     } catch (error) {
@@ -53,14 +56,38 @@ export const sessionManager = {
         return;
       }
 
-      console.error('[SessionManager] Failed to initialize session:', error);
+      console.warn('[SessionManager] Failed to fetch live profile, attempting offline fallback:', error);
 
-      if (axios.isAxiosError(error) && error.response?.status === 401) {
+      if (isAxiosError(error) && error.response?.status === 401) {
         await tokenStore.clearTokens();
+        try {
+          await AsyncStorage.removeItem('cached_user_profile');
+        } catch (e) {
+          console.error('[SessionManager] Failed to clear cached user:', e);
+        }
         useAuthStore.getState().setUser(null);
         useAuthStore.getState().setInitialized(true);
         useAuthStore.getState().setBootstrapError(null);
+        useAuthStore.getState().setOffline(false);
         return;
+      }
+
+      // Offline fallback: load cached user profile from AsyncStorage if available
+      try {
+        const cachedUserStr = await AsyncStorage.getItem('cached_user_profile');
+        if (cachedUserStr) {
+          const cachedUser = JSON.parse(cachedUserStr);
+          if (cachedUser && cachedUser.id) {
+            const refreshToken = await tokenStore.getRefreshToken();
+            await useAuthStore.getState().setAuth(cachedUser, accessToken, refreshToken || '');
+            useAuthStore.getState().setOffline(true);
+            console.log('[SessionManager] Restored session from offline cache for:', cachedUser.full_name);
+            useAuthStore.getState().setBootstrapError(null);
+            return;
+          }
+        }
+      } catch (cacheErr) {
+        console.error('[SessionManager] Failed to restore cached user:', cacheErr);
       }
 
       useAuthStore.getState().setBootstrapError(

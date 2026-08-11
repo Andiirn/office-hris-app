@@ -24,6 +24,9 @@ import { Tokens } from '../../src/core/theme/tokens';
 import { authService } from '../../src/services/auth.service';
 import { useAuthStore } from '../../src/stores/auth.store';
 
+import { queryClient } from '../../src/core/api/query-client';
+import { qk } from '../../src/core/query/query-keys';
+
 const loginSchema = z.object({
   nik: z.string().min(1, 'NIK diperlukan'),
   password: z.string().min(1, 'Password diperlukan'),
@@ -58,11 +61,13 @@ export default function LoginScreen() {
 
       try {
         const profile = await authService.getProfile();
+        queryClient.setQueryData(qk.profile(), profile);
         const userData = {
           id: profile.id,
           nik: profile.nik || '',
           full_name: profile.full_name || '',
           role: profile.role,
+          employee_category: profile.employee_category ?? null,
           position_name: profile.position_name,
           department_name: profile.department_name,
           branch_name: profile.branch_name,
@@ -190,12 +195,12 @@ export default function LoginScreen() {
                 </MotiView>
 
                 <MotiView
-                  from={{ opacity: 0, scale: 0.5, translateY: 30 }}
-                  animate={{ opacity: 1, scale: 1, translateY: 0 }}
+                  from={{ opacity: 0, translateY: 16 }}
+                  animate={{ opacity: 1, translateY: 0 }}
                   transition={{
-                    type: 'spring',
-                    delay: 600,
-                    damping: 10,
+                    type: 'timing',
+                    duration: 300,
+                    delay: 550,
                   }}
                 >
                   <Button

@@ -3,6 +3,7 @@ export interface ProfileData {
   nik?: string;
   full_name?: string;
   role?: string | null;
+  employee_category?: string | null;
   company_id?: string | null;
   email?: string | null;
   phone?: string | null;

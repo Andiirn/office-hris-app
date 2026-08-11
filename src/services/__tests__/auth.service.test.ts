@@ -40,6 +40,7 @@ describe('authService', () => {
       position_name: 'Developer',
       department_name: 'IT',
       branch_name: 'HQ',
+      employee_category: null,
       role: 'employee',
     });
   });

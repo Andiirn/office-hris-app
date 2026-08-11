@@ -66,6 +66,7 @@ export const buildSelfieAttendancePayload = (input: SelfieTimemarkRequest): Self
   address: input.address?.trim() || '',
   deviceID: input.deviceID,
   deviceModel: input.deviceModel,
+  selected_shift_id: input.selected_shift_id || null,
 });
 
 const buildSelfieFormData = (input: SelfieTimemarkRequest, selfiePhoto: SelfieUploadFile) => {
@@ -84,6 +85,9 @@ const buildSelfieFormData = (input: SelfieTimemarkRequest, selfiePhoto: SelfieUp
   formData.append('address', payload.address);
   formData.append('deviceID', payload.deviceID);
   formData.append('deviceModel', payload.deviceModel);
+  if (payload.selected_shift_id) {
+    formData.append('selected_shift_id', payload.selected_shift_id);
+  }
   return formData;
 };
 

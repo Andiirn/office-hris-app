@@ -1,6 +1,10 @@
 import { useAuthStore } from '../auth.store';
 import { tokenStore } from '../../core/auth/token-store';
 
+jest.mock('@react-native-async-storage/async-storage', () =>
+  require('@react-native-async-storage/async-storage/jest/async-storage-mock')
+);
+
 jest.mock('../../core/auth/token-store', () => ({
   tokenStore: {
     setTokens: jest.fn(),

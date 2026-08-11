@@ -34,6 +34,7 @@ export interface SelfieTimemarkRequest {
   address?: string | null;
   deviceID: string;
   deviceModel: string;
+  selected_shift_id?: string | null;
 }
 
 export interface SelfieUploadFile {
@@ -51,6 +52,7 @@ export interface SelfieTimemarkPayload {
   address: string;
   deviceID: string;
   deviceModel: string;
+  selected_shift_id?: string | null;
 }
 
 export interface AttendanceActionResponse {
