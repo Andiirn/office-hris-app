@@ -26,6 +26,7 @@ import { SkeletonCard } from '../src/components/ui/Skeleton';
 import { StatusBadge } from '../src/components/ui/StatusBadge';
 import { SuccessAnimation } from '../src/components/ui/SuccessAnimation';
 import { Tokens } from '../src/core/theme/tokens';
+import { COMPATIBLE_IMAGE_PICKER_OPTIONS, processPickedAsset } from '../src/utils/image-processor';
 import { approvalService } from '../src/services/approval.service';
 import { authService } from '../src/services/auth.service';
 import { employeeService } from '../src/services/employee.service';
@@ -244,8 +245,12 @@ export default function LeaveScreen() {
             name: payload.documentFile.name,
             type: payload.documentFile.mimeType,
           });
-        } catch (uploadError) {
+        } catch (uploadError: any) {
           console.warn('[Leave] Upload document failed:', uploadError);
+          Alert.alert(
+            'Upload Dokumen Gagal',
+            'Pengajuan cuti berhasil dibuat, namun dokumen lampiran gagal diunggah. Silakan coba unggah dokumen secara manual pada detail pengajuan.'
+          );
         }
       }
       return request;
@@ -487,18 +492,16 @@ export default function LeaveScreen() {
 
   const pickImage = async () => {
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        quality: 0.8,
-      });
+      const result = await ImagePicker.launchImageLibraryAsync(COMPATIBLE_IMAGE_PICKER_OPTIONS);
 
       if (result.canceled || !result.assets?.length) return;
-      const asset = result.assets[0];
+      const processed = processPickedAsset(result.assets[0]);
+      if (!processed) return;
+
       setDocumentFile({
-        uri: asset.uri,
-        name: asset.fileName || `image_${Date.now()}.jpg`,
-        mimeType: asset.mimeType || 'image/jpeg',
+        uri: processed.uri,
+        name: processed.name,
+        mimeType: processed.mimeType,
       });
     } catch (error: any) {
       Alert.alert('Error', error?.message || 'Gagal memilih gambar');

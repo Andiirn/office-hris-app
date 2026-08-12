@@ -23,6 +23,7 @@ import { Button } from '../src/components/ui/Button';
 import { GlassCard } from '../src/components/ui/GlassCard';
 import { Input } from '../src/components/ui/Input';
 import { SkeletonCard } from '../src/components/ui/Skeleton';
+import { processPickedAsset } from '../src/utils/image-processor';
 import { StatusBadge } from '../src/components/ui/StatusBadge';
 import { Tokens } from '../src/core/theme/tokens';
 import { filterVisitsByDescendants, findDescendantIds } from '../src/features/visit/hierarchy';
@@ -202,13 +203,16 @@ export default function VisitScreen() {
         cameraType: ImagePicker.CameraType.back,
         mediaTypes: ['images'],
         quality: 0.8,
+        preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
       });
       if (result.canceled || !result.assets[0]?.uri) return;
-      const photo = result.assets[0];
+      const processed = processPickedAsset(result.assets[0]);
+      if (!processed) return;
+
       setPhotoFile({
-        uri: photo.uri,
-        name: `visit_${Date.now()}.jpg`,
-        mimeType: photo.mimeType ?? 'image/jpeg',
+        uri: processed.uri,
+        name: processed.name,
+        mimeType: processed.mimeType,
       });
     } catch (error: any) {
       Alert.alert('Error', error?.message || 'Gagal mengambil foto');

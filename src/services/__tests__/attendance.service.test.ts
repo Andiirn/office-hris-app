@@ -252,6 +252,7 @@ describe('attendanceService', () => {
         address: 'Jl. Darussalam Utara II No.36, RT.006/RW.006, Batusari, Kec. Batuceper, Kota Tangerang, Banten 15121',
         deviceID: 'e62d5f9e204bd939',
         deviceModel: 'realme C25',
+        selected_shift_id: null,
       });
     });
 

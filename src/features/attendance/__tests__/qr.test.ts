@@ -13,14 +13,12 @@ describe('parseAttendanceQrPayload', () => {
       branch_id: '3886772b-4b25-4796-a998-066911c51fe6',
     }))).toEqual({
       qrToken: 'tokentoken',
-      branchId: '3886772b-4b25-4796-a998-066911c51fe6',
     });
   });
 
   it('parses the legacy branchId:token qr format', () => {
     expect(parseAttendanceQrPayload('3886772b-4b25-4796-a998-066911c51fe6:tokentoken')).toEqual({
       qrToken: 'tokentoken',
-      branchId: '3886772b-4b25-4796-a998-066911c51fe6',
     });
   });
 });

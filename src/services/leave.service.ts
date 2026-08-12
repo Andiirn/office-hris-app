@@ -59,10 +59,13 @@ export const leaveService = {
 
   async uploadDocument(requestId: string, file: { uri: string; name: string; type?: string | null }): Promise<void> {
     const formData = new FormData();
+    const fileType = (!file.type || file.type === 'application/octet-stream') ? 'image/jpeg' : file.type;
+    const fileName = file.name || `document_${Date.now()}.jpg`;
+
     formData.append('file', {
       uri: file.uri,
-      name: file.name,
-      type: file.type || 'application/octet-stream',
+      name: fileName,
+      type: fileType,
     } as any);
 
     await api.post(`/leave/requests/${requestId}/upload-document`, formData, {
