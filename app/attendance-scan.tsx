@@ -18,8 +18,8 @@ import { getAttendanceScanDecisionForToday } from '../src/features/attendance/sc
 import { attendanceService, createSelfiePhotoCode } from '../src/services/attendance.service';
 import { authService } from '../src/services/auth.service';
 import { EmpAssignmentService, EmpStoreAssignment, EmpStoreShift } from '../src/services/emp-assignment.service';
-import { ProfileData } from '../src/types/profile';
 import { useAuthStore } from '../src/stores/auth.store';
+import { ProfileData } from '../src/types/profile';
 import { goBackOrTabs } from '../src/utils/navigation';
 
 type LocationStatus = 'loading' | 'granted' | 'denied';
@@ -182,8 +182,11 @@ const getYesterdayDateString = (date = new Date()) => {
   return getLocalDateString(prev);
 };
 
-const isSelfieCategory = (value?: string | null) =>
-  value !== null && value !== undefined && String(value).trim() !== '';
+const isSelfieCategory = (value?: string | null) => {
+  if (!value) return false;
+  const normalized = String(value).trim().toUpperCase();
+  return normalized === 'SPG' || normalized === 'MD';
+};
 
 
 function SuccessResultScreen({
