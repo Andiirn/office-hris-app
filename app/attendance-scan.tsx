@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { CameraView, useCameraPermissions, type CameraCapturedPicture } from 'expo-camera';
 import * as Device from 'expo-device';
 import * as Location from 'expo-location';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MotiView } from 'moti';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
@@ -17,7 +17,7 @@ import { parseAttendanceQrPayload } from '../src/features/attendance/qr';
 import { getAttendanceScanDecisionForToday } from '../src/features/attendance/scan-state';
 import { attendanceService, createSelfiePhotoCode } from '../src/services/attendance.service';
 import { authService } from '../src/services/auth.service';
-import { EmpAssignmentService, EmpStoreAssignment, EmpStoreShift } from '../src/services/emp-assignment.service';
+import { EmpAssignmentService, EmpStoreItem, EmpStoreShift } from '../src/services/emp-assignment.service';
 import { useAuthStore } from '../src/stores/auth.store';
 import { ProfileData } from '../src/types/profile';
 import { goBackOrTabs } from '../src/utils/navigation';
@@ -182,10 +182,42 @@ const getYesterdayDateString = (date = new Date()) => {
   return getLocalDateString(prev);
 };
 
-const isSelfieCategory = (value?: string | null) => {
-  if (!value) return false;
-  const normalized = String(value).trim().toUpperCase();
-  return normalized === 'SPG' || normalized === 'MD';
+const normalizeCategory = (value?: string | null): string => {
+  if (!value) return '';
+  return String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_-]+/g, '');
+};
+
+const isStoreShiftCategory = (value?: string | null): boolean => {
+  const norm = normalizeCategory(value);
+  return norm === 'spg' || norm === 'md';
+};
+
+const isManualGeneralShiftCategory = (value?: string | null): boolean => {
+  const norm = normalizeCategory(value);
+  if (!norm) return false;
+  return (
+    norm.includes('driver') ||
+    norm.includes('host') ||
+    norm === 'livehost' ||
+    norm === 'driverpribadi'
+  );
+};
+
+const isSelfieModeCategory = (value?: string | null): boolean => {
+  return isStoreShiftCategory(value) || isManualGeneralShiftCategory(value);
+};
+
+const formatShiftTimeLabel = (start?: string | null, end?: string | null) => {
+  if (!start && !end) return null;
+  const s = start ? String(start).trim().slice(0, 5) : '';
+  const e = end ? String(end).trim().slice(0, 5) : '';
+  if (s && e) return `${s} - ${e}`;
+  if (s) return s;
+  if (e) return `s/d ${e}`;
+  return null;
 };
 
 
@@ -422,11 +454,16 @@ export default function AttendanceScanScreen() {
   const [address, setAddress] = useState<string | null>(null);
   const [isMocked, setIsMocked] = useState(false);
   const [scanFailure, setScanFailure] = useState<ScanFailure | null>(null);
-  const [selfieAssignment, setSelfieAssignment] = useState<EmpStoreAssignment | null>(null);
+
+  const [assignedStores, setAssignedStores] = useState<EmpStoreItem[]>([]);
+  const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
+  const [storeShifts, setStoreShifts] = useState<EmpStoreShift[]>([]);
+  const [shiftsLoading, setShiftsLoading] = useState(false);
   const [selfieAssignmentLoading, setSelfieAssignmentLoading] = useState(false);
   const [selfieAssignmentError, setSelfieAssignmentError] = useState<string | null>(null);
   const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null);
   const [assignmentReloadTick, setAssignmentReloadTick] = useState(0);
+
   const { width, height } = useWindowDimensions();
   const { data: fetchedProfile } = useQuery({
     queryKey: qk.profile(),
@@ -434,16 +471,34 @@ export default function AttendanceScanScreen() {
     staleTime: 1000 * 60 * 5,
     enabled: !!user?.id,
   });
+  const { data: openCheckinRecord } = useQuery({
+    queryKey: ['attendance-open-checkin', user?.id],
+    queryFn: () => attendanceService.getTodayRecord(),
+    staleTime: 1000 * 30,
+    enabled: !!user?.id,
+  });
+
+  const params = useLocalSearchParams<{ type?: string; mode?: string }>();
+  const isCheckoutParam = params.type === 'checkout' || params.mode === 'checkout';
+
+  const isCheckoutMode = isCheckoutParam || Boolean(
+    openCheckinRecord &&
+    (openCheckinRecord.checkin_time || openCheckinRecord.checkin_at) &&
+    !openCheckinRecord.checkout_time &&
+    !openCheckinRecord.checkout_at
+  );
+
   const cachedProfile = queryClient.getQueryData<ProfileData>(qk.profile());
   const selfieCategory = fetchedProfile?.employee_category ?? cachedProfile?.employee_category ?? user?.employee_category ?? null;
-  const hasSelfieCategory = isSelfieCategory(selfieCategory);
-  const [scanMode, setScanMode] = useState<ScanMode>(hasSelfieCategory ? 'selfie' : 'qr');
-  const selfieShifts = selfieAssignment?.store?.shifts ?? [];
-  const selectedShift = selfieShifts.find((shift) => shift.id === selectedShiftId) ?? selfieShifts[0] ?? null;
+  const hasSelfieCategory = isStoreShiftCategory(selfieCategory);
+  const hasGeneralCategory = isManualGeneralShiftCategory(selfieCategory);
+  const isSelfieDefault = isSelfieModeCategory(selfieCategory);
+  const [scanMode, setScanMode] = useState<ScanMode>(isSelfieDefault ? 'selfie' : 'qr');
+  const selectedShift = storeShifts.find((shift) => shift.id === selectedShiftId) ?? storeShifts[0] ?? null;
 
   useEffect(() => {
-    setScanMode(hasSelfieCategory ? 'selfie' : 'qr');
-  }, [hasSelfieCategory]);
+    setScanMode(isSelfieDefault ? 'selfie' : 'qr');
+  }, [isSelfieDefault]);
 
   const submitSelfieAttendance = async () => {
     if (!coords) return;
@@ -495,6 +550,23 @@ export default function AttendanceScanScreen() {
         return;
       }
 
+      const effectiveShiftId = selectedShift?.id || (openRecord as any)?.shift_id || (openRecord as any)?.shift?.id || (openCheckinRecord as any)?.shift_id || (openCheckinRecord as any)?.shift?.id || null;
+
+      if (decision.action !== 'checkout') {
+        if (hasSelfieCategory) {
+          if (!selectedStoreId) {
+            throw new Error('Silakan pilih toko penugasan terlebih dahulu');
+          }
+          if (!effectiveShiftId) {
+            throw new Error('Silakan pilih shift toko terlebih dahulu');
+          }
+        } else if (hasGeneralCategory) {
+          if (!effectiveShiftId) {
+            throw new Error('Silakan pilih shift kerja terlebih dahulu');
+          }
+        }
+      }
+
       const photoCode = createSelfiePhotoCode();
       const selfiePhoto = await camera.takePictureAsync({ quality: 0.85, skipProcessing: false });
       if (!selfiePhoto?.uri) {
@@ -511,7 +583,7 @@ export default function AttendanceScanScreen() {
         deviceModel: Device.modelName || Device.deviceName || 'unknown',
         timezoneID: Intl.DateTimeFormat().resolvedOptions().timeZone,
         timestamp: Math.floor(Date.now() / 1000),
-        selected_shift_id: selectedShift?.id || null,
+        selected_shift_id: effectiveShiftId,
       };
       const upload = toSelfieUpload(selfiePhoto, photoCode);
 
@@ -558,13 +630,10 @@ export default function AttendanceScanScreen() {
       }
 
       try {
-        // Coba ambil lokasi terakhir (cache) terlebih dahulu
         let position = await Location.getLastKnownPositionAsync();
-        // Cek apakah lokasi masih baru (misalnya kurang dari 2 menit / 120.000 ms)
         const isFresh = position && (Date.now() - position.timestamp < 120000);
 
         if (!isFresh) {
-          // Default tetap Balanced; High dipakai hanya saat user minta retry lokasi lebih akurat.
           position = await Location.getCurrentPositionAsync({ accuracy });
         }
 
@@ -642,40 +711,114 @@ export default function AttendanceScanScreen() {
   }, [cameraPermission, requestCameraPermission]);
 
   useEffect(() => {
+    if (!hasGeneralCategory || !user?.id) {
+      if (!hasSelfieCategory) {
+        setStoreShifts([]);
+        setSelectedShiftId(null);
+      }
+      return;
+    }
+
+    let cancelled = false;
+    const loadGeneralShifts = async () => {
+      setShiftsLoading(true);
+      try {
+        const fetchedShifts = await EmpAssignmentService.getGeneralShifts();
+        if (cancelled) return;
+        setStoreShifts(fetchedShifts);
+        setSelectedShiftId((curr) => curr || fetchedShifts[0]?.id || null);
+      } catch (err) {
+        if (cancelled) return;
+        setStoreShifts([]);
+        setSelectedShiftId(null);
+      } finally {
+        if (!cancelled) setShiftsLoading(false);
+      }
+    };
+
+    loadGeneralShifts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hasGeneralCategory, hasSelfieCategory, user?.id]);
+
+  useEffect(() => {
     if (!hasSelfieCategory || !user?.id) {
-      setSelfieAssignment(null);
+      setAssignedStores([]);
+      setSelectedStoreId(null);
+      if (!hasGeneralCategory) {
+        setStoreShifts([]);
+        setSelectedShiftId(null);
+      }
       setSelfieAssignmentError(null);
       setSelfieAssignmentLoading(false);
-      setSelectedShiftId(null);
       return;
     }
 
     let cancelled = false;
 
-    const loadAssignment = async () => {
+    const loadStores = async () => {
       setSelfieAssignmentLoading(true);
       setSelfieAssignmentError(null);
 
       try {
-        const assignment = await EmpAssignmentService.getActiveStoreAssignmentByEmployeeId(user.id);
+        const stores = await EmpAssignmentService.getAllAssignedStoresByEmployeeId(user.id);
         if (cancelled) return;
-        setSelfieAssignment(assignment);
-        setSelectedShiftId((current) => current ?? assignment?.store?.shifts?.[0]?.id ?? null);
+        setAssignedStores(stores);
+        if (stores.length > 0) {
+          setSelectedStoreId((current) => current || stores[0].id);
+        } else {
+          setSelfieAssignmentError('Tidak ada toko yang ditugaskan untuk akun ini');
+        }
       } catch (error: any) {
         if (cancelled) return;
-        setSelfieAssignment(null);
-        setSelfieAssignmentError(error?.response?.data?.message || error?.message || 'Gagal memuat assignment selfie');
+        setAssignedStores([]);
+        setSelfieAssignmentError(error?.response?.data?.message || error?.message || 'Gagal memuat penugasan toko');
       } finally {
         if (!cancelled) setSelfieAssignmentLoading(false);
       }
     };
 
-    loadAssignment();
+    loadStores();
 
     return () => {
       cancelled = true;
     };
   }, [assignmentReloadTick, hasSelfieCategory, user?.id]);
+
+  useEffect(() => {
+    if (!hasSelfieCategory || !selectedStoreId) {
+      if (hasSelfieCategory) {
+        setStoreShifts([]);
+        setSelectedShiftId(null);
+      }
+      return;
+    }
+
+    let cancelled = false;
+    const loadShifts = async () => {
+      setShiftsLoading(true);
+      try {
+        const fetchedShifts = await EmpAssignmentService.getStoreShifts(selectedStoreId);
+        if (cancelled) return;
+        setStoreShifts(fetchedShifts);
+        setSelectedShiftId(fetchedShifts[0]?.id ?? null);
+      } catch (err) {
+        if (cancelled) return;
+        setStoreShifts([]);
+        setSelectedShiftId(null);
+      } finally {
+        if (!cancelled) setShiftsLoading(false);
+      }
+    };
+
+    loadShifts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hasSelfieCategory, selectedStoreId]);
 
   const submitAttendance = useCallback(async (rawQrData: string) => {
     if (!coords) return;
@@ -733,6 +876,20 @@ export default function AttendanceScanScreen() {
         setCheckinMessage(result.message ?? 'Check-out berhasil');
         setSuccessTime(formatSuccessTime());
       } else {
+        const effectiveShiftId = selectedShift?.id || (openRecord as any)?.shift_id || (openRecord as any)?.shift?.id || (openCheckinRecord as any)?.shift_id || (openCheckinRecord as any)?.shift?.id || null;
+        if (hasSelfieCategory) {
+          if (!selectedStoreId) {
+            throw new Error('Silakan pilih toko penugasan terlebih dahulu');
+          }
+          if (!effectiveShiftId) {
+            throw new Error('Silakan pilih shift toko terlebih dahulu');
+          }
+        } else if (hasGeneralCategory) {
+          if (!effectiveShiftId) {
+            throw new Error('Silakan pilih shift kerja terlebih dahulu');
+          }
+        }
+
         const deviceFingerprint = await getStableDeviceFingerprint();
         const qrPayload = {
           qr_token: qrToken,
@@ -749,6 +906,8 @@ export default function AttendanceScanScreen() {
           battery_level: null,
           screen_resolution: `${Math.round(width)}x${Math.round(height)}`,
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          selected_shift_id: effectiveShiftId,
+          shift_id: effectiveShiftId,
         };
         const result = await attendanceService.checkin(qrPayload);
         setCheckinMessage(result.message ?? 'Check-in berhasil');
@@ -770,7 +929,7 @@ export default function AttendanceScanScreen() {
     } finally {
       setSubmitting(false);
     }
-  }, [address, coords, height, isMocked, queryClient, user?.id, width]);
+  }, [address, coords, height, isMocked, queryClient, selectedShift?.id, user?.id, width]);
 
   const handleRetryScanner = async () => {
     if (isLocationRelatedFailure(scanFailure)) {
@@ -926,20 +1085,78 @@ export default function AttendanceScanScreen() {
 
               {isScannerVisible && (
                 <>
-                  {hasSelfieCategory && scanMode === 'selfie' && (
+                  {hasGeneralCategory && !isCheckoutMode && (
                     <View className="w-full rounded-3xl bg-white/95 px-4 py-4 border border-white/90 shadow-sm mb-1">
-                      <View className="flex-row items-center justify-between">
+                      <View className="flex-row items-center justify-between mb-2">
                         <Text className="font-inter-bold text-[10px] text-primary uppercase tracking-wider">
-                          Shift Tersedia
+                          Pilih Shift Kerja Dulu
                         </Text>
-                        {selfieAssignment?.store?.code && (
+                        {user?.employee_category && (
                           <View className="bg-primary/10 px-2.5 py-0.5 rounded-full">
-                            <Text className="font-inter-bold text-[10px] text-primary">
-                              {selfieAssignment.store.code}
+                            <Text className="font-inter-bold text-[10px] text-primary uppercase">
+                              {user.employee_category}
                             </Text>
                           </View>
                         )}
                       </View>
+                      {shiftsLoading ? (
+                        <View className="flex-row gap-2 py-1">
+                          <Skeleton height={32} width={80} />
+                          <Skeleton height={32} width={80} />
+                        </View>
+                      ) : storeShifts.length > 0 ? (
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          contentContainerStyle={{ gap: 8 }}
+                          className="py-1"
+                        >
+                          {storeShifts.map((shift: EmpStoreShift) => {
+                            const active = shift.id === selectedShiftId;
+                            const timeLabel = formatShiftTimeLabel(shift.start_time, shift.end_time);
+                            return (
+                              <Pressable
+                                key={shift.id}
+                                onPress={() => setSelectedShiftId(shift.id)}
+                                className={`px-3.5 py-2 rounded-full border ${active ? 'bg-primary border-primary' : 'bg-white border-outline-variant'}`}
+                              >
+                                <View className="flex-row items-center gap-1.5">
+                                  <Text className={`font-inter-bold text-xs ${active ? 'text-white' : 'text-primary'}`}>
+                                    {shift.name || shift.code || 'Shift'}
+                                  </Text>
+                                  {timeLabel && (
+                                    <Text className={`font-inter-medium text-[11px] ${active ? 'text-white/80' : 'text-on-surface-variant'}`}>
+                                      ({timeLabel})
+                                    </Text>
+                                  )}
+                                </View>
+                              </Pressable>
+                            );
+                          })}
+                        </ScrollView>
+                      ) : (
+                        <Text className="font-inter-medium text-xs text-text-muted mt-1">
+                          Shift umum tidak tersedia.
+                        </Text>
+                      )}
+                    </View>
+                  )}
+
+                  {hasSelfieCategory && scanMode === 'selfie' && !isCheckoutMode && (
+                    <View className="w-full rounded-3xl bg-white/95 px-4 py-4 border border-white/90 shadow-sm mb-1">
+                      <View className="flex-row items-center justify-between mb-2">
+                        <Text className="font-inter-bold text-[10px] text-primary uppercase tracking-wider">
+                          Penugasan Selfie ({user?.employee_category?.toUpperCase() || 'SPG/MD'})
+                        </Text>
+                        {user?.full_name && (
+                          <View className="bg-primary/10 px-2.5 py-0.5 rounded-full">
+                            <Text className="font-inter-bold text-[10px] text-primary">
+                              {user.full_name}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+
                       {selfieAssignmentLoading ? (
                         <View className="mt-3 gap-2">
                           <Skeleton height={18} width="72%" />
@@ -955,34 +1172,87 @@ export default function AttendanceScanScreen() {
                           />
                         </View>
                       ) : (
-                        <View className="mt-2 gap-1.5">
-                          <Text className="font-manrope-bold text-base text-primary">
-                            {selfieAssignment?.store?.name || selfieAssignment?.store?.code || 'Selfie Mode'}
-                          </Text>
-                          <Text className="font-inter text-xs text-on-surface-variant">
-                            {selfieAssignment?.employee?.full_name || user?.full_name || '-'} • {user?.employee_category || '-'}
-                          </Text>
-                          <View className="mt-2">
+                        <View className="gap-3 mt-1">
+                          {/* Step 1: Pilih Toko */}
+                          <View>
                             <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider mb-2">
-                              Pilih Shift Toko
+                              1. Pilih Toko
                             </Text>
-                            {selfieShifts.length > 0 ? (
-                              <View className="flex-row flex-wrap gap-2">
-                                {selfieShifts.map((shift: EmpStoreShift) => {
-                                  const active = shift.id === selectedShift?.id;
+                            {assignedStores.length > 0 ? (
+                              <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={{ gap: 8 }}
+                                className="py-1"
+                              >
+                                {assignedStores.map((store) => {
+                                  const active = store.id === selectedStoreId;
+                                  return (
+                                    <Pressable
+                                      key={store.id}
+                                      onPress={() => {
+                                        setSelectedStoreId(store.id);
+                                      }}
+                                      className={`px-3.5 py-2 rounded-2xl border ${active ? 'bg-primary border-primary' : 'bg-white border-outline-variant'}`}
+                                    >
+                                      <Text className={`font-inter-bold text-xs ${active ? 'text-white' : 'text-primary'}`}>
+                                        {store.name || store.code || 'Toko'}
+                                      </Text>
+                                    </Pressable>
+                                  );
+                                })}
+                              </ScrollView>
+                            ) : (
+                              <Text className="font-inter-medium text-xs text-error">
+                                Belum ada toko yang ditugaskan.
+                              </Text>
+                            )}
+                          </View>
+
+                          {/* Step 2: Pilih Shift Toko */}
+                          <View>
+                            <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider mb-2">
+                              2. Pilih Shift Toko
+                            </Text>
+                            {!selectedStoreId ? (
+                              <Text className="font-inter-medium text-xs text-text-muted">
+                                Silakan pilih toko terlebih dahulu.
+                              </Text>
+                            ) : shiftsLoading ? (
+                              <View className="flex-row gap-2 py-1">
+                                <Skeleton height={32} width={80} />
+                                <Skeleton height={32} width={80} />
+                              </View>
+                            ) : storeShifts.length > 0 ? (
+                              <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={{ gap: 8 }}
+                                className="py-1"
+                              >
+                                {storeShifts.map((shift: EmpStoreShift) => {
+                                  const active = shift.id === selectedShiftId;
+                                  const timeLabel = formatShiftTimeLabel(shift.start_time, shift.end_time);
                                   return (
                                     <Pressable
                                       key={shift.id}
                                       onPress={() => setSelectedShiftId(shift.id)}
                                       className={`px-3.5 py-2 rounded-full border ${active ? 'bg-primary border-primary' : 'bg-white border-outline-variant'}`}
                                     >
-                                      <Text className={`font-inter-bold text-xs ${active ? 'text-white' : 'text-primary'}`}>
-                                        {shift.name || shift.code || 'Shift'}
-                                      </Text>
+                                      <View className="flex-row items-center gap-1.5">
+                                        <Text className={`font-inter-bold text-xs ${active ? 'text-white' : 'text-primary'}`}>
+                                          {shift.name || shift.code || 'Shift'}
+                                        </Text>
+                                        {timeLabel && (
+                                          <Text className={`font-inter-medium text-[11px] ${active ? 'text-white/80' : 'text-on-surface-variant'}`}>
+                                            ({timeLabel})
+                                          </Text>
+                                        )}
+                                      </View>
                                     </Pressable>
                                   );
                                 })}
-                              </View>
+                              </ScrollView>
                             ) : (
                               <View className="py-1">
                                 <Text className="font-inter-medium text-xs text-error">

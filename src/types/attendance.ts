@@ -15,6 +15,8 @@ export interface CheckinRequest {
   device_timezone?: string | null;
   checkin_photo_url?: string | null;
   location_address?: string | null;
+  selected_shift_id?: string | null;
+  shift_id?: string | null;
 }
 
 export interface CheckoutRequest {

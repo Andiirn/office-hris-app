@@ -30,12 +30,124 @@ export interface EmpStoreAssignment {
   created_at?: string | null;
 }
 
+export interface EmpStoreItem {
+  id: string;
+  name?: string | null;
+  code?: string | null;
+  address?: string | null;
+  shifts?: EmpStoreShift[] | null;
+}
+
 export const EmpAssignmentService = {
+  async getAllAssignedStoresByEmployeeId(employeeId: string): Promise<EmpStoreItem[]> {
+    const storesMap = new Map<string, EmpStoreItem>();
+
+    try {
+      const response = await api.get(`/employee-assignments/store/by-employee/${employeeId}`);
+      const rawData = unwrapData<any>(response.data);
+      if (rawData) {
+        // SPG assignment can be:
+        // 1. { employee_id, stores: [ { id, store_id, store: { id, name, code, shifts } }, ... ] }
+        // 2. { id, store_id, store: { id, name, code, shifts } }
+        // 3. Array of assignments: [ { store_id, store: { ... } }, ... ]
+        // 4. { items: [ ... ] } or { data: [ ... ] }
+        const storesArray = Array.isArray(rawData.stores)
+          ? rawData.stores
+          : Array.isArray(rawData)
+            ? rawData
+            : Array.isArray(rawData.items)
+              ? rawData.items
+              : Array.isArray(rawData.data)
+                ? rawData.data
+                : [rawData];
+
+        for (const item of storesArray) {
+          const storeObj = item?.store || (item?.id ? item : null);
+          const storeId = storeObj?.id || item?.store_id;
+          if (storeId && !storesMap.has(storeId)) {
+            storesMap.set(storeId, {
+              id: storeId,
+              name: storeObj?.name || storeObj?.code || 'Toko SPG',
+              code: storeObj?.code,
+              address: storeObj?.address,
+              shifts: storeObj?.shifts || null,
+            });
+          }
+        }
+      }
+    } catch (err) {
+      // Ignore SPG fail
+    }
+
+    try {
+      const mdRes = await api.get(`/employee-assignments/md-store/by-employee/${employeeId}`);
+      const mdData = unwrapData<any>(mdRes.data);
+      const mdItems = Array.isArray(mdData)
+        ? mdData
+        : Array.isArray(mdData?.stores)
+          ? mdData.stores
+          : Array.isArray(mdData?.items)
+            ? mdData.items
+            : Array.isArray(mdData?.data)
+              ? mdData.data
+              : mdData
+                ? [mdData]
+                : [];
+
+      for (const item of mdItems) {
+        const storeObj = item?.store || (item?.id ? item : null);
+        const storeId = storeObj?.id || item?.store_id;
+        if (storeId && !storesMap.has(storeId)) {
+          storesMap.set(storeId, {
+            id: storeId,
+            name: storeObj?.name || storeObj?.code || 'Toko MD',
+            code: storeObj?.code,
+            address: storeObj?.address,
+            shifts: storeObj?.shifts || null,
+          });
+        }
+      }
+    } catch (mdErr) {
+      // Ignore MD fail
+    }
+
+    return Array.from(storesMap.values());
+  },
+
   async getActiveStoreAssignmentByEmployeeId(employeeId: string): Promise<EmpStoreAssignment | null> {
     let data: EmpStoreAssignment | null = null;
     try {
       const response = await api.get(`/employee-assignments/store/by-employee/${employeeId}`);
-      data = unwrapData<EmpStoreAssignment | null>(response.data);
+      const rawData = unwrapData<any>(response.data);
+      if (rawData) {
+        if (rawData.store?.id) {
+          data = rawData as EmpStoreAssignment;
+        } else if (Array.isArray(rawData.stores) && rawData.stores.length > 0) {
+          const firstItem = rawData.stores[0];
+          data = {
+            id: firstItem.id || rawData.id || 'assign-1',
+            employee_id: rawData.employee_id || employeeId,
+            store_id: firstItem.store_id || firstItem.store?.id,
+            effective_date: firstItem.effective_date,
+            end_date: firstItem.end_date,
+            employee: rawData.employee,
+            store: firstItem.store,
+            created_at: firstItem.created_at,
+          };
+        } else if (Array.isArray(rawData) && rawData.length > 0) {
+          const firstItem = rawData[0];
+          data = {
+            id: firstItem.id,
+            employee_id: firstItem.employee_id || employeeId,
+            store_id: firstItem.store_id || firstItem.store?.id,
+            effective_date: firstItem.effective_date,
+            end_date: firstItem.end_date,
+            employee: firstItem.employee,
+            store: firstItem.store,
+            created_at: firstItem.created_at,
+          };
+        }
+      }
     } catch (err) {
       console.warn('[EmpAssignmentService] SPG assignment check failed, trying MD assignment...', err);
     }
@@ -44,7 +156,18 @@ export const EmpAssignmentService = {
       try {
         const mdRes = await api.get(`/employee-assignments/md-store/by-employee/${employeeId}`);
         const mdData = unwrapData<any>(mdRes.data);
-        const mdItems = Array.isArray(mdData) ? mdData : mdData?.items || (mdData ? [mdData] : []);
+        const mdItems = Array.isArray(mdData)
+          ? mdData
+          : Array.isArray(mdData?.stores)
+            ? mdData.stores
+            : Array.isArray(mdData?.items)
+              ? mdData.items
+              : Array.isArray(mdData?.data)
+                ? mdData.data
+                : mdData
+                  ? [mdData]
+                  : [];
+
         if (mdItems.length > 0) {
           const first = mdItems[0];
           data = {
@@ -119,6 +242,32 @@ export const EmpAssignmentService = {
       }));
     } catch (err) {
       console.warn('Failed to fetch store shifts:', err);
+      return [];
+    }
+  },
+
+  async getGeneralShifts(): Promise<EmpStoreShift[]> {
+    try {
+      const response = await api.get('/shifts', {
+        params: { is_active: true, limit: 100 },
+      });
+      const rawData = unwrapData<any>(response.data);
+      const items = Array.isArray(rawData)
+        ? rawData
+        : Array.isArray(rawData?.items)
+          ? rawData.items
+          : Array.isArray(rawData?.data)
+            ? rawData.data
+            : [];
+      return items.map((s: any) => ({
+        id: s.id || s.shift_id || String(Math.random()),
+        name: s.name || s.shift_name || s.code || 'Shift',
+        code: s.code || s.name || s.shift_name || 'SHIFT',
+        start_time: s.start_time || s.checkin_time,
+        end_time: s.end_time || s.checkout_time,
+      }));
+    } catch (err) {
+      console.warn('Failed to fetch general shifts:', err);
       return [];
     }
   },

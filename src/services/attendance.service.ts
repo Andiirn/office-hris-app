@@ -87,6 +87,7 @@ const buildSelfieFormData = (input: SelfieTimemarkRequest, selfiePhoto: SelfieUp
   formData.append('deviceModel', payload.deviceModel);
   if (payload.selected_shift_id) {
     formData.append('selected_shift_id', payload.selected_shift_id);
+    formData.append('shift_id', payload.selected_shift_id);
   }
   return formData;
 };
