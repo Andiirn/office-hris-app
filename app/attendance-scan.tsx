@@ -6,7 +6,7 @@ import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MotiView } from 'moti';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../src/components/ui/Button';
 import { Skeleton, SkeletonCard } from '../src/components/ui/Skeleton';
@@ -494,7 +494,7 @@ export default function AttendanceScanScreen() {
   const hasGeneralCategory = isManualGeneralShiftCategory(selfieCategory);
   const isSelfieDefault = isSelfieModeCategory(selfieCategory);
   const [scanMode, setScanMode] = useState<ScanMode>(isSelfieDefault ? 'selfie' : 'qr');
-  const selectedShift = storeShifts.find((shift) => shift.id === selectedShiftId) ?? storeShifts[0] ?? null;
+  const selectedShift = storeShifts.find((shift) => shift.id === selectedShiftId) ?? null;
 
   useEffect(() => {
     setScanMode(isSelfieDefault ? 'selfie' : 'qr');
@@ -550,18 +550,18 @@ export default function AttendanceScanScreen() {
         return;
       }
 
-      const effectiveShiftId = selectedShift?.id || (openRecord as any)?.shift_id || (openRecord as any)?.shift?.id || (openCheckinRecord as any)?.shift_id || (openCheckinRecord as any)?.shift?.id || null;
+      const effectiveShiftId = selectedShift?.id || null;
 
       if (decision.action !== 'checkout') {
         if (hasSelfieCategory) {
           if (!selectedStoreId) {
             throw new Error('Silakan pilih toko penugasan terlebih dahulu');
           }
-          if (!effectiveShiftId) {
+          if (!selectedShiftId) {
             throw new Error('Silakan pilih shift toko terlebih dahulu');
           }
         } else if (hasGeneralCategory) {
-          if (!effectiveShiftId) {
+          if (!selectedShiftId) {
             throw new Error('Silakan pilih shift kerja terlebih dahulu');
           }
         }
@@ -726,7 +726,7 @@ export default function AttendanceScanScreen() {
         const fetchedShifts = await EmpAssignmentService.getGeneralShifts();
         if (cancelled) return;
         setStoreShifts(fetchedShifts);
-        setSelectedShiftId((curr) => curr || fetchedShifts[0]?.id || null);
+        setSelectedShiftId(null);
       } catch (err) {
         if (cancelled) return;
         setStoreShifts([]);
@@ -766,9 +766,8 @@ export default function AttendanceScanScreen() {
         const stores = await EmpAssignmentService.getAllAssignedStoresByEmployeeId(user.id);
         if (cancelled) return;
         setAssignedStores(stores);
-        if (stores.length > 0) {
-          setSelectedStoreId((current) => current || stores[0].id);
-        } else {
+        setSelectedStoreId(null);
+        if (stores.length === 0) {
           setSelfieAssignmentError('Tidak ada toko yang ditugaskan untuk akun ini');
         }
       } catch (error: any) {
@@ -803,7 +802,7 @@ export default function AttendanceScanScreen() {
         const fetchedShifts = await EmpAssignmentService.getStoreShifts(selectedStoreId);
         if (cancelled) return;
         setStoreShifts(fetchedShifts);
-        setSelectedShiftId(fetchedShifts[0]?.id ?? null);
+        setSelectedShiftId(null);
       } catch (err) {
         if (cancelled) return;
         setStoreShifts([]);
@@ -876,16 +875,16 @@ export default function AttendanceScanScreen() {
         setCheckinMessage(result.message ?? 'Check-out berhasil');
         setSuccessTime(formatSuccessTime());
       } else {
-        const effectiveShiftId = selectedShift?.id || (openRecord as any)?.shift_id || (openRecord as any)?.shift?.id || (openCheckinRecord as any)?.shift_id || (openCheckinRecord as any)?.shift?.id || null;
+        const effectiveShiftId = selectedShift?.id || null;
         if (hasSelfieCategory) {
           if (!selectedStoreId) {
             throw new Error('Silakan pilih toko penugasan terlebih dahulu');
           }
-          if (!effectiveShiftId) {
+          if (!selectedShiftId) {
             throw new Error('Silakan pilih shift toko terlebih dahulu');
           }
         } else if (hasGeneralCategory) {
-          if (!effectiveShiftId) {
+          if (!selectedShiftId) {
             throw new Error('Silakan pilih shift kerja terlebih dahulu');
           }
         }
