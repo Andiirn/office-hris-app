@@ -134,6 +134,38 @@ describe('employeeAssignmentService', () => {
     expect(stores.map((s) => s.id)).toEqual(['store-1', 'store-3']);
   });
 
+  it('getAllAssignedStoresByEmployeeId queries MD endpoints when category is md', async () => {
+    (api.get as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes('/employee-assignments/md-store?md_employee_id=md-emp-1')) {
+        return Promise.resolve({
+          data: {
+            data: [
+              {
+                id: 'md-assign-1',
+                md_employee_id: 'md-emp-1',
+                store_id: 'store-md-100',
+                store: { id: 'store-md-100', name: 'Superindo MD 1', code: 'SMD1' },
+              },
+            ],
+          },
+        });
+      }
+      return Promise.reject(new Error('not found'));
+    });
+
+    const stores = await EmpAssignmentService.getAllAssignedStoresByEmployeeId('md-emp-1', 'md');
+
+    expect(stores).toHaveLength(1);
+    expect(stores[0]).toEqual({
+      id: 'store-md-100',
+      name: 'Superindo MD 1',
+      code: 'SMD1',
+      address: undefined,
+      shifts: null,
+    });
+    expect(api.get).toHaveBeenCalledWith('/employee-assignments/md-store?md_employee_id=md-emp-1');
+  });
+
   it('fetches general shifts directly from /shifts endpoint', async () => {
     (api.get as jest.Mock).mockResolvedValue({
       data: {

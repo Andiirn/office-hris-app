@@ -763,7 +763,7 @@ export default function AttendanceScanScreen() {
       setSelfieAssignmentError(null);
 
       try {
-        const stores = await EmpAssignmentService.getAllAssignedStoresByEmployeeId(user.id);
+        const stores = await EmpAssignmentService.getAllAssignedStoresByEmployeeId(user.id, selfieCategory);
         if (cancelled) return;
         setAssignedStores(stores);
         setSelectedStoreId(null);
@@ -784,7 +784,7 @@ export default function AttendanceScanScreen() {
     return () => {
       cancelled = true;
     };
-  }, [assignmentReloadTick, hasSelfieCategory, user?.id]);
+  }, [assignmentReloadTick, hasSelfieCategory, selfieCategory, user?.id]);
 
   useEffect(() => {
     if (!hasSelfieCategory || !selectedStoreId) {
@@ -799,13 +799,18 @@ export default function AttendanceScanScreen() {
     const loadShifts = async () => {
       setShiftsLoading(true);
       try {
-        const fetchedShifts = await EmpAssignmentService.getStoreShifts(selectedStoreId);
+        const selectedStore = assignedStores.find((s) => s.id === selectedStoreId);
+        let fetchedShifts = await EmpAssignmentService.getStoreShifts(selectedStoreId);
+        if (fetchedShifts.length === 0 && selectedStore?.shifts && selectedStore.shifts.length > 0) {
+          fetchedShifts = selectedStore.shifts;
+        }
         if (cancelled) return;
         setStoreShifts(fetchedShifts);
         setSelectedShiftId(null);
       } catch (err) {
         if (cancelled) return;
-        setStoreShifts([]);
+        const selectedStore = assignedStores.find((s) => s.id === selectedStoreId);
+        setStoreShifts(selectedStore?.shifts || []);
         setSelectedShiftId(null);
       } finally {
         if (!cancelled) setShiftsLoading(false);
@@ -817,7 +822,7 @@ export default function AttendanceScanScreen() {
     return () => {
       cancelled = true;
     };
-  }, [hasSelfieCategory, selectedStoreId]);
+  }, [assignedStores, hasSelfieCategory, selectedStoreId]);
 
   const submitAttendance = useCallback(async (rawQrData: string) => {
     if (!coords) return;
