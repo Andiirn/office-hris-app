@@ -1,5 +1,5 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
@@ -51,36 +51,45 @@ export default function ApprovalsScreen() {
   const [photoModalUrl, setPhotoModalUrl] = useState<string | null>(null);
   const approvalSource = tab === 'pending' ? 'pending' : 'history';
 
+  const pageSize = 10;
+
   // 1. Query data
   const {
-    data: approvals = [],
+    data,
     isLoading,
     isFetching,
     refetch,
-  } = useQuery({
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['approvals', approvalSource, user?.id],
-    queryFn: async () => {
+    queryFn: async ({ pageParam = 1 }) => {
       try {
         return tab === 'pending'
-          ? await approvalService.getPending()
-          : await approvalService.getHistory();
+          ? await approvalService.getPending({ page: pageParam as number, limit: pageSize })
+          : await approvalService.getHistory({ page: pageParam as number, limit: pageSize });
       } catch (err: any) {
         console.error(`[ApprovalsScreen] Fetch error:`, err?.message || err);
         throw err;
       }
     },
     enabled: !!user?.id,
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, _allPages, lastPageParam) =>
+      lastPage.length < pageSize ? undefined : Number(lastPageParam) + 1,
     staleTime: 30 * 1000,
     refetchOnMount: 'always',
     refetchOnReconnect: true,
-    placeholderData: (previous) => previous,
   });
+
+  const approvals = useMemo(() => data?.pages.flat() ?? [], [data]);
 
   useFocusEffect(
     React.useCallback(() => {
       if (!user?.id) return;
       refetch();
-    }, [approvalSource, refetch, user?.id])
+    }, [refetch, user?.id])
   );
 
   // State Modal Konfirmasi Alasan Approver
@@ -214,7 +223,7 @@ export default function ApprovalsScreen() {
       };
       return getTime(b) - getTime(a);
     });
-  }, [approvals, selectedModule, searchQuery, tab]);
+  }, [approvals, selectedModule, searchQuery, tab, user?.id]);
 
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return '-';
@@ -599,7 +608,7 @@ export default function ApprovalsScreen() {
         contentContainerStyle={{ paddingBottom: 40 + insets.bottom }}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={isFetching} onRefresh={onRefresh} tintColor={Tokens.colors.primary} />
+          <RefreshControl refreshing={isFetching && !isFetchingNextPage} onRefresh={onRefresh} tintColor={Tokens.colors.primary} />
         }
       >
         {isLoading ? (
@@ -721,6 +730,26 @@ export default function ApprovalsScreen() {
                 </GlassCard>
               );
             })}
+
+            {hasNextPage && !searchQuery.trim() && (
+              <Pressable
+                onPress={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+                className="mt-2 py-3 items-center justify-center active:opacity-60 flex-row"
+                style={{ gap: 8 }}
+              >
+                {isFetchingNextPage ? (
+                  <ActivityIndicator size="small" color={Tokens.colors.primary} />
+                ) : (
+                  <>
+                    <MaterialIcons name="expand-more" size={18} color={Tokens.colors.primary} />
+                    <Text className="font-inter-bold text-xs text-primary">
+                      Muat Lebih Banyak
+                    </Text>
+                  </>
+                )}
+              </Pressable>
+            )}
           </View>
         )}
       </ScrollView>
