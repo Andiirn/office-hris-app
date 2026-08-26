@@ -16,6 +16,7 @@ import { Tokens } from '../../core/theme/tokens';
 import { formatOvertimeTime } from '../../features/overtime/time';
 import { AttendanceItem } from '../../types/attendance';
 import { CreateOvertimeRequest, OvertimeSegment, OvertimeType } from '../../types/overtime';
+import { formatAttendanceDayDate } from '../../utils/datetime';
 import { getAttendanceBadgeProps } from '../../utils/status';
 import { Button } from '../ui/Button';
 import { GlassCard } from '../ui/GlassCard';
@@ -147,14 +148,14 @@ export function OvertimeCreateModal({
               <View className="mb-4">
                 <Text className="font-inter-bold text-sm text-primary mb-3 ml-1">Pilih Kehadiran</Text>
                 <Pressable
-                  className={`flex-row items-center justify-between px-4 py-3 rounded-2xl border ${hasSelectedAttendance ? 'bg-primary/5 border-primary/15' : 'bg-[#f8f8f8] border-transparent'}`}
+                  className={`flex-row items-center justify-between px-4 py-3 rounded-2xl border ${hasSelectedAttendance ? 'bg-blue-50 border-primary' : 'bg-[#f8f8f8] border-transparent'}`}
                   style={{ minHeight: 72 }}
                   onPress={onOpenAttendancePicker}
                 >
                   <View className="flex-1 pr-3">
                     <Text className={`font-inter-bold text-sm ${hasSelectedAttendance ? 'text-primary' : 'text-on-surface'}`} numberOfLines={1}>
                       {hasSelectedAttendance
-                        ? selectedAttendance.attendance_date || selectedAttendance.date || 'Kehadiran dipilih'
+                        ? formatAttendanceDayDate(selectedAttendance.attendance_date || selectedAttendance.date)
                         : 'Belum ada kehadiran dipilih'}
                     </Text>
                     <Text className="font-inter-medium text-[10px] text-text-muted mt-1" numberOfLines={1}>
@@ -202,43 +203,78 @@ export function OvertimeCreateModal({
               </View>
             )}
 
-            <Text className="font-inter-bold text-sm text-primary mb-3 ml-1">Tipe Lembur</Text>
+            <View className="flex-row items-center justify-between mb-3 ml-1">
+              <Text className="font-inter-bold text-sm text-primary">Pilih Tipe Lembur</Text>
+              <View className="bg-red-100 px-2 py-0.5 rounded-md">
+                <Text className="font-inter-bold text-[10px] text-error">Wajib</Text>
+              </View>
+            </View>
             <View className="flex-row gap-2 mb-5">
-              {overtimeTypes.map((type) => (
-                <Pressable
-                  key={type}
-                  onPress={() => setForm((prev) => ({ ...prev, overtime_type: type }))}
-                  className={`flex-1 py-3 rounded-xl border items-center ${form.overtime_type === type ? 'bg-primary border-primary' : 'bg-[#f8f8f8] border-transparent'}`}
-                >
-                  <Text className={`font-inter-bold text-[10px] ${form.overtime_type === type ? 'text-white' : 'text-text-muted'}`}>
-                    {overtimeTypeLabels[type]}
-                  </Text>
-                </Pressable>
-              ))}
+              {overtimeTypes.map((type) => {
+                const isSelected = form.overtime_type === type;
+                const iconName = type === 'REGULAR' ? 'work' : type === 'SATURDAY' ? 'event' : 'event-note';
+                return (
+                  <Pressable
+                    key={type}
+                    onPress={() => setForm((prev) => ({ ...prev, overtime_type: type }))}
+                    className={`flex-1 py-3 px-2 rounded-2xl border items-center justify-center gap-1.5 ${
+                      isSelected
+                        ? 'bg-primary border-primary shadow-sm'
+                        : 'bg-white border-gray-200 shadow-sm'
+                    }`}
+                  >
+                    <View className="flex-row items-center gap-1">
+                      <MaterialIcons
+                        name={iconName as any}
+                        size={16}
+                        color={isSelected ? '#ffffff' : Tokens.colors.textMuted}
+                      />
+                      {isSelected ? (
+                        <MaterialIcons name="check-circle" size={14} color="#ffffff" />
+                      ) : null}
+                    </View>
+                    <Text
+                      className={`font-inter-bold text-[11px] text-center ${
+                        isSelected ? 'text-white' : 'text-on-surface'
+                      }`}
+                    >
+                      {overtimeTypeLabels[type]}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
 
-            <Text className="font-inter-bold text-sm text-primary mb-3 ml-1">Waktu Lembur</Text>
+            <Text className="font-inter-bold text-sm text-primary mb-3 ml-1">Waktu Lembur Utama</Text>
             <View className="flex-row gap-3 mb-5">
-              <View className="flex-1 px-4 py-3 rounded-xl bg-[#f8f8f8]">
-                <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Mulai</Text>
+              <View className="flex-1 px-4 py-3 rounded-2xl bg-white border border-gray-200 shadow-sm">
+                <View className="flex-row items-center justify-between">
+                  <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Mulai</Text>
+                  <MaterialIcons name="schedule" size={14} color={Tokens.colors.primary} />
+                </View>
                 <TextInput
                   value={form.start_time}
                   onChangeText={(text) => setForm((prev) => ({ ...prev, start_time: normalizeTimeInput(text) }))}
                   placeholder="18:00"
+                  placeholderTextColor="#94a3b8"
                   keyboardType="number-pad"
                   maxLength={5}
-                  className="font-inter-bold text-sm text-on-surface mt-1 p-0"
+                  className="font-inter-bold text-base text-on-surface mt-1 p-0"
                 />
               </View>
-              <View className="flex-1 px-4 py-3 rounded-xl bg-[#f8f8f8]">
-                <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Selesai</Text>
+              <View className="flex-1 px-4 py-3 rounded-2xl bg-white border border-gray-200 shadow-sm">
+                <View className="flex-row items-center justify-between">
+                  <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Selesai</Text>
+                  <MaterialIcons name="schedule" size={14} color={Tokens.colors.primary} />
+                </View>
                 <TextInput
                   value={form.end_time}
                   onChangeText={(text) => setForm((prev) => ({ ...prev, end_time: normalizeTimeInput(text) }))}
                   placeholder="21:00"
+                  placeholderTextColor="#94a3b8"
                   keyboardType="number-pad"
                   maxLength={5}
-                  className="font-inter-bold text-sm text-on-surface mt-1 p-0"
+                  className="font-inter-bold text-base text-on-surface mt-1 p-0"
                 />
               </View>
             </View>
@@ -257,7 +293,7 @@ export function OvertimeCreateModal({
                 </Pressable>
               </View>
               {segmentModalVisible ? (
-                <View className="mt-4 rounded-2xl bg-white p-4 border border-outline/20">
+                <View className="mt-4 rounded-2xl bg-white p-4 border border-gray-200">
                   <Text className="font-manrope-bold text-base text-on-surface mb-1">
                     {editingSegmentId ? 'Edit Segment' : 'Tambah Lembur'}
                   </Text>
@@ -266,7 +302,7 @@ export function OvertimeCreateModal({
                       ? 'Ubah jam mulai dan selesai untuk sesi lembur tambahan.'
                       : 'Isi jam mulai dan selesai untuk sesi lembur tambahan.'}
                   </Text>
-                  <View className="mb-3 px-4 py-3 rounded-xl bg-[#f8f8f8]">
+                  <View className="mb-3 px-4 py-3 rounded-2xl bg-white border border-gray-200">
                     <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">
                       Tanggal Segment
                     </Text>
@@ -274,31 +310,40 @@ export function OvertimeCreateModal({
                       value={segmentForm.segment_date}
                       onChangeText={(text) => setSegmentForm((prev) => ({ ...prev, segment_date: text }))}
                       placeholder="2026-08-04"
+                      placeholderTextColor="#94a3b8"
                       className="font-inter-bold text-sm text-on-surface mt-1 p-0"
                     />
                   </View>
                   <View className="flex-row gap-3">
-                    <View className="flex-1 px-4 py-3 rounded-xl bg-[#f8f8f8]">
-                      <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Mulai</Text>
+                    <View className="flex-1 px-4 py-3 rounded-2xl bg-white border border-gray-200">
+                      <View className="flex-row items-center justify-between">
+                        <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Mulai</Text>
+                        <MaterialIcons name="schedule" size={14} color={Tokens.colors.primary} />
+                      </View>
                       <TextInput
                         autoFocus
                         value={segmentForm.start_time}
                         onChangeText={(text) => setSegmentForm((prev) => ({ ...prev, start_time: normalizeTimeInput(text) }))}
                         placeholder="20:00"
+                        placeholderTextColor="#94a3b8"
                         keyboardType="number-pad"
                         maxLength={5}
-                        className="font-inter-bold text-sm text-on-surface mt-1 p-0"
+                        className="font-inter-bold text-base text-on-surface mt-1 p-0"
                       />
                     </View>
-                    <View className="flex-1 px-4 py-3 rounded-xl bg-[#f8f8f8]">
-                      <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Selesai</Text>
+                    <View className="flex-1 px-4 py-3 rounded-2xl bg-white border border-gray-200">
+                      <View className="flex-row items-center justify-between">
+                        <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Selesai</Text>
+                        <MaterialIcons name="schedule" size={14} color={Tokens.colors.primary} />
+                      </View>
                       <TextInput
                         value={segmentForm.end_time}
                         onChangeText={(text) => setSegmentForm((prev) => ({ ...prev, end_time: normalizeTimeInput(text) }))}
                         placeholder="22:00"
+                        placeholderTextColor="#94a3b8"
                         keyboardType="number-pad"
                         maxLength={5}
-                        className="font-inter-bold text-sm text-on-surface mt-1 p-0"
+                        className="font-inter-bold text-base text-on-surface mt-1 p-0"
                       />
                     </View>
                   </View>
@@ -308,7 +353,7 @@ export function OvertimeCreateModal({
                   <View className="flex-row gap-3 mt-4">
                     <Pressable
                       onPress={() => setSegmentModalVisible(false)}
-                      className="flex-1 h-10 rounded-xl bg-black/5 items-center justify-center"
+                      className="flex-1 h-10 rounded-xl bg-gray-100 items-center justify-center"
                       accessibilityRole="button"
                     >
                       <Text className="font-inter-bold text-[13px] text-primary">Batal</Text>
@@ -331,7 +376,7 @@ export function OvertimeCreateModal({
               {segments.length > 0 && (
                 <View className="mt-3 gap-2">
                   {segments.map((segment) => (
-                    <View key={segment.id} className="rounded-2xl bg-black/5 px-4 py-3 flex-row items-center justify-between">
+                    <View key={segment.id} className="rounded-2xl bg-gray-100 px-4 py-3 flex-row items-center justify-between">
                       <View className="flex-1">
                         <Text className="font-inter-bold text-sm text-on-surface">
                           {formatOvertimeTime(segment.start_time)} - {formatOvertimeTime(segment.end_time)}
@@ -343,7 +388,7 @@ export function OvertimeCreateModal({
                       <View className="flex-row items-center gap-1.5 ml-2">
                         <Pressable
                           onPress={() => onOpenSegmentEditor(segment)}
-                          className="w-7 h-7 rounded-full bg-black/5 items-center justify-center ml-1"
+                          className="w-7 h-7 rounded-full bg-gray-200 items-center justify-center ml-1"
                           accessibilityRole="button"
                           accessibilityLabel="Edit segment"
                         >
@@ -351,7 +396,7 @@ export function OvertimeCreateModal({
                         </Pressable>
                         <Pressable
                           onPress={() => onDeleteSegment(segment.id)}
-                          className="w-7 h-7 rounded-full bg-black/5 items-center justify-center"
+                          className="w-7 h-7 rounded-full bg-gray-200 items-center justify-center"
                           accessibilityRole="button"
                           accessibilityLabel="Hapus segment"
                         >
@@ -398,7 +443,7 @@ export function OvertimeCreateModal({
                     <Text className="font-manrope-bold text-xl text-primary">Pilih Kehadiran</Text>
                     <Text className="font-inter text-xs text-text-muted">Scroll lalu tap salah satu attendance</Text>
                   </View>
-                  <Pressable onPress={() => setAttendancePickerVisible(false)} className="w-9 h-9 rounded-full bg-black/5 items-center justify-center">
+                  <Pressable onPress={() => setAttendancePickerVisible(false)} className="w-9 h-9 rounded-full bg-gray-100 items-center justify-center">
                     <MaterialIcons name="close" size={18} color={Tokens.colors.text} />
                   </Pressable>
                 </View>
@@ -407,7 +452,7 @@ export function OvertimeCreateModal({
                   {isLoadingAttendance ? (
                     <Text className="font-inter text-sm text-text-muted py-6 text-center">Memuat attendance...</Text>
                   ) : selectableAttendanceHistory.length === 0 ? (
-                    <View className="p-4 bg-black/5 rounded-xl border border-dashed border-outline">
+                    <View className="p-4 bg-gray-50 rounded-xl border border-dashed border-gray-300">
                       <Text className="font-inter text-xs text-text-muted text-center">Tidak ada data kehadiran terbaru</Text>
                     </View>
                   ) : (
@@ -416,18 +461,18 @@ export function OvertimeCreateModal({
                       return (
                         <Pressable
                           key={att.id}
-                          className={`p-4 rounded-xl border mb-2 ${isSelected ? 'bg-primary/5 border-primary' : 'bg-[#f8f8f8] border-transparent'}`}
+                          className={`p-4 rounded-xl border mb-2 ${isSelected ? 'bg-blue-50 border-primary' : 'bg-[#f8f8f8] border-transparent'}`}
                           onPress={() => onPickAttendance(att)}
                         >
                           <View className="flex-row justify-between items-center">
                             <View className="flex-row items-center gap-3 flex-1">
-                              <View className={`w-8 h-8 rounded-full items-center justify-center ${isSelected ? 'bg-primary' : 'bg-outline/20'}`}>
+                              <View className={`w-8 h-8 rounded-full items-center justify-center ${isSelected ? 'bg-primary' : 'bg-gray-200'}`}>
                                 <MaterialIcons name="event" size={14} color={isSelected ? '#fff' : Tokens.colors.textMuted} />
                               </View>
                               <View className="flex-1">
                                 <View className="flex-row items-center gap-2">
                                   <Text className={`font-inter-bold text-sm ${isSelected ? 'text-primary' : 'text-on-surface'}`}>
-                                    {att.attendance_date || att.date}
+                                    {formatAttendanceDayDate(att.attendance_date || att.date)}
                                   </Text>
                                   {att.attendance_status ? (() => {
                                     const badgeProps = getAttendanceBadgeProps(att.attendance_status);

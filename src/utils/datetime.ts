@@ -48,3 +48,16 @@ export function formatIndonesianDateTime(value?: string | null) {
     timeZone: DEFAULT_TIME_ZONE,
   });
 }
+
+export function formatAttendanceDayDate(value?: string | null) {
+  if (!value) return '-';
+  const cleanStr = value.includes('T') ? value : `${value}T00:00:00`;
+  const date = new Date(cleanStr);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString('id-ID', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}

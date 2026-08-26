@@ -141,7 +141,7 @@ export default function OvertimeScreen() {
     overtime_date: new Date().toISOString().slice(0, 10),
     start_time: '',
     end_time: '',
-    overtime_type: 'REGULAR',
+    overtime_type: null,
     reason: '',
   });
 
@@ -331,8 +331,7 @@ export default function OvertimeScreen() {
     setModalVisible(false);
     setAttendancePickerVisible(false);
     setShowSuccessAnim(false);
-    setEditingRecordId(null);
-    setDraftSegments([]);
+    resetForm();
   };
 
   const resetSegmentModal = () => {
@@ -369,9 +368,14 @@ export default function OvertimeScreen() {
       overtime_date: new Date().toISOString().slice(0, 10),
       start_time: '',
       end_time: '',
-      overtime_type: 'REGULAR',
+      overtime_type: null,
       reason: '',
     });
+  };
+
+  const openCreateModal = () => {
+    resetForm();
+    setModalVisible(true);
   };
 
   const openEdit = () => {
@@ -466,15 +470,19 @@ export default function OvertimeScreen() {
 
   const handleCreate = () => {
     if (mode === 'attendance' && !form.attendance_id) {
-      Alert.alert('Error', 'Pilih kehadiran terlebih dahulu');
+      Alert.alert('Upss!', 'Pilih kehadiran terlebih dahulu');
       return;
     }
     if (mode === 'pre_submit' && !form.overtime_date) {
-      Alert.alert('Error', 'Pilih tanggal lembur');
+      Alert.alert('Upss!', 'Pilih tanggal lembur');
+      return;
+    }
+    if (!form.overtime_type) {
+      Alert.alert('Upss!', 'Pilih tipe lembur terlebih dahulu');
       return;
     }
     if (!form.reason || !form.reason.trim()) {
-      Alert.alert('Upss', 'Alasan lembur wajib diisi');
+      Alert.alert('Upss!', 'Alasan lembur wajib diisi');
       return;
     }
 
@@ -598,7 +606,7 @@ export default function OvertimeScreen() {
         </View>
         <Pressable
           className="w-12 h-12 rounded-2xl bg-primary items-center justify-center shadow-lg shadow-primary/30 elevation-8"
-          onPress={() => setModalVisible(true)}
+          onPress={openCreateModal}
         >
           <MaterialIcons name="add" size={24} color="#fff" />
         </Pressable>

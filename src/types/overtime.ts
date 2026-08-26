@@ -48,7 +48,7 @@ export interface CreateOvertimeRequest {
   overtime_date: string;
   start_time?: string;
   end_time?: string;
-  overtime_type: OvertimeType;
+  overtime_type: OvertimeType | null;
   notes?: string;
   reason?: string;
   segments?: OvertimeSegmentInput[];
