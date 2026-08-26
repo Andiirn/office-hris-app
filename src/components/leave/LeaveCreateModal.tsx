@@ -149,7 +149,7 @@ export function LeaveCreateModal({
             extraScrollHeight={Platform.OS === 'ios' ? 24 : 100}
             contentContainerStyle={{ flexGrow: 1, paddingHorizontal: 20, paddingBottom: 48 }}
           >
-            <GlassCard style={{ padding: 16, marginBottom: 20 }}>
+            <GlassCard style={{ padding: 16, marginBottom: 12 }}>
               <View className="mb-4">
                 <Text className="font-manrope-bold text-lg text-primary">Pilih Tipe</Text>
                 <Text className="font-inter text-sm text-text-muted mt-1">Pilih jenis cuti yang ingin diajukan.</Text>
@@ -191,7 +191,7 @@ export function LeaveCreateModal({
             </GlassCard>
 
             {isHourlyLeave ? (
-              <GlassCard style={{ padding: 14, marginBottom: 16 }}>
+              <GlassCard style={{ padding: 14, marginBottom: 12 }}>
                 <Text className="font-inter-bold text-sm text-primary mb-2">Izin per jam</Text>
                 <Text className="font-inter text-xs text-text-muted">Pilih tanggal dulu, lalu isi jam mulai dan selesai.</Text>
                 <View className="mt-4">
@@ -226,32 +226,40 @@ export function LeaveCreateModal({
                   </Text>
                 </View>
                 <View className="flex-row gap-3 mt-4">
-                  <View className="flex-1 px-4 py-3 rounded-xl bg-[#f8f8f8]">
-                    <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Mulai</Text>
+                  <View className="flex-1 px-4 py-3 rounded-2xl bg-white border border-gray-200">
+                    <View className="flex-row items-center justify-between">
+                      <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Mulai</Text>
+                      <MaterialIcons name="schedule" size={14} color={Tokens.colors.primary} />
+                    </View>
                     <TextInput
                       value={form.start_time || ''}
                       onChangeText={(text) => setForm((prev) => ({ ...prev, start_time: normalizeTimeInput(text) }))}
                       placeholder="08:00"
+                      placeholderTextColor="#94a3b8"
                       keyboardType="number-pad"
                       maxLength={5}
-                      className="font-inter-bold text-sm text-on-surface mt-1 p-0"
+                      className="font-inter-bold text-base text-on-surface mt-1 p-0"
                     />
                   </View>
-                  <View className="flex-1 px-4 py-3 rounded-xl bg-[#f8f8f8]">
-                    <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Selesai</Text>
+                  <View className="flex-1 px-4 py-3 rounded-2xl bg-white border border-gray-200">
+                    <View className="flex-row items-center justify-between">
+                      <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">Selesai</Text>
+                      <MaterialIcons name="schedule" size={14} color={Tokens.colors.primary} />
+                    </View>
                     <TextInput
                       value={form.end_time || ''}
                       onChangeText={(text) => setForm((prev) => ({ ...prev, end_time: normalizeTimeInput(text) }))}
                       placeholder="10:00"
+                      placeholderTextColor="#94a3b8"
                       keyboardType="number-pad"
                       maxLength={5}
-                      className="font-inter-bold text-sm text-on-surface mt-1 p-0"
+                      className="font-inter-bold text-base text-on-surface mt-1 p-0"
                     />
                   </View>
                 </View>
               </GlassCard>
             ) : (
-              <GlassCard style={{ padding: 10, marginBottom: 16 }}>
+              <GlassCard style={{ padding: 10, marginBottom: 12 }}>
                 <Calendar
                   current={selectedRange.start || form.start_date || today}
                   theme={{
@@ -288,7 +296,7 @@ export function LeaveCreateModal({
               </GlassCard>
             )}
 
-            <GlassCard style={{ padding: 16, marginTop: 12 }}>
+            <GlassCard style={{ padding: 16, marginBottom: 12 }}>
               <Input
                 label="Alasan (Wajib)"
                 value={form.reason}
@@ -301,7 +309,7 @@ export function LeaveCreateModal({
             </GlassCard>
 
             {canChooseReplacement ? (
-              <GlassCard style={{ padding: 14, marginTop: 12 }}>
+              <GlassCard style={{ padding: 14, marginBottom: 12 }}>
                 <Text className="font-inter-bold text-sm text-primary mb-2">Pengganti (Opsional)</Text>
                 <Text className="font-inter text-xs text-text-muted mb-3">
                   Pilih rekan 1 divisi untuk menggantikan Anda selama cuti. Jika tidak ada rekan 1 divisi, kosongkan.
@@ -321,7 +329,7 @@ export function LeaveCreateModal({
             ) : null}
 
             {shouldShowDocument ? (
-              <GlassCard style={{ padding: 14, marginTop: 12 }}>
+              <GlassCard style={{ padding: 14, marginBottom: 12 }}>
                 <Text className="font-inter-bold text-sm text-primary mb-2">
                   Dokumen Pendukung {isStrictlyRequired ? '(Wajib)' : '(Opsional)'}
                 </Text>
@@ -357,13 +365,13 @@ export function LeaveCreateModal({
             ) : null}
 
             {errorMessage ? (
-              <GlassCard style={{ padding: 12, marginTop: 12, backgroundColor: 'rgba(186, 26, 26, 0.06)' }}>
+              <GlassCard style={{ padding: 12, marginBottom: 12, backgroundColor: 'rgba(186, 26, 26, 0.06)' }}>
                 <Text className="font-manrope-bold text-sm text-error">Gagal mengajukan cuti</Text>
                 <Text className="font-inter text-xs text-text-muted mt-1">{errorMessage}</Text>
               </GlassCard>
             ) : null}
 
-            <GlassCard style={{ padding: 16, marginTop: 12 }}>
+            <GlassCard style={{ padding: 16, marginBottom: 24 }}>
               <Button
                 title="Kirim Pengajuan Cuti"
                 onPress={onSubmit}

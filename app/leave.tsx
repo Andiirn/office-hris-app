@@ -264,12 +264,7 @@ export default function LeaveScreen() {
         queryClient.refetchQueries({ queryKey: historyQueryKey, type: 'active' }),
       ]);
 
-      setModalVisible(false);
-      setSelectedRange({});
-      setSelectedHourlyDate(new Date().toISOString().slice(0, 10));
-      setDocumentFile(null);
-      setReplacementModalVisible(false);
-      setColleagueSearch('');
+      resetForm();
       setShowSuccessAnim(true);
     },
     onError: (error: any) => {
@@ -529,19 +524,11 @@ export default function LeaveScreen() {
     }
   };
 
-  const resetAndCloseCreate = () => {
-    setModalVisible(false);
-    setSelectedRange({});
-    setDocumentFile(null);
-    setColleagueSearch('');
-    setReplacementModalVisible(false);
-  };
-
   const resetForm = () => {
     setForm({
       leave_type_id: '',
       start_date: '',
-      end_date: null,
+      end_date: '',
       start_time: '',
       end_time: '',
       reason: '',
@@ -553,6 +540,15 @@ export default function LeaveScreen() {
     setColleagueSearch('');
     setReplacementModalVisible(false);
     setModalVisible(false);
+  };
+
+  const resetAndCloseCreate = () => {
+    resetForm();
+  };
+
+  const openCreateModal = () => {
+    resetForm();
+    setModalVisible(true);
   };
 
   const handleCancel = (id: string) => {
@@ -618,7 +614,7 @@ export default function LeaveScreen() {
         </View>
         <Pressable
           className="w-12 h-12 rounded-2xl bg-primary items-center justify-center shadow-lg shadow-primary/30 elevation-8"
-          onPress={() => setModalVisible(true)}
+          onPress={openCreateModal}
         >
           <MaterialIcons name="add" size={24} color="#fff" />
         </Pressable>
