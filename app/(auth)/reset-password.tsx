@@ -17,6 +17,10 @@ import * as z from 'zod';
 import { Button } from '../../src/components/ui/Button';
 import { Input } from '../../src/components/ui/Input';
 import { authService } from '../../src/services/auth.service';
+import {
+  getMissingPasswordRequirements,
+  validatePasswordRequirements,
+} from '../../src/utils/password-validator';
 
 const requestSchema = z.object({
   nik: z.string().min(1, 'NIK wajib diisi'),
@@ -26,10 +30,28 @@ const verifySchema = z.object({
   otp_code: z.string().length(6, 'OTP harus 6 digit'),
 });
 
-const resetSchema = z.object({
-  new_password: z.string().min(8, 'Minimal 8 karakter'),
-  confirm_password: z.string().min(8, 'Minimal 8 karakter'),
-});
+const resetSchema = z
+  .object({
+    new_password: z.string(),
+    confirm_password: z.string(),
+  })
+  .superRefine((data, ctx) => {
+    const missing = getMissingPasswordRequirements(data.new_password);
+    if (missing.length > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['new_password'],
+        message: `Password kurang: ${missing.join(', ')}`,
+      });
+    }
+    if (data.confirm_password !== data.new_password) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['confirm_password'],
+        message: 'Konfirmasi password tidak sama',
+      });
+    }
+  });
 
 type RequestValues = z.infer<typeof requestSchema>;
 type VerifyValues = z.infer<typeof verifySchema>;
@@ -60,6 +82,16 @@ export default function ResetPasswordScreen() {
     defaultValues: { new_password: '', confirm_password: '' },
   });
 
+  const watchNewPassword = resetForm.watch('new_password') || '';
+  const passwordReqs = validatePasswordRequirements(watchNewPassword);
+  const requirementItems = [
+    { key: 'length', label: '8-12 karakter', met: passwordReqs.hasValidLength },
+    { key: 'uppercase', label: 'Minimal 1 huruf besar (A-Z)', met: passwordReqs.hasUppercase },
+    { key: 'lowercase', label: 'Minimal 1 huruf kecil (a-z)', met: passwordReqs.hasLowercase },
+    { key: 'number', label: 'Minimal 1 angka (0-9)', met: passwordReqs.hasNumber },
+    { key: 'special', label: 'Minimal 1 karakter khusus / simbol (!@#$%^&*()_+-=...)', met: passwordReqs.hasSpecialChar },
+  ];
+
   const requestMutation = useMutation({
     mutationFn: async (values: RequestValues) => {
       const response = await authService.requestForgotPassword({
@@ -89,7 +121,7 @@ export default function ResetPasswordScreen() {
     },
     onSuccess: (data) => {
       setResetToken(data.reset_token);
-      setInfoMessage('OTP valid. Silakan buat password baru.');
+      setInfoMessage('');
       setStep('reset');
     },
     onError: (error: any) => {
@@ -130,10 +162,17 @@ export default function ResetPasswordScreen() {
 
               {infoMessage ? <Text className="font-inter-bold text-[13px] text-primary-container bg-surface-container-low border border-outline-variant rounded-2xl p-3">{infoMessage}</Text> : null}
 
-              <View className="flex-row gap-2 mt-1">
-                {(['request', 'verify', 'reset'] as Step[]).map((item) => (
-                  <View key={item} className={`w-2.5 h-2.5 rounded-full ${step === item ? 'bg-primary' : 'bg-outline-variant'}`} />
-                ))}
+              <View className="flex-row items-center gap-2 mt-1">
+                {(['request', 'verify', 'reset'] as Step[]).map((item) => {
+                  const isActive = step === item;
+                  return (
+                    <View
+                      key={item}
+                      className={`rounded-full ${isActive ? 'w-6 h-2.5 bg-black' : 'w-2.5 h-2.5 bg-gray-300'
+                        }`}
+                    />
+                  );
+                })}
               </View>
 
               {step === 'request' ? (
@@ -191,7 +230,7 @@ export default function ResetPasswordScreen() {
                     name="otp_code"
                     render={({ field: { onChange, onBlur, value } }) => (
                       <Input
-                        label="Kode OTP"
+                        label="Masukan Kode OTP"
                         placeholder="6 digit kode"
                         onBlur={onBlur}
                         onChangeText={onChange}
@@ -226,6 +265,22 @@ export default function ResetPasswordScreen() {
 
               {step === 'reset' ? (
                 <View className="gap-3 mt-1">
+                  <View className="bg-surface-container-low border border-outline-variant rounded-2xl p-3 gap-1.5">
+                    <Text className="font-inter-bold text-xs text-on-surface mb-0.5">
+                      Syarat Password Baru:
+                    </Text>
+                    {requirementItems.map((req) => (
+                      <View key={req.key} className="flex-row items-center gap-2">
+                        <Text className={`font-inter-bold text-xs ${req.met ? 'text-green-600' : 'text-text-muted'}`}>
+                          {req.met ? '✓' : '○'}
+                        </Text>
+                        <Text className={`font-inter text-xs ${req.met ? 'text-green-700 font-inter-semibold' : 'text-text-muted'}`}>
+                          {req.label}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+
                   <Controller
                     control={resetForm.control}
                     name="new_password"
