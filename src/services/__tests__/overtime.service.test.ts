@@ -140,18 +140,21 @@ describe('overtimeService', () => {
     });
 
     const result = await overtimeService.updateRecord('overtime-1', {
-      start_time: '2026-06-05T05:00:00.000Z',
-      end_time: '2026-06-05T07:00:00.000Z',
-      overtime_type: 'SATURDAY',
-      reason: 'Updated reason',
-    });
-
-    expect(api.put).toHaveBeenCalledWith('/overtime/records/overtime-1', {
+      attendance_id: 'att-1',
+      overtime_date: '2026-06-05',
       start_time: '2026-06-05T05:00:00.000Z',
       end_time: '2026-06-05T07:00:00.000Z',
       overtime_type: 'SATURDAY',
       notes: 'Updated reason',
-      reason: 'Updated reason',
+    });
+
+    expect(api.put).toHaveBeenCalledWith('/overtime/records/overtime-1', {
+      attendance_id: 'att-1',
+      overtime_date: '2026-06-05',
+      start_time: '2026-06-05T05:00:00.000Z',
+      end_time: '2026-06-05T07:00:00.000Z',
+      overtime_type: 'SATURDAY',
+      notes: 'Updated reason',
     });
     expect(result).toEqual({
       id: 'overtime-1',

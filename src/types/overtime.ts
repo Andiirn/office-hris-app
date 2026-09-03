@@ -55,11 +55,12 @@ export interface CreateOvertimeRequest {
 }
 
 export interface UpdateOvertimeRequest {
+  attendance_id?: string | null;
+  overtime_date?: string | null;
   start_time?: string | null;
   end_time?: string | null;
   overtime_type?: OvertimeType | null;
   notes?: string | null;
-  reason?: string | null;
 }
 
 export interface OvertimeSegmentInput {

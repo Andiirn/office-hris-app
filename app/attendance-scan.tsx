@@ -962,7 +962,6 @@ export default function AttendanceScanScreen() {
     status === 'granted' &&
     cameraStatus === 'granted' &&
     !isMocked &&
-    !scanned &&
     !checkinMessage &&
     !errorMessage &&
     !scanFailure;
@@ -1281,6 +1280,16 @@ export default function AttendanceScanScreen() {
                           submitAttendance(data);
                         }}
                       />
+                      {submitting && (
+                        <View className="absolute inset-0 items-center justify-center bg-black/45 z-20">
+                          <View className="items-center rounded-3xl bg-white/92 px-5 py-4 shadow-lg">
+                            <ActivityIndicator size="large" color={Tokens.colors.primary} />
+                            <Text className="font-inter-bold text-sm text-primary mt-3 text-center">
+                              Memproses QR...
+                            </Text>
+                          </View>
+                        </View>
+                      )}
                       <View className="absolute inset-0 items-center justify-center pointer-events-none">
                         <View className="w-48 h-48 border-2 border-dashed border-white/80 rounded-2xl" />
                         <View className="absolute left-1/2 top-12 w-[1px] h-40 bg-red-500 opacity-60" style={{ transform: [{ translateX: -0.5 }] }} />

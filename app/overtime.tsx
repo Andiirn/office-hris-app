@@ -55,7 +55,19 @@ function normalizeTimeInput(value: string) {
 }
 
 function toTimeValue(value: string) {
-  const [hours = '', minutes = ''] = value.split(':');
+  if (!value) return null;
+
+  const raw = value.trim();
+  if (/^\d{2}:\d{2}$/.test(raw)) return raw;
+  if (/^\d{2}:\d{2}:\d{2}$/.test(raw)) return raw.slice(0, 5);
+
+  const timeMatch = raw.match(/T(\d{2}):(\d{2})/);
+  if (timeMatch) return `${timeMatch[1]}:${timeMatch[2]}`;
+
+  const hhmmMatch = raw.match(/\b(\d{2}):(\d{2})\b/);
+  if (hhmmMatch) return `${hhmmMatch[1]}:${hhmmMatch[2]}`;
+
+  const [hours = '', minutes = ''] = raw.split(':');
   const hh = Number(hours);
   const mm = Number(minutes);
   if (!hours || !minutes || Number.isNaN(hh) || Number.isNaN(mm) || hh > 23 || mm > 59) return null;
@@ -232,12 +244,20 @@ export default function OvertimeScreen() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ recordId, payload }: { recordId: string; payload: CreateOvertimeRequest }) => overtimeService.updateRecord(recordId, {
-      start_time: payload.start_time ? toLocalDateTimeString(payload.overtime_date, toTimeValue(payload.start_time) || '00:00') : undefined,
-      end_time: payload.end_time ? toLocalDateTimeString(payload.overtime_date, toTimeValue(payload.end_time) || '00:00') : undefined,
-      overtime_type: payload.overtime_type,
-      reason: payload.reason || null,
-    }),
+    mutationFn: async ({ recordId, payload }: { recordId: string; payload: CreateOvertimeRequest }) => {
+      const requestPayload = {
+        attendance_id: payload.attendance_id,
+        overtime_date: payload.overtime_date,
+        start_time: payload.start_time ? toLocalDateTimeString(payload.overtime_date, toTimeValue(payload.start_time) || '00:00') : undefined,
+        end_time: payload.end_time ? toLocalDateTimeString(payload.overtime_date, toTimeValue(payload.end_time) || '00:00') : undefined,
+        overtime_type: payload.overtime_type,
+        notes: payload.reason || null,
+      };
+
+      const response = await overtimeService.updateRecord(recordId, requestPayload);
+
+      return response;
+    },
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['overtime-history', user?.id, selectedYear, selectedMonth] }),

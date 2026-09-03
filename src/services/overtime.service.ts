@@ -67,11 +67,8 @@ export const overtimeService = {
   },
 
   async updateRecord(recordId: string, payload: UpdateOvertimeRequest): Promise<OvertimeRecord> {
-    const reasonValue = payload.reason ?? payload.notes ?? undefined;
     const response = await api.put(`/overtime/records/${recordId}`, stripNullishFields({
       ...payload,
-      reason: reasonValue,
-      notes: reasonValue,
     }));
     return unwrapData<OvertimeRecord>(response.data);
   },
