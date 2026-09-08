@@ -190,7 +190,7 @@ export default function LeaveScreen() {
     queryFn: () => leaveService.getTypes(user?.company_id || null),
   });
   const visibleLeaveTypes = useMemo(
-    () => leaveTypes.filter((type) => !user?.company_id || !type.company_id || type.company_id === user.company_id),
+    () => leaveTypes.filter((type) => !type.company_id || type.company_id === user?.company_id),
     [leaveTypes, user?.company_id],
   );
 

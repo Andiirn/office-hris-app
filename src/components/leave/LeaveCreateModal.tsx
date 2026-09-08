@@ -105,7 +105,7 @@ export function LeaveCreateModal({
   const insets = useSafeAreaInsets();
   const headerTopPadding = Math.max(insets.top, 12);
   const visibleLeaveTypes = React.useMemo(
-    () => leaveTypes.filter((type) => !companyId || !type.company_id || type.company_id === companyId),
+    () => leaveTypes.filter((type) => !type.company_id || type.company_id === companyId),
     [leaveTypes, companyId],
   );
   const selectedLeaveType = React.useMemo(

@@ -217,11 +217,10 @@ export function OvertimeCreateModal({
                   <Pressable
                     key={type}
                     onPress={() => setForm((prev) => ({ ...prev, overtime_type: type }))}
-                    className={`flex-1 py-3 px-2 rounded-2xl border items-center justify-center gap-1.5 ${
-                      isSelected
-                        ? 'bg-primary border-primary shadow-sm'
-                        : 'bg-white border-gray-200 shadow-sm'
-                    }`}
+                    className={`flex-1 py-3 px-2 rounded-2xl border items-center justify-center gap-1.5 ${isSelected
+                      ? 'bg-primary border-primary shadow-sm'
+                      : 'bg-white border-gray-200 shadow-sm'
+                      }`}
                   >
                     <View className="flex-row items-center gap-1">
                       <MaterialIcons
@@ -234,9 +233,8 @@ export function OvertimeCreateModal({
                       ) : null}
                     </View>
                     <Text
-                      className={`font-inter-bold text-[11px] text-center ${
-                        isSelected ? 'text-white' : 'text-on-surface'
-                      }`}
+                      className={`font-inter-bold text-[11px] text-center ${isSelected ? 'text-white' : 'text-on-surface'
+                        }`}
                     >
                       {overtimeTypeLabels[type]}
                     </Text>
@@ -278,7 +276,7 @@ export function OvertimeCreateModal({
                 />
               </View>
             </View>
-            <Text className="font-inter text-[11px] text-text-muted -mt-3 mb-5 ml-1">Isi manual format `HH:MM`.</Text>
+            <Text className="font-inter text-[11px] text-text-muted -mt-3 mb-5 ml-1">Isi manual format `HH:MM: Pastikan Jam Mulai Harus Lebih Kecil dari Jam Selesai.</Text>
 
             <GlassCard style={{ padding: 14, marginBottom: 14 }}>
               <View className="flex-row items-center justify-between">
@@ -300,11 +298,11 @@ export function OvertimeCreateModal({
                   <Text className="font-inter text-xs text-text-muted mb-3">
                     {editingSegmentId
                       ? 'Ubah jam mulai dan selesai untuk sesi lembur tambahan.'
-                      : 'Isi jam mulai dan selesai untuk sesi lembur tambahan.'}
+                      : 'Jika lembur tidak melewati jam 12 malam, kamu tidak perlu fitur ini.'}
                   </Text>
                   <View className="mb-3 px-4 py-3 rounded-2xl bg-white border border-gray-200">
                     <Text className="font-inter-bold text-[10px] text-text-muted uppercase tracking-wider">
-                      Tanggal Segment
+                      Tanggal Lembur
                     </Text>
                     <TextInput
                       value={segmentForm.segment_date}
@@ -339,7 +337,7 @@ export function OvertimeCreateModal({
                       <TextInput
                         value={segmentForm.end_time}
                         onChangeText={(text) => setSegmentForm((prev) => ({ ...prev, end_time: normalizeTimeInput(text) }))}
-                        placeholder="22:00"
+                        placeholder="23:59"
                         placeholderTextColor="#94a3b8"
                         keyboardType="number-pad"
                         maxLength={5}
