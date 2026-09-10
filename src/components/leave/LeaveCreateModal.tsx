@@ -31,7 +31,6 @@ type Props = {
   companyId?: string | null;
   form: CreateLeaveRequest;
   onSelectLeaveType: (typeId: string) => void;
-  formatLeaveTypeName: (name?: string | null) => string;
   isHourlyLeave: boolean;
   selectedHourlyDate: string;
   setSelectedHourlyDate: (value: string) => void;
@@ -73,7 +72,6 @@ export function LeaveCreateModal({
   companyId,
   form,
   onSelectLeaveType,
-  formatLeaveTypeName,
   isHourlyLeave,
   selectedHourlyDate,
   setSelectedHourlyDate,
@@ -152,7 +150,7 @@ export function LeaveCreateModal({
             <GlassCard style={{ padding: 16, marginBottom: 12 }}>
               <View className="mb-4">
                 <Text className="font-manrope-bold text-lg text-primary">Pilih Tipe</Text>
-                <Text className="font-inter text-sm text-text-muted mt-1">Pilih jenis cuti yang ingin diajukan.</Text>
+                <Text className="font-inter text-sm text-text-muted mt-1">Pilih jenis cuti atau izin yang ingin kamu ajukan.</Text>
               </View>
 
               {visibleLeaveTypes.length === 0 ? (
@@ -169,7 +167,7 @@ export function LeaveCreateModal({
                           className={`px-4 py-2.5 rounded-full border ${active ? 'bg-primary border-primary' : 'bg-primary/5 border-primary/10'}`}
                         >
                           <Text className={`font-inter-bold text-[13px] ${active ? 'text-white' : 'text-primary'}`}>
-                            {formatLeaveTypeName(type.name)}
+                            {type.name}
                           </Text>
                         </Pressable>
                       );

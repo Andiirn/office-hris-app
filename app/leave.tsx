@@ -86,12 +86,6 @@ function getLeaveDayCount(startDate?: string | null, endDate?: string | null) {
   return Math.floor(diffMs / 86_400_000) + 1;
 }
 
-function formatLeaveTypeName(name?: string | null) {
-  if (!name) return '';
-  // Remove "Cuti " or "cuti " prefix, case-insensitive
-  return name.replace(/^Cuti\s+/i, '');
-}
-
 function resolveDocumentUrl(rawUrl?: string | null) {
   if (!rawUrl) return null;
   return rawUrl.startsWith('http')
@@ -673,7 +667,9 @@ export default function LeaveScreen() {
           <View className="gap-0">
             {history.map((item, index) => {
               const typeName = item.leave_type_name || leaveTypes.find(t => t.id === item.leave_type_id)?.name;
-              const displayTitle = typeName ? `Pengajuan cuti ${formatLeaveTypeName(typeName)}` : 'Pengajuan Izin/Cuti';
+              const displayTitle = typeName
+                ? (/^(cuti|izin)\b/i.test(typeName.trim()) ? `Pengajuan ${typeName}` : `Pengajuan cuti ${typeName}`)
+                : 'Pengajuan Izin/Cuti';
 
               const isSameDate = item.start_date === item.end_date || !item.end_date;
               const timeString = item.start_time && item.end_time ? ` (${formatTime(item.start_time)} - ${formatTime(item.end_time)})` : '';
@@ -728,7 +724,6 @@ export default function LeaveScreen() {
         companyId={user?.company_id}
         form={form}
         onSelectLeaveType={handleSelectLeaveType}
-        formatLeaveTypeName={formatLeaveTypeName}
         isHourlyLeave={isHourlyLeave}
         selectedHourlyDate={selectedHourlyDate}
         setSelectedHourlyDate={setSelectedHourlyDate}
