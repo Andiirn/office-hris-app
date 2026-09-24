@@ -1,6 +1,7 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import React from 'react';
 import {
+  ActivityIndicator,
   Modal,
   Platform,
   Pressable,
@@ -58,6 +59,7 @@ type Props = {
   setSegmentForm: React.Dispatch<React.SetStateAction<{ segment_date: string; start_time: string; end_time: string }>>;
   editingSegmentId: string | null;
   segmentLoading: boolean;
+  deletingSegmentId?: string | null;
 };
 
 export function OvertimeCreateModal({
@@ -94,10 +96,25 @@ export function OvertimeCreateModal({
   setSegmentForm,
   editingSegmentId,
   segmentLoading,
+  deletingSegmentId: propDeletingSegmentId,
 }: Props) {
   const hasSelectedAttendance = !!selectedAttendance;
   const insets = useSafeAreaInsets();
   const headerTopPadding = Math.max(insets.top, 12);
+  const [localDeletingId, setLocalDeletingId] = React.useState<string | null>(null);
+  const activeDeletingId = propDeletingSegmentId ?? localDeletingId;
+
+  React.useEffect(() => {
+    if (!segmentLoading) {
+      setLocalDeletingId(null);
+    }
+  }, [segmentLoading]);
+
+  React.useEffect(() => {
+    if (!visible) {
+      setLocalDeletingId(null);
+    }
+  }, [visible]);
 
   return (
     <Modal animationType="slide" visible={visible} onRequestClose={onClose}>
@@ -283,7 +300,8 @@ export function OvertimeCreateModal({
                 <Text className="font-inter-bold text-[11px] uppercase tracking-wider text-text-muted">Tambah Jam Lembur</Text>
                 <Pressable
                   onPress={onAddSegment}
-                  className="w-9 h-9 rounded-full bg-primary items-center justify-center"
+                  disabled={segmentLoading}
+                  className={`w-9 h-9 rounded-full bg-primary items-center justify-center ${segmentLoading ? 'opacity-50' : ''}`}
                   accessibilityRole="button"
                   accessibilityLabel="Tambah segment"
                 >
@@ -305,6 +323,7 @@ export function OvertimeCreateModal({
                       Tanggal Lembur
                     </Text>
                     <TextInput
+                      editable={!segmentLoading}
                       value={segmentForm.segment_date}
                       onChangeText={(text) => setSegmentForm((prev) => ({ ...prev, segment_date: text }))}
                       placeholder="2026-08-04"
@@ -320,6 +339,7 @@ export function OvertimeCreateModal({
                       </View>
                       <TextInput
                         autoFocus
+                        editable={!segmentLoading}
                         value={segmentForm.start_time}
                         onChangeText={(text) => setSegmentForm((prev) => ({ ...prev, start_time: normalizeTimeInput(text) }))}
                         placeholder="20:00"
@@ -335,6 +355,7 @@ export function OvertimeCreateModal({
                         <MaterialIcons name="schedule" size={14} color={Tokens.colors.primary} />
                       </View>
                       <TextInput
+                        editable={!segmentLoading}
                         value={segmentForm.end_time}
                         onChangeText={(text) => setSegmentForm((prev) => ({ ...prev, end_time: normalizeTimeInput(text) }))}
                         placeholder="23:59"
@@ -351,7 +372,8 @@ export function OvertimeCreateModal({
                   <View className="flex-row gap-3 mt-4">
                     <Pressable
                       onPress={() => setSegmentModalVisible(false)}
-                      className="flex-1 h-10 rounded-xl bg-gray-100 items-center justify-center"
+                      disabled={segmentLoading}
+                      className={`flex-1 h-10 rounded-xl bg-gray-100 items-center justify-center ${segmentLoading ? 'opacity-50' : ''}`}
                       accessibilityRole="button"
                     >
                       <Text className="font-inter-bold text-[13px] text-primary">Batal</Text>
@@ -359,50 +381,63 @@ export function OvertimeCreateModal({
                     <Pressable
                       onPress={onSubmitSegment}
                       disabled={segmentLoading}
-                      className={`flex-1 h-10 rounded-xl bg-primary items-center justify-center ${segmentLoading ? 'opacity-60' : ''}`}
+                      className={`flex-1 h-10 rounded-xl bg-primary flex-row items-center justify-center gap-2 ${segmentLoading ? 'opacity-60' : ''}`}
                       accessibilityRole="button"
                     >
-                      {segmentLoading ? (
-                        <Text className="font-inter-bold text-[13px] text-white">Menyimpan...</Text>
-                      ) : (
-                        <Text className="font-inter-bold text-[13px] text-white">Simpan</Text>
+                      {segmentLoading && (
+                        <ActivityIndicator size="small" color="#ffffff" />
                       )}
+                      <Text className="font-inter-bold text-[13px] text-white">
+                        {segmentLoading ? 'Menyimpan...' : 'Simpan'}
+                      </Text>
                     </Pressable>
                   </View>
                 </View>
               ) : null}
               {segments.length > 0 && (
                 <View className="mt-3 gap-2">
-                  {segments.map((segment) => (
-                    <View key={segment.id} className="rounded-2xl bg-gray-100 px-4 py-3 flex-row items-center justify-between">
-                      <View className="flex-1">
-                        <Text className="font-inter-bold text-sm text-on-surface">
-                          {formatOvertimeTime(segment.start_time)} - {formatOvertimeTime(segment.end_time)}
-                        </Text>
-                        <Text className="font-inter text-[11px] text-text-muted mt-1">
-                          {segment.overtime_hours ? `${segment.overtime_hours} jam` : `${segment.overtime_minutes} menit`}
-                        </Text>
+                  {segments.map((segment) => {
+                    const isDeleting = segmentLoading && (activeDeletingId === segment.id || (!activeDeletingId && !segmentModalVisible && segments.length === 1));
+                    return (
+                      <View key={segment.id} className="rounded-2xl bg-gray-100 px-4 py-3 flex-row items-center justify-between">
+                        <View className="flex-1">
+                          <Text className="font-inter-bold text-sm text-on-surface">
+                            {formatOvertimeTime(segment.start_time)} - {formatOvertimeTime(segment.end_time)}
+                          </Text>
+                          <Text className="font-inter text-[11px] text-text-muted mt-1">
+                            {segment.overtime_hours ? `${segment.overtime_hours} jam` : `${segment.overtime_minutes} menit`}
+                          </Text>
+                        </View>
+                        <View className="flex-row items-center gap-1.5 ml-2">
+                          <Pressable
+                            onPress={() => onOpenSegmentEditor(segment)}
+                            disabled={segmentLoading}
+                            className={`w-7 h-7 rounded-full bg-gray-200 items-center justify-center ml-1 ${segmentLoading ? 'opacity-50' : ''}`}
+                            accessibilityRole="button"
+                            accessibilityLabel="Edit segment"
+                          >
+                            <MaterialIcons name="edit" size={14} color={Tokens.colors.primary} />
+                          </Pressable>
+                          <Pressable
+                            onPress={() => {
+                              setLocalDeletingId(segment.id);
+                              onDeleteSegment(segment.id);
+                            }}
+                            disabled={segmentLoading}
+                            className={`w-7 h-7 rounded-full bg-gray-200 items-center justify-center ${segmentLoading ? 'opacity-60' : ''}`}
+                            accessibilityRole="button"
+                            accessibilityLabel="Hapus segment"
+                          >
+                            {isDeleting ? (
+                              <ActivityIndicator size="small" color={Tokens.colors.error} />
+                            ) : (
+                              <MaterialIcons name="close" size={14} color={Tokens.colors.error} />
+                            )}
+                          </Pressable>
+                        </View>
                       </View>
-                      <View className="flex-row items-center gap-1.5 ml-2">
-                        <Pressable
-                          onPress={() => onOpenSegmentEditor(segment)}
-                          className="w-7 h-7 rounded-full bg-gray-200 items-center justify-center ml-1"
-                          accessibilityRole="button"
-                          accessibilityLabel="Edit segment"
-                        >
-                          <MaterialIcons name="edit" size={14} color={Tokens.colors.primary} />
-                        </Pressable>
-                        <Pressable
-                          onPress={() => onDeleteSegment(segment.id)}
-                          className="w-7 h-7 rounded-full bg-gray-200 items-center justify-center"
-                          accessibilityRole="button"
-                          accessibilityLabel="Hapus segment"
-                        >
-                          <MaterialIcons name="close" size={14} color={Tokens.colors.error} />
-                        </Pressable>
-                      </View>
-                    </View>
-                  ))}
+                    );
+                  })}
                 </View>
               )}
             </GlassCard>

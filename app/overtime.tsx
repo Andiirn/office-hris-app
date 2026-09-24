@@ -27,7 +27,7 @@ import { attendanceService } from '../src/services/attendance.service';
 import { overtimeService } from '../src/services/overtime.service';
 import { useAuthStore } from '../src/stores/auth.store';
 import { AttendanceItem } from '../src/types/attendance';
-import { AddOvertimeSegmentRequest, CreateOvertimeRequest, OvertimeSegment, OvertimeType, UpdateOvertimeSegmentRequest } from '../src/types/overtime';
+import { AddOvertimeSegmentRequest, CreateOvertimeRequest, OvertimeRecord, OvertimeSegment, OvertimeType, UpdateOvertimeSegmentRequest } from '../src/types/overtime';
 import { goBackOrTabs } from '../src/utils/navigation';
 
 type OvertimeMode = 'attendance' | 'pre_submit';
@@ -277,10 +277,24 @@ export default function OvertimeScreen() {
     },
   });
 
+  const syncDraftSegmentsFromRecord = (record?: OvertimeRecord | null) => {
+    if (!record) return;
+    if (Array.isArray(record.segments)) {
+      setDraftSegments(
+        (record.segments as OvertimeSegment[])
+          .filter((segment) => (typeof segment.sort_order === 'number' ? segment.sort_order > 0 : true))
+          .map((segment: OvertimeSegment, index: number) => toDraftSegment(segment, index + 1))
+      );
+    }
+  };
+
   const addSegmentMutation = useMutation({
     mutationFn: ({ recordId, payload }: { recordId: string; payload: AddOvertimeSegmentRequest }) =>
       overtimeService.addSegment(recordId, payload),
-    onSuccess: async () => {
+    onSuccess: async (data) => {
+      if (data && Array.isArray(data.segments)) {
+        syncDraftSegmentsFromRecord(data);
+      }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['overtime-history', user?.id, selectedYear, selectedMonth] }),
         queryClient.invalidateQueries({ queryKey: ['overtime-summary', user?.id, selectedYear, selectedMonth] }),
@@ -298,7 +312,10 @@ export default function OvertimeScreen() {
   const editSegmentMutation = useMutation({
     mutationFn: ({ recordId, segmentId, payload }: { recordId: string; segmentId: string; payload: UpdateOvertimeSegmentRequest }) =>
       overtimeService.editSegment(recordId, segmentId, payload),
-    onSuccess: async () => {
+    onSuccess: async (data) => {
+      if (data && Array.isArray(data.segments)) {
+        syncDraftSegmentsFromRecord(data);
+      }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['overtime-history', user?.id, selectedYear, selectedMonth] }),
         queryClient.invalidateQueries({ queryKey: ['overtime-summary', user?.id, selectedYear, selectedMonth] }),
@@ -316,7 +333,11 @@ export default function OvertimeScreen() {
   const deleteSegmentMutation = useMutation({
     mutationFn: ({ recordId, segmentId }: { recordId: string; segmentId: string }) =>
       overtimeService.deleteSegment(recordId, segmentId),
-    onSuccess: async () => {
+    onSuccess: async (data, variables) => {
+      setDraftSegments((prev) => prev.filter((segment) => segment.id !== variables.segmentId));
+      if (data && Array.isArray(data.segments) && data.segments.length > 0) {
+        syncDraftSegmentsFromRecord(data);
+      }
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['overtime-history', user?.id, selectedYear, selectedMonth] }),
         queryClient.invalidateQueries({ queryKey: ['overtime-summary', user?.id, selectedYear, selectedMonth] }),
@@ -340,11 +361,20 @@ export default function OvertimeScreen() {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['overtime-record-detail', recordId] }),
       queryClient.refetchQueries({ queryKey: ['overtime-record-detail', recordId], type: 'active' }),
-      queryClient.fetchQuery({
+    ]);
+    try {
+      const freshRecord = await queryClient.fetchQuery({
         queryKey: ['overtime-record-detail', recordId],
         queryFn: () => overtimeService.getRecordDetail(recordId),
-      }),
-    ]);
+      });
+      if (freshRecord) {
+        queryClient.setQueryData(['overtime-record-detail', recordId], freshRecord);
+        syncDraftSegmentsFromRecord(freshRecord);
+      }
+      return freshRecord;
+    } catch {
+      // ignore
+    }
   };
 
   const resetAndClose = () => {
@@ -827,6 +857,7 @@ export default function OvertimeScreen() {
         setSegmentForm={setSegmentForm}
         editingSegmentId={editingSegmentId}
         segmentLoading={addSegmentMutation.isPending || editSegmentMutation.isPending || deleteSegmentMutation.isPending}
+        deletingSegmentId={deleteSegmentMutation.isPending ? (deleteSegmentMutation.variables as any)?.segmentId : null}
       />
 
       <Modal
