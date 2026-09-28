@@ -1,7 +1,7 @@
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { router, useFocusEffect } from 'expo-router';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -91,6 +91,13 @@ export default function ApprovalsScreen() {
       refetch();
     }, [refetch, user?.id])
   );
+
+  useEffect(() => {
+    if (!searchQuery.trim() || !hasNextPage || isFetchingNextPage) return;
+
+    // ponytail: client-side search scans paginated results; use server-side search when supported.
+    void fetchNextPage();
+  }, [searchQuery, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // State Modal Konfirmasi Alasan Approver
   const [actionModalVisible, setActionModalVisible] = useState(false);
@@ -626,6 +633,23 @@ export default function ApprovalsScreen() {
                 ? 'Tidak ada permintaan persetujuan pending.'
                 : 'Belum ada riwayat persetujuan.'}
             </Text>
+            {hasNextPage ? (
+              <Pressable
+                onPress={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+                className="mt-4 py-3 items-center justify-center active:opacity-60 flex-row"
+                style={{ gap: 8 }}
+              >
+                {isFetchingNextPage ? (
+                  <ActivityIndicator size="small" color={Tokens.colors.primary} />
+                ) : (
+                  <>
+                    <MaterialIcons name="expand-more" size={18} color={Tokens.colors.primary} />
+                    <Text className="font-inter-bold text-xs text-primary">Muat Lebih Banyak</Text>
+                  </>
+                )}
+              </Pressable>
+            ) : null}
           </View>
         ) : (
           <View style={{ gap: 12 }}>
@@ -731,7 +755,7 @@ export default function ApprovalsScreen() {
               );
             })}
 
-            {hasNextPage && !searchQuery.trim() && (
+            {hasNextPage && (
               <Pressable
                 onPress={() => fetchNextPage()}
                 disabled={isFetchingNextPage}
